@@ -151,7 +151,7 @@
 
 | Task ID | Task | Reviewer | Status | Notes |
 |---------|------|----------|--------|-------|
-| - | - | - | - | - |
+| DEMO-001 | Interactive flagship demo | - | Ready for review | Single-page HTML demo with full AI Data Center Moratorium debate |
 
 ---
 

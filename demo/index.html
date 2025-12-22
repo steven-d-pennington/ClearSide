@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClearSide - Structured Reasoning Demo</title>
+    <style>
+        :root {
+            --pro-color: #10b981;
+            --pro-bg: #ecfdf5;
+            --pro-border: #a7f3d0;
+            --con-color: #ef4444;
+            --con-bg: #fef2f2;
+            --con-border: #fecaca;
+            --mod-color: #6b7280;
+            --mod-bg: #f9fafb;
+            --mod-border: #e5e7eb;
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+            --bg-main: #ffffff;
+            --bg-secondary: #f3f4f6;
+            --border-color: #d1d5db;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-main);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.025em;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-style: italic;
+        }
+
+        /* Main Container */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Input Section */
+        .input-section {
+            background: var(--bg-main);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-label {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            display: block;
+            color: var(--text-primary);
+        }
+
+        .question-input {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .question-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .context-toggle {
+            margin-top: 1rem;
+        }
+
+        .context-toggle summary {
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            user-select: none;
+        }
+
+        .context-inputs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .context-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .context-field label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .context-field input {
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: inherit;
+        }
+
+        .generate-btn {
+            margin-top: 1.5rem;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .generate-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .generate-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        /* Proposition Banner */
+        .proposition-banner {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .proposition-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            opacity: 0.8;
+            margin-bottom: 0.5rem;
+        }
+
+        .proposition-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        .context-tags {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .context-tag {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.8rem;
+        }
+
+        /* Three Column Layout */
+        .debate-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .debate-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Debate Column */
+        .debate-column {
+            background: var(--bg-main);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .column-header {
+            padding: 1.25rem 1.5rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .column-header .icon {
+            font-size: 1.25rem;
+        }
+
+        .pro-column .column-header {
+            background: var(--pro-bg);
+            color: var(--pro-color);
+            border-bottom: 3px solid var(--pro-color);
+        }
+
+        .con-column .column-header {
+            background: var(--con-bg);
+            color: var(--con-color);
+            border-bottom: 3px solid var(--con-color);
+        }
+
+        .mod-column .column-header {
+            background: var(--mod-bg);
+            color: var(--mod-color);
+            border-bottom: 3px solid var(--mod-color);
+        }
+
+        .column-content {
+            padding: 1.5rem;
+        }
+
+        /* Section Styling */
+        .section {
+            margin-bottom: 1.5rem;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        .executive-summary {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .executive-summary ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .executive-summary li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: 0.95rem;
+        }
+
+        .pro-column .executive-summary li::before {
+            content: "+";
+            position: absolute;
+            left: 0;
+            color: var(--pro-color);
+            font-weight: bold;
+        }
+
+        .con-column .executive-summary li::before {
+            content: "-";
+            position: absolute;
+            left: 0;
+            color: var(--con-color);
+            font-weight: bold;
+        }
+
+        .mod-column .executive-summary li::before {
+            content: "~";
+            position: absolute;
+            left: 0;
+            color: var(--mod-color);
+            font-weight: bold;
+        }
+
+        /* Argument Cards */
+        .argument-card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: box-shadow 0.2s;
+        }
+
+        .argument-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .argument-category {
+            display: inline-block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+
+        .pro-column .argument-category {
+            background: var(--pro-bg);
+            color: var(--pro-color);
+        }
+
+        .con-column .argument-category {
+            background: var(--con-bg);
+            color: var(--con-color);
+        }
+
+        .argument-claim {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .argument-explanation {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .argument-meta {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-tag {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            color: var(--text-secondary);
+        }
+
+        /* Assumptions & Uncertainties */
+        .assumption-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .assumption-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .assumption-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 0.7rem;
+        }
+
+        .assumption-icon.assumption {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .assumption-icon.uncertainty {
+            background: #e0e7ff;
+            color: #4f46e5;
+        }
+
+        .assumption-icon.weak {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        /* Moderator Specific */
+        .disagreement-item {
+            border-left: 3px solid var(--mod-color);
+            padding: 0.75rem 1rem;
+            background: var(--bg-secondary);
+            border-radius: 0 6px 6px 0;
+            margin-bottom: 0.75rem;
+        }
+
+        .disagreement-topic {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .disagreement-cause {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .conflict-item {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0.5rem;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .conflict-pro {
+            color: var(--pro-color);
+            text-align: right;
+        }
+
+        .conflict-vs {
+            font-weight: bold;
+            color: var(--mod-color);
+        }
+
+        .conflict-con {
+            color: var(--con-color);
+        }
+
+        .hinge-item {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .hinge-item::before {
+            content: "?";
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background: #0ea5e9;
+            color: white;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        /* Challenge Panel */
+        .challenge-panel {
+            background: var(--bg-main);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .challenge-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .challenge-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .challenge-actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .challenge-btn {
+            padding: 0.75rem 1.25rem;
+            border: 2px solid var(--border-color);
+            background: var(--bg-main);
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .challenge-btn:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .challenge-btn.active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .challenge-input-area {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .challenge-input-area.visible {
+            display: block;
+        }
+
+        .challenge-input {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+
+        .challenge-submit {
+            padding: 0.75rem 1.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .challenge-submit:hover {
+            background: #2563eb;
+        }
+
+        /* Challenge Response */
+        .challenge-response {
+            margin-top: 1.5rem;
+            border: 2px solid #e0e7ff;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .challenge-response.visible {
+            display: block;
+        }
+
+        .response-header {
+            background: #e0e7ff;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #4338ca;
+        }
+
+        .response-body {
+            padding: 1rem;
+        }
+
+        .response-section {
+            margin-bottom: 1rem;
+        }
+
+        .response-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .response-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .response-content {
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .classification-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .classification-badge.uncertain {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .classification-badge.factual {
+            background: #d1fae5;
+            color: #059669;
+        }
+
+        .classification-badge.values {
+            background: #e0e7ff;
+            color: #4f46e5;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .footer a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+
+        /* Loading State */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading-overlay.visible {
+            display: flex;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border-color);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Output Hidden Initially */
+        .output-section {
+            display: none;
+        }
+
+        .output-section.visible {
+            display: block;
+        }
+
+        /* Evidence Gap List */
+        .gap-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .gap-item {
+            padding: 0.5rem;
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: 0.9rem;
+            background: #fff7ed;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .gap-item::before {
+            content: "!";
+            position: absolute;
+            left: 0.5rem;
+            color: #ea580c;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">ClearSide</div>
+            <div class="tagline">"Think both sides. Decide with clarity."</div>
+        </div>
+    </header>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Analyzing both sides...</div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <main class="main-container">
+        <!-- Input Section -->
+        <section class="input-section">
+            <label class="input-label" for="questionInput">Enter a question or claim to analyze:</label>
+            <textarea
+                class="question-input"
+                id="questionInput"
+                placeholder="e.g., Should the United States impose a temporary moratorium on new large-scale AI data centers?"
+            >Should the United States impose a temporary moratorium on new large-scale AI data center construction to allow democratic institutions to catch up?</textarea>
+
+            <details class="context-toggle" open>
+                <summary>Optional Context</summary>
+                <div class="context-inputs">
+                    <div class="context-field">
+                        <label for="geography">Geography</label>
+                        <input type="text" id="geography" value="United States" placeholder="e.g., United States">
+                    </div>
+                    <div class="context-field">
+                        <label for="timeframe">Timeframe</label>
+                        <input type="text" id="timeframe" value="2025-2030" placeholder="e.g., 2025-2030">
+                    </div>
+                    <div class="context-field">
+                        <label for="domain">Domain</label>
+                        <input type="text" id="domain" value="AI governance and public policy" placeholder="e.g., AI governance">
+                    </div>
+                </div>
+            </details>
+
+            <button class="generate-btn" id="generateBtn" onclick="generateDebate()">
+                Generate Pro & Con Debate
+            </button>
+        </section>
+
+        <!-- Output Section -->
+        <div class="output-section" id="outputSection">
+            <!-- Proposition Banner -->
+            <div class="proposition-banner">
+                <div class="proposition-label">Normalized Proposition</div>
+                <div class="proposition-text" id="propositionText">
+                    Should the United States impose a temporary moratorium on new large-scale AI data center construction?
+                </div>
+                <div class="context-tags">
+                    <span class="context-tag" id="geoTag">United States</span>
+                    <span class="context-tag" id="timeTag">2025-2030</span>
+                    <span class="context-tag" id="domainTag">AI governance and public policy</span>
+                </div>
+            </div>
+
+            <!-- Three Column Debate Grid -->
+            <div class="debate-grid">
+                <!-- Pro Column -->
+                <div class="debate-column pro-column">
+                    <div class="column-header">
+                        <span class="icon">+</span>
+                        FOR the Proposition
+                    </div>
+                    <div class="column-content">
+                        <!-- Executive Summary -->
+                        <div class="executive-summary">
+                            <div class="section-title">Executive Summary</div>
+                            <ul>
+                                <li>AI infrastructure is scaling faster than democratic governance</li>
+                                <li>Data centers lock in technological trajectories before public consent</li>
+                                <li>Temporary pauses are historically valid tools to prevent irreversible harm</li>
+                                <li>Societal costs of unchecked AI scaling may outweigh short-term economic gains</li>
+                                <li>A moratorium buys time for regulation, standards, and public understanding</li>
+                            </ul>
+                        </div>
+
+                        <!-- Arguments -->
+                        <div class="section">
+                            <div class="section-title">Core Arguments</div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Political</span>
+                                <div class="argument-claim">Democratic & Governance Concerns</div>
+                                <div class="argument-explanation">
+                                    AI capabilities advance faster than laws, courts, and regulators can adapt. Infrastructure build-out locks in technological trajectories before society consents. Decisions affecting national security, labor markets, and civil liberties are being made by private actors first.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Projection</span>
+                                    <span class="meta-tag">Confidence: Medium</span>
+                                </div>
+                            </div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Ethical</span>
+                                <div class="argument-claim">Risk of Irreversible Harm</div>
+                                <div class="argument-explanation">
+                                    Once built, data centers create sunk costs and political inertia, incentivizing continued use even if harms emerge. AI systems may cause long-term societal effects (labor displacement, surveillance normalization) that are difficult to reverse.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Projection</span>
+                                    <span class="meta-tag">Confidence: Medium</span>
+                                </div>
+                            </div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Economic</span>
+                                <div class="argument-claim">Concentration of Power</div>
+                                <div class="argument-explanation">
+                                    Large AI data centers disproportionately benefit a small number of tech firms and capital-rich regions. This risks oligopolistic control, regulatory capture, and reduced innovation diversity.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Analogy</span>
+                                    <span class="meta-tag">Confidence: Medium</span>
+                                </div>
+                            </div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Environmental</span>
+                                <div class="argument-claim">Environmental & Resource Strain</div>
+                                <div class="argument-explanation">
+                                    AI data centers demand massive electricity and water resources. Communities often lack meaningful input before construction. Environmental impacts are externalized to local populations.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Fact</span>
+                                    <span class="meta-tag">Confidence: High</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Assumptions -->
+                        <div class="section">
+                            <div class="section-title">Assumptions</div>
+                            <ul class="assumption-list">
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    Democratic legitimacy requires informed public participation
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    Infrastructure scale constrains future policy options
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    Some AI harms are non-linear and visible only after deployment
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    Precaution is justified under high uncertainty
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Uncertainties / Weak Points -->
+                        <div class="section">
+                            <div class="section-title">Known Weak Points</div>
+                            <ul class="assumption-list">
+                                <li class="assumption-item">
+                                    <span class="assumption-icon weak">!</span>
+                                    Economic opportunity costs are real
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon weak">!</span>
+                                    Other countries may not pause, creating strategic disadvantage
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon weak">!</span>
+                                    Enforcement boundaries could be difficult to define
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Con Column -->
+                <div class="debate-column con-column">
+                    <div class="column-header">
+                        <span class="icon">-</span>
+                        AGAINST the Proposition
+                    </div>
+                    <div class="column-content">
+                        <!-- Executive Summary -->
+                        <div class="executive-summary">
+                            <div class="section-title">Executive Summary</div>
+                            <ul>
+                                <li>A moratorium would slow innovation and weaken U.S. global competitiveness</li>
+                                <li>Infrastructure pauses do not stop AI development - they shift it elsewhere</li>
+                                <li>Economic, security, and scientific costs may outweigh speculative harms</li>
+                                <li>Regulation can evolve alongside deployment</li>
+                                <li>History shows pauses often entrench incumbents rather than protect the public</li>
+                            </ul>
+                        </div>
+
+                        <!-- Arguments -->
+                        <div class="section">
+                            <div class="section-title">Core Arguments</div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Political</span>
+                                <div class="argument-claim">Global Competitiveness & National Security</div>
+                                <div class="argument-explanation">
+                                    AI is a strategic technology; compute capacity correlates with geopolitical influence. Slowing domestic infrastructure benefits foreign competitors and reduces U.S. leverage in standards-setting.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Projection</span>
+                                    <span class="meta-tag">Confidence: High</span>
+                                </div>
+                            </div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Economic</span>
+                                <div class="argument-claim">Innovation & Economic Growth</div>
+                                <div class="argument-explanation">
+                                    Data centers enable startups, research institutions, and cloud access for smaller players. A moratorium may favor existing large firms with overseas capacity while reducing job creation and local tax revenue.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Fact</span>
+                                    <span class="meta-tag">Confidence: Medium</span>
+                                </div>
+                            </div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Technical</span>
+                                <div class="argument-claim">Regulatory Adaptation Is Possible Without Pausing</div>
+                                <div class="argument-explanation">
+                                    Many technologies (internet, aviation, biotech) evolved alongside regulation. Governance does not require a freeze - it requires iteration. Pauses risk becoming indefinite due to political incentives.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Analogy</span>
+                                    <span class="meta-tag">Confidence: Medium</span>
+                                </div>
+                            </div>
+
+                            <div class="argument-card">
+                                <span class="argument-category">Economic</span>
+                                <div class="argument-claim">Slippery Precedent</div>
+                                <div class="argument-explanation">
+                                    Pausing infrastructure sets a precedent for politicizing technological build-out and arbitrary freezes in other sectors. Uncertainty discourages investment beyond AI.
+                                </div>
+                                <div class="argument-meta">
+                                    <span class="meta-tag">Evidence: Projection</span>
+                                    <span class="meta-tag">Confidence: Medium</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Assumptions -->
+                        <div class="section">
+                            <div class="section-title">Assumptions</div>
+                            <ul class="assumption-list">
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    AI leadership correlates with national power
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    Other nations will not adopt similar pauses
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    Infrastructure growth broadly benefits innovation ecosystems
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon assumption">A</span>
+                                    Institutions can adapt quickly enough
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Uncertainties / Weak Points -->
+                        <div class="section">
+                            <div class="section-title">Known Weak Points</div>
+                            <ul class="assumption-list">
+                                <li class="assumption-item">
+                                    <span class="assumption-icon weak">!</span>
+                                    Optimistic assumptions about regulatory speed
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon weak">!</span>
+                                    Underestimation of cumulative environmental impact
+                                </li>
+                                <li class="assumption-item">
+                                    <span class="assumption-icon weak">!</span>
+                                    Assumes benefits distribute broadly rather than concentrating
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Moderator Column -->
+                <div class="debate-column mod-column">
+                    <div class="column-header">
+                        <span class="icon">=</span>
+                        Moderator Synthesis
+                    </div>
+                    <div class="column-content">
+                        <!-- Areas of Agreement -->
+                        <div class="executive-summary">
+                            <div class="section-title">Areas of Genuine Agreement</div>
+                            <ul>
+                                <li>AI is transformative and high-impact</li>
+                                <li>Governance currently lags technological change</li>
+                                <li>Infrastructure decisions have long-term consequences</li>
+                                <li>Environmental and resource impacts are non-trivial</li>
+                            </ul>
+                        </div>
+
+                        <!-- Core Disagreements -->
+                        <div class="section">
+                            <div class="section-title">Core Disagreements & Root Causes</div>
+
+                            <div class="disagreement-item">
+                                <div class="disagreement-topic">Pause vs. Proceed</div>
+                                <div class="disagreement-cause">Root: Risk tolerance vs. competitiveness</div>
+                            </div>
+
+                            <div class="disagreement-item">
+                                <div class="disagreement-topic">Speed of Regulation</div>
+                                <div class="disagreement-cause">Root: Confidence in institutional adaptability</div>
+                            </div>
+
+                            <div class="disagreement-item">
+                                <div class="disagreement-topic">Global Competition</div>
+                                <div class="disagreement-cause">Root: Zero-sum vs. cooperative worldview</div>
+                            </div>
+
+                            <div class="disagreement-item">
+                                <div class="disagreement-topic">Infrastructure Lock-in</div>
+                                <div class="disagreement-cause">Root: Reversibility assumptions</div>
+                            </div>
+                        </div>
+
+                        <!-- Assumption Conflicts -->
+                        <div class="section">
+                            <div class="section-title">Assumption Conflicts</div>
+
+                            <div class="conflict-item">
+                                <div class="conflict-pro">Slowing down is safer</div>
+                                <div class="conflict-vs">vs</div>
+                                <div class="conflict-con">Falling behind is riskier</div>
+                            </div>
+
+                            <div class="conflict-item">
+                                <div class="conflict-pro">Democracy needs time to catch up</div>
+                                <div class="conflict-vs">vs</div>
+                                <div class="conflict-con">Institutions can adapt in parallel</div>
+                            </div>
+
+                            <div class="conflict-item">
+                                <div class="conflict-pro">Infrastructure is hard to reverse</div>
+                                <div class="conflict-vs">vs</div>
+                                <div class="conflict-con">AI harms are reversible</div>
+                            </div>
+                        </div>
+
+                        <!-- Evidence Gaps -->
+                        <div class="section">
+                            <div class="section-title">Evidence Gaps</div>
+                            <ul class="gap-list">
+                                <li class="gap-item">Empirical data on long-term societal harm from AI at scale</li>
+                                <li class="gap-item">Comparative outcomes of historical technology moratoria</li>
+                                <li class="gap-item">Real-world measurements of AI data center environmental impact</li>
+                                <li class="gap-item">Regulatory response timelines vs. infrastructure deployment timelines</li>
+                            </ul>
+                        </div>
+
+                        <!-- Decision Hinges -->
+                        <div class="section">
+                            <div class="section-title">Decision Hinges</div>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                The debate would materially shift if we knew:
+                            </p>
+
+                            <div class="hinge-item">Can AI governance demonstrably keep pace without pauses?</div>
+                            <div class="hinge-item">Are AI-driven harms reversible after large-scale deployment?</div>
+                            <div class="hinge-item">Would allied nations coordinate on similar limits?</div>
+                            <div class="hinge-item">How quickly can energy infrastructure sustainably scale?</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Challenge Panel -->
+            <section class="challenge-panel">
+                <div class="challenge-title">Challenge the Reasoning</div>
+                <div class="challenge-subtitle">
+                    Explore deeper by questioning assumptions, requesting stronger arguments, or identifying outcome-changing evidence.
+                </div>
+
+                <div class="challenge-actions">
+                    <button class="challenge-btn" onclick="selectChallenge('assumption')">
+                        <span>?</span> Question an Assumption
+                    </button>
+                    <button class="challenge-btn" onclick="selectChallenge('counter')">
+                        <span>+</span> Ask for Stronger Counterargument
+                    </button>
+                    <button class="challenge-btn" onclick="selectChallenge('evidence')">
+                        <span>!</span> What Evidence Would Change This?
+                    </button>
+                </div>
+
+                <div class="challenge-input-area" id="challengeInputArea">
+                    <input
+                        type="text"
+                        class="challenge-input"
+                        id="challengeInput"
+                        placeholder="Specify which assumption, argument, or claim you want to examine..."
+                    >
+                    <button class="challenge-submit" onclick="submitChallenge()">Submit Challenge</button>
+                </div>
+
+                <!-- Challenge Response -->
+                <div class="challenge-response" id="challengeResponse">
+                    <div class="response-header">Challenge Response</div>
+                    <div class="response-body">
+                        <div class="response-section">
+                            <div class="response-label">Target</div>
+                            <div class="response-content" id="responseTarget">
+                                Assumption: "Other nations will not adopt similar pauses"
+                            </div>
+                        </div>
+                        <div class="response-section">
+                            <div class="response-label">Classification</div>
+                            <div class="response-content">
+                                <span class="classification-badge uncertain" id="responseBadge">Uncertain</span>
+                            </div>
+                        </div>
+                        <div class="response-section">
+                            <div class="response-label">Analysis</div>
+                            <div class="response-content" id="responseAnalysis">
+                                <p>This assumption is <strong>uncertain</strong> because:</p>
+                                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                                    <li>The EU has shown willingness to regulate AI (EU AI Act), suggesting potential openness to coordinated pauses</li>
+                                    <li>International climate agreements demonstrate precedent for coordinated technological restraint</li>
+                                    <li>However, geopolitical competition (especially US-China) creates strong incentives against coordination</li>
+                                    <li>No major economy has publicly proposed a data center moratorium</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="response-section">
+                            <div class="response-label">Historical Context</div>
+                            <div class="response-content" id="responseContext">
+                                Historical moratoria on technology (e.g., nuclear testing, genetic modification research) have had mixed international adoption. The Asilomar Conference (1975) on recombinant DNA achieved broad voluntary compliance, while nuclear non-proliferation has seen significant defection.
+                            </div>
+                        </div>
+                        <div class="response-section">
+                            <div class="response-label">Dependency Impact</div>
+                            <div class="response-content" id="responseDependency">
+                                If this assumption is wrong (i.e., allies would coordinate), it would significantly strengthen the Pro position by eliminating the competitive disadvantage argument. The "Global Competitiveness & National Security" argument depends heavily on this assumption.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>ClearSide is a thinking support system, not an opinion generator.</p>
+        <p style="margin-top: 0.5rem;">
+            <strong>North Star:</strong> Did the user understand the issue better than when they started?
+        </p>
+    </footer>
+
+    <script>
+        // Demo data - flagship debate
+        const flagshipDebate = {
+            proposition: {
+                raw_input: "Should the United States impose a temporary moratorium on new large-scale AI data center construction to allow democratic institutions to catch up?",
+                normalized_question: "Should the United States impose a temporary moratorium on new large-scale AI data center construction?",
+                context: {
+                    geography: "United States",
+                    timeframe: "2025-2030",
+                    domain: "AI governance and public policy"
+                }
+            }
+        };
+
+        // Challenge responses database
+        const challengeResponses = {
+            "assumption": {
+                "other nations": {
+                    target: 'Assumption: "Other nations will not adopt similar pauses"',
+                    classification: "uncertain",
+                    analysis: `<p>This assumption is <strong>uncertain</strong> because:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li>The EU has shown willingness to regulate AI (EU AI Act), suggesting potential openness to coordinated pauses</li>
+                            <li>International climate agreements demonstrate precedent for coordinated technological restraint</li>
+                            <li>However, geopolitical competition (especially US-China) creates strong incentives against coordination</li>
+                            <li>No major economy has publicly proposed a data center moratorium</li>
+                        </ul>`,
+                    context: "Historical moratoria on technology (e.g., nuclear testing, genetic modification research) have had mixed international adoption. The Asilomar Conference (1975) on recombinant DNA achieved broad voluntary compliance, while nuclear non-proliferation has seen significant defection.",
+                    dependency: "If this assumption is wrong (i.e., allies would coordinate), it would significantly strengthen the Pro position by eliminating the competitive disadvantage argument. The 'Global Competitiveness & National Security' argument depends heavily on this assumption."
+                },
+                "institutions": {
+                    target: 'Assumption: "Institutions can adapt quickly enough"',
+                    classification: "uncertain",
+                    analysis: `<p>This assumption is <strong>uncertain</strong> because:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li>Historical evidence is mixed - some regulations (seatbelts, environmental standards) took decades</li>
+                            <li>AI evolves faster than previous technologies, compressing adaptation timelines</li>
+                            <li>Institutional capacity varies significantly by jurisdiction</li>
+                            <li>Political polarization may slow regulatory consensus</li>
+                        </ul>`,
+                    context: "The FDA took 20+ years to establish comprehensive drug approval processes. The EPA was created in 1970, decades after industrialization began. Internet regulation remains incomplete 30+ years after commercialization.",
+                    dependency: "This assumption is foundational to the Con position. If institutions cannot adapt in parallel, the case for a moratorium strengthens significantly."
+                },
+                "democratic": {
+                    target: 'Assumption: "Democratic legitimacy requires informed public participation"',
+                    classification: "values",
+                    analysis: `<p>This assumption is <strong>values-dependent</strong> because:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li>Different democratic theories prioritize different forms of legitimacy</li>
+                            <li>Representative democracy delegates decisions to elected officials and experts</li>
+                            <li>Direct participation models require broader public engagement</li>
+                            <li>Technical complexity may limit meaningful public participation regardless</li>
+                        </ul>`,
+                    context: "Democratic theory offers multiple frameworks: deliberative democracy (Habermas), epistemic democracy (Estlund), and technocratic governance models. The appropriate level of public participation for technical policy remains contested.",
+                    dependency: "This assumption shapes whether 'governance lag' is a problem at all. Those who favor expert-driven policy may see less urgency for public deliberation before infrastructure deployment."
+                },
+                "default": {
+                    target: 'Selected assumption',
+                    classification: "uncertain",
+                    analysis: `<p>This assumption requires further examination because:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li>The underlying evidence is contested or incomplete</li>
+                            <li>Different stakeholders may interpret available data differently</li>
+                            <li>Future developments could validate or invalidate this assumption</li>
+                        </ul>`,
+                    context: "Many assumptions in complex policy debates rest on projections about future states that are inherently uncertain.",
+                    dependency: "The validity of this assumption affects the strength of arguments that depend on it."
+                }
+            },
+            "counter": {
+                "pro": {
+                    target: "Request: Stronger counterargument to Pro position",
+                    classification: "factual",
+                    analysis: `<p>A stronger counterargument against the moratorium:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li><strong>Path dependency works both ways:</strong> Delaying infrastructure also creates lock-in - to older, less efficient systems and foreign dependencies</li>
+                            <li><strong>The pause itself causes harm:</strong> Every month of delay means continued reliance on carbon-intensive legacy computing, delayed medical AI research, and competitive losses that compound</li>
+                            <li><strong>Democratic legitimacy argument backfires:</strong> Who decides what "democratic institutions catching up" means? Indefinite pauses could be anti-democratic if they prevent beneficial innovation that majorities would support</li>
+                            <li><strong>Opportunity cost is concrete, not speculative:</strong> We have data on jobs, tax revenue, and research enabled by data centers; alleged harms remain theoretical</li>
+                        </ul>`,
+                    context: "The strongest version of this counterargument emphasizes that inaction is itself a choice with consequences, and that the burden of proof should fall on those proposing restrictions.",
+                    dependency: "This strengthens the economic and practical case against moratorium while challenging the moral framing of the Pro position."
+                },
+                "con": {
+                    target: "Request: Stronger counterargument to Con position",
+                    classification: "factual",
+                    analysis: `<p>A stronger counterargument for the moratorium:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li><strong>First-mover disadvantage:</strong> Being first in potentially dangerous technology means absorbing all the risks while others learn from your mistakes</li>
+                            <li><strong>Regulatory capture is already happening:</strong> AI companies are writing their own rules through lobbying and revolving doors; speed favors incumbents, not innovation</li>
+                            <li><strong>The "competitiveness" framing is propaganda:</strong> It's used by industries resisting all regulation; we don't accept this argument for pollution or labor standards</li>
+                            <li><strong>Sunk costs amplify, not reduce, the case for pausing:</strong> Every new data center makes future course-correction harder, not easier</li>
+                        </ul>`,
+                    context: "The strongest version of this counterargument reframes the debate from 'innovation vs. caution' to 'whose interests does speed serve?' and challenges the assumption that U.S. AI dominance is inherently beneficial.",
+                    dependency: "This strengthens the political economy case for moratorium while undermining the national interest framing of the Con position."
+                },
+                "default": {
+                    target: "Request: Stronger counterargument",
+                    classification: "factual",
+                    analysis: `<p>To strengthen the opposing argument:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li>Identify the weakest assumption in the position you're challenging</li>
+                            <li>Find the strongest empirical evidence against that assumption</li>
+                            <li>Reframe the debate to highlight overlooked trade-offs</li>
+                            <li>Challenge the values implicit in the original framing</li>
+                        </ul>`,
+                    context: "Steel-man argumentation requires understanding why intelligent people hold opposing views and engaging with their strongest reasons.",
+                    dependency: "Stronger counterarguments help stress-test positions and identify which disagreements are factual vs. values-based."
+                }
+            },
+            "evidence": {
+                "default": {
+                    target: "Query: What evidence would change the outcome?",
+                    classification: "factual",
+                    analysis: `<p>Evidence that would materially shift this debate:</p>
+                        <ul style="margin: 0.5rem 0 0 1.5rem;">
+                            <li><strong>For the Pro side:</strong> Documented cases where AI deployment caused large-scale, irreversible harm that earlier intervention could have prevented</li>
+                            <li><strong>For the Con side:</strong> Evidence that regulatory agencies successfully adapted to AI in real-time without pauses, maintaining both innovation and safety</li>
+                            <li><strong>For either side:</strong> Data on whether allied nations would realistically coordinate on compute restrictions</li>
+                            <li><strong>For either side:</strong> Empirical measurements of actual vs. projected environmental impact of AI data centers</li>
+                        </ul>`,
+                    context: "This debate is heavily shaped by projections and analogies because AI at scale is a novel phenomenon. Much hinges on which historical analogies prove apt.",
+                    dependency: "The core disagreements are partly empirical (can institutions adapt?) and partly values-based (how much risk is acceptable?). New evidence could resolve the empirical questions but not the values questions."
+                }
+            }
+        };
+
+        let selectedChallengeType = null;
+
+        function generateDebate() {
+            const btn = document.getElementById('generateBtn');
+            const loading = document.getElementById('loadingOverlay');
+            const output = document.getElementById('outputSection');
+
+            // Update context tags
+            document.getElementById('geoTag').textContent = document.getElementById('geography').value || 'Not specified';
+            document.getElementById('timeTag').textContent = document.getElementById('timeframe').value || 'Not specified';
+            document.getElementById('domainTag').textContent = document.getElementById('domain').value || 'Not specified';
+
+            // Update proposition
+            document.getElementById('propositionText').textContent =
+                document.getElementById('questionInput').value || flagshipDebate.proposition.normalized_question;
+
+            // Show loading
+            btn.disabled = true;
+            loading.classList.add('visible');
+
+            // Simulate generation delay
+            setTimeout(() => {
+                loading.classList.remove('visible');
+                output.classList.add('visible');
+                btn.disabled = false;
+
+                // Smooth scroll to output
+                output.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 1500);
+        }
+
+        function selectChallenge(type) {
+            selectedChallengeType = type;
+
+            // Update button states
+            document.querySelectorAll('.challenge-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.closest('.challenge-btn').classList.add('active');
+
+            // Show input area
+            const inputArea = document.getElementById('challengeInputArea');
+            inputArea.classList.add('visible');
+
+            // Update placeholder based on type
+            const input = document.getElementById('challengeInput');
+            switch(type) {
+                case 'assumption':
+                    input.placeholder = 'Which assumption do you want to question? (e.g., "institutions can adapt" or "other nations")';
+                    break;
+                case 'counter':
+                    input.placeholder = 'Which position do you want a stronger counterargument for? (e.g., "pro" or "con")';
+                    break;
+                case 'evidence':
+                    input.placeholder = 'What specific aspect are you curious about? (or leave blank for general analysis)';
+                    break;
+            }
+
+            input.focus();
+        }
+
+        function submitChallenge() {
+            const input = document.getElementById('challengeInput').value.toLowerCase();
+            const responseDiv = document.getElementById('challengeResponse');
+
+            // Find matching response
+            let response;
+            const typeResponses = challengeResponses[selectedChallengeType];
+
+            // Search for keyword matches
+            for (const [key, value] of Object.entries(typeResponses)) {
+                if (key !== 'default' && input.includes(key)) {
+                    response = value;
+                    break;
+                }
+            }
+
+            // Fall back to default
+            if (!response) {
+                response = typeResponses['default'];
+            }
+
+            // Update response display
+            document.getElementById('responseTarget').textContent = response.target;
+            document.getElementById('responseAnalysis').innerHTML = response.analysis;
+            document.getElementById('responseContext').textContent = response.context;
+            document.getElementById('responseDependency').textContent = response.dependency;
+
+            // Update classification badge
+            const badge = document.getElementById('responseBadge');
+            badge.textContent = response.classification.charAt(0).toUpperCase() + response.classification.slice(1);
+            badge.className = 'classification-badge ' + (response.classification === 'values' ? 'values' : response.classification);
+
+            // Show response
+            responseDiv.classList.add('visible');
+            responseDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Initialize - show output section by default for demo purposes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-show the debate after a short delay for demo purposes
+            setTimeout(() => {
+                document.getElementById('outputSection').classList.add('visible');
+            }, 100);
+        });
+    </script>
+</body>
+</html>
