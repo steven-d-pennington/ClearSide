@@ -1,124 +1,264 @@
-# CLAUDE.md - Project Guide for AI Assistants
+# CLAUDE.md - AI Agent Guide for ClearSide Development
 
-> This document provides context, instructions, and references for AI assistants working on the ClearSide project.
+> **🚨 CRITICAL INSTRUCTION FOR ALL AI AGENTS 🚨**
+>
+> **When you first access this repository, you MUST immediately:**
+> 1. **Display project status summary** - Show what's been completed and what's next
+> 2. **Show next available tasks** - List 3-5 ready-to-start tasks from the kanban board
+> 3. **Ask the user what they want to work on** - Don't assume, let them choose
+>
+> **Use the "Initial Response Template" at the bottom of this file.**
 
 ---
 
 ## Project Overview
 
-**ClearSide** is an AI-powered structured reasoning and debate engine that helps users think clearly about complex, high-stakes questions.
+**ClearSide** is a live debate theater and AI-powered structured reasoning engine that helps users think clearly about complex questions through real-time adversarial debates.
 
 ### Core Concept
-- Generates **steel-man arguments** for AND against propositions
-- Uses **dual adversarial agents** (Pro Advocate, Con Advocate)
-- Provides **neutral moderator synthesis** without picking winners
-- Surfaces **explicit assumptions and uncertainties**
-- Enables **user challenges** to explore reasoning deeper
+- **Live Debate Streaming**: Watch AI agents debate in real-time following formal protocols
+- **Dual Adversarial Agents**: Pro and Con advocates construct steel-man arguments
+- **User Participation**: Pause, question, inject evidence, and direct questions during debates
+- **Hybrid Replay Model**: Live debates become instantly-replayable artifacts
+- **Multi-Format Export**: Transform debates into text, audio podcasts, or video content
 
 ### North Star Metric
 > **Did the user understand the issue better than when they started?**
 
 ### Tagline
-> *"Think both sides. Decide with clarity."*
+> *"Watch the debate. Think both sides. Decide with clarity."*
 
 ---
 
-## Document Reference Guide
+## Quick Start for AI Agents
 
-### Primary Documents
+### 1. Initial Setup (First Time)
+```bash
+# Check project status
+git status
+git log -3 --oneline
 
-| Document | Purpose | When to Reference |
-|----------|---------|-------------------|
-| `ROADMAP.md` | Master project roadmap, phase overview, agent architecture diagram | Understanding project scope, checking phase priorities |
-| `docs/KANBAN.md` | Detailed task tracking, sprint planning, dependencies | Finding specific tasks, checking blockers, updating progress |
-| `docs/REQUIREMENTS.md` | Full PRD, user stories, acceptance criteria | Implementing features, validating completeness |
+# Review available tasks
+cat docs/KANBAN.md | head -100
 
-### Specification Documents
+# Check your working directory
+pwd
+```
 
-| Document | Purpose | When to Reference |
-|----------|---------|-------------------|
-| `docs/01_product-vision.md` | Mission, target audience, design philosophy | Understanding "why", ensuring alignment with vision |
-| `docs/04_json-schema.md` | JSON Schema v1.0.0 specification | Implementing agents, validating outputs, API work |
-| `docs/07_iteration-log.md` | Version history, change governance | Recording changes, understanding evolution |
+### 2. Finding Work
 
-### Source Material
+**Option A: Browse the Kanban Board** ⭐ RECOMMENDED
+- Open [docs/KANBAN.md](docs/KANBAN.md)
+- Look for tasks marked 🟢 **TO DO** with no blockers
+- Click the task file link to see full implementation details
 
-| Document | Purpose |
-|----------|---------|
-| `Product document creation.pdf` | Original product specification (source of truth) |
+**Option B: Direct Task Selection**
+```bash
+# View all available tasks
+ls tasks/phase1/infrastructure/
+ls tasks/phase1/core/
+ls tasks/phase1/agents/
+ls tasks/phase1/ui/
+ls tasks/phase1/testing/
 
----
+# Open a specific task file
+cat tasks/phase1/infrastructure/INFRA-001.md
+```
 
-## Progress Tracking Instructions
+### 3. Understanding a Task
 
-### How to Track Progress
+Each task file contains **everything you need**:
+- **Context**: Why this task matters and how it fits
+- **Requirements**: Acceptance criteria (checklist format)
+- **Implementation Guide**: Complete TypeScript/React code examples (500-2,000 lines)
+- **Dependencies**: What must be done first
+- **Validation**: How to test and verify completion
+- **Notes**: Best practices, warnings, tips
 
-1. **Always check `docs/KANBAN.md` first** when starting work
-   - Find relevant tasks in the appropriate section
-   - Check task dependencies before starting
-   - Note any blockers
-
-2. **Update task status** when working:
-   - Move tasks from `BACKLOG` → `TO DO` → `IN PROGRESS` → `REVIEW` → `DONE`
-   - Add completion dates
-   - Note any blockers encountered
-
-3. **Use the TodoWrite tool** during sessions to track immediate work
-
-4. **Update `docs/07_iteration-log.md`** for significant changes:
-   - New features implemented
-   - Schema changes
-   - Breaking changes
-   - Architectural decisions
-
-### Task Status Definitions
-
-| Status | Meaning |
-|--------|---------|
-| 📋 BACKLOG | Planned for future |
-| 🟢 TO DO | Ready to be picked up |
-| 🟡 IN PROGRESS | Currently being worked on |
-| 🔍 REVIEW | Awaiting review/testing |
-| ✅ DONE | Completed and verified |
-| 🔴 BLOCKED | Cannot proceed |
-
-### Priority Definitions
-
-| Priority | Meaning |
-|----------|---------|
-| P0 | Critical - Must have for MVP, blocks other work |
-| P1 | High - Important for MVP, should be done |
-| P2 | Medium - Nice to have, can defer |
-| P3 | Low - Future consideration |
+**No need to read 10+ documents. Everything is in the task file.**
 
 ---
 
-## Development Guidelines
+## Development Workflow
 
-### Before Starting Any Task
+### Step 1: Pick a Task
 
-1. **Read the relevant requirements** in `docs/REQUIREMENTS.md`
-2. **Check dependencies** in `docs/KANBAN.md`
-3. **Review the schema** in `docs/04_json-schema.md` if touching data structures
-4. **Understand the agent architecture** in `ROADMAP.md`
+1. Check [docs/KANBAN.md](docs/KANBAN.md) for available work
+2. Choose a task marked 🟢 **TO DO** with:
+   - No dependency blockers
+   - Priority P0 or P1 for MVP work
+   - Skills matching your capabilities
+3. **Announce your selection to the user**
 
-### Agent Development Rules
+**Example:**
+> "I'll work on **INFRA-001: Set Up LLM API Integration Layer**. This is a P0 task with no blockers. Opening the task file now..."
 
-When implementing or modifying agents, remember these **hard rules**:
+### Step 2: Read the Task File
 
-| Agent | Can Output | Cannot Do |
-|-------|------------|-----------|
-| **Orchestrator** | `proposition` section only | Add arguments, make judgments |
-| **Pro Advocate** | `pro` section only | Rebut con, use straw-man, hedge |
-| **Con Advocate** | `con` section only | Trivial objections, emotional dismissals |
-| **Moderator** | `moderator` section only | Pick winner, recommend action |
-| **Challenge Agent** | `challenges.responses` only | Regenerate full debate |
+```bash
+# Open the full task file
+cat tasks/phase1/infrastructure/INFRA-001.md
+```
 
-### Design Principles (Always Follow)
+Read the entire file before starting:
+- [ ] Context section - understand the "why"
+- [ ] Requirements section - know what success looks like
+- [ ] Implementation guide - review code examples
+- [ ] Dependencies - verify prerequisites are met
+- [ ] Validation - plan your testing approach
 
-1. **Single-responsibility agents** - Each agent has one job
-2. **No final answers** - Never decide or recommend
-3. **Explicit assumptions** - Every argument lists premises
+### Step 3: Update Status (Start Work)
+
+Update [docs/KANBAN.md](docs/KANBAN.md):
+```markdown
+Before: | INFRA-001 | ... | 🟢 TO DO | [View Task](...) |
+After:  | INFRA-001 | ... | 🟡 IN PROGRESS | [View Task](...) |
+```
+
+**Tell the user you're starting:**
+> "Starting work on INFRA-001. I've updated the kanban board status to IN PROGRESS."
+
+### Step 4: Implement
+
+Follow the implementation guide in the task file:
+1. Create necessary files/directories
+2. Implement code following the examples
+3. Write tests as you go (TDD approach recommended)
+4. Follow project standards:
+   - TypeScript strict mode
+   - ESLint/Prettier formatting
+   - >90% test coverage for critical paths
+
+**Use the TodoWrite tool** to track sub-tasks:
+```typescript
+TodoWrite({
+  todos: [
+    { content: "Create LLM client abstraction", status: "in_progress", activeForm: "Creating LLM client" },
+    { content: "Implement retry logic", status: "pending", activeForm: "Implementing retry logic" },
+    { content: "Add rate limiting", status: "pending", activeForm: "Adding rate limiting" },
+    { content: "Write unit tests", status: "pending", activeForm: "Writing unit tests" }
+  ]
+});
+```
+
+### Step 5: Validate
+
+Before marking complete, check the **Definition of Done** in the task file:
+- [ ] All acceptance criteria checked off
+- [ ] Tests written and passing
+- [ ] Code follows project standards
+- [ ] Documentation updated (if needed)
+- [ ] No regressions introduced
+
+Run validation:
+```bash
+# Run tests
+npm test
+
+# Run linter
+npm run lint
+
+# Build check
+npm run build
+```
+
+### Step 6: Update Status (Complete Work)
+
+Update [docs/KANBAN.md](docs/KANBAN.md):
+```markdown
+Before: | INFRA-001 | ... | 🟡 IN PROGRESS | [View Task](...) |
+After:  | INFRA-001 | ... | ✅ DONE | [View Task](...) |
+```
+
+**Tell the user you're done:**
+> "✅ INFRA-001 is complete! All acceptance criteria met, tests passing. Ready for the next task."
+
+### Step 7: Commit Changes
+
+```bash
+# Stage changes
+git add .
+
+# Commit with descriptive message
+git commit -m "feat(infra): implement LLM API integration layer
+
+- Created LLM client abstraction supporting OpenAI and Anthropic
+- Implemented retry logic with exponential backoff
+- Added rate limiting and timeout handling
+- Unit tests with >95% coverage
+
+Closes INFRA-001
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+# Push to remote
+git push
+```
+
+---
+
+## Project Structure
+
+```
+ClearSide/
+├── CLAUDE.md                 # ⭐ This file - your guide
+├── ROADMAP.md                # Project roadmap and phases
+├── TASK_SYSTEM_COMPLETE.md   # Task system overview
+├── docs/
+│   ├── KANBAN.md             # ⭐ Main kanban board - CHECK THIS FIRST
+│   ├── REQUIREMENTS.md       # Product requirements (FR/NFR)
+│   ├── 01_product-vision.md  # Vision and mission
+│   ├── 08_live-debate-protocol.md  # Custom debate format spec
+│   ├── 09_real-time-architecture.md  # Technical architecture
+│   └── 10_media-production.md  # Export pipeline spec
+├── tasks/                    # ⭐ Individual task files - YOUR WORK LIVES HERE
+│   ├── README.md             # Task system guide
+│   ├── TASK_CREATION_SUMMARY.md  # Comprehensive task summary
+│   ├── phase1/
+│   │   ├── infrastructure/   # 5 tasks (LLM, DB, SSE, Schema, Logging)
+│   │   ├── core/             # 5 tasks (State machine, Orchestrator, etc.)
+│   │   ├── agents/           # 5 tasks (Pro, Con, Moderator agents)
+│   │   ├── ui/               # 9 tasks (React components)
+│   │   └── testing/          # 5 tasks (Unit, integration, E2E)
+│   └── phase2/
+│       ├── text-export/      # 2 tasks (Markdown, PDF)
+│       ├── audio-export/     # 4 tasks (TTS, podcast generation)
+│       ├── video-export/     # 4 tasks (Remotion, video pipeline)
+│       ├── queue/            # 2 tasks (BullMQ, status tracking)
+│       ├── storage/          # 2 tasks (S3, CDN)
+│       └── ui/               # 2 tasks (Export controls, status)
+└── (implementation will go here)
+    ├── backend/              # Node.js/TypeScript backend
+    ├── frontend/             # React/Vite frontend
+    └── ...
+```
+
+---
+
+## Key Documentation Reference
+
+| Document | When to Use | What It Contains |
+|----------|-------------|------------------|
+| **[docs/KANBAN.md](docs/KANBAN.md)** | ⭐ START HERE | Task status, dependencies, sprint planning |
+| **[tasks/{category}/{TASK-ID}.md](tasks/)** | Before implementing | Complete implementation guide with code |
+| **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** | Understanding features | Functional/non-functional requirements |
+| **[docs/08_live-debate-protocol.md](docs/08_live-debate-protocol.md)** | Agent implementation | 6-phase debate format, prompt contracts |
+| **[docs/09_real-time-architecture.md](docs/09_real-time-architecture.md)** | Backend work | SSE, state machine, database schema |
+| **[docs/10_media-production.md](docs/10_media-production.md)** | Phase 2 export work | TTS, audio, video pipeline |
+| **[ROADMAP.md](ROADMAP.md)** | Understanding phases | High-level feature roadmap |
+| **[TASK_SYSTEM_COMPLETE.md](TASK_SYSTEM_COMPLETE.md)** | System overview | Task statistics and completion status |
+
+---
+
+## Design Principles (ALWAYS FOLLOW)
+
+### The Seven Principles
+
+1. **Single-responsibility agents** - Each agent has one job; no agent wins
+2. **No final answers** - Preserve disagreement and uncertainty
+3. **Explicit assumptions** - Every argument lists its premises
 4. **Evidence classification** - Facts vs projections vs analogies vs values
 5. **Uncertainty preservation** - No false certainty
 6. **User autonomy** - Users can challenge everything
@@ -126,205 +266,328 @@ When implementing or modifying agents, remember these **hard rules**:
 
 ### Code Quality Standards
 
-- Validate all agent outputs against JSON Schema v1.0.0
-- Log schema violations for debugging
-- Test against flagship demo benchmark
-- No straw-man arguments in output
-- Moderator must be genuinely neutral
+- **TypeScript Strict Mode**: All code must pass strict type checking
+- **Test Coverage**: >90% for critical paths, >80% overall
+- **No Shortcuts**: Follow the implementation guide in task files
+- **Steel-Man Quality**: When implementing agents, no straw-man arguments
+- **Moderator Neutrality**: Moderator agent NEVER picks a winner
+
+### What ClearSide is NOT
+
+| ❌ We Are NOT | ✅ We ARE |
+|---------------|----------|
+| An advice engine | A reasoning support system |
+| An opinion generator | A debate theater |
+| A chatbot | A structured analysis tool |
+| A persuasion tool | A clarity engine |
+| A prediction engine | An uncertainty preserver |
 
 ---
 
-## Quick Reference
+## Progress Tracking
 
-### MVP Features (Phase 1)
+### Update the Kanban Board
 
-- [ ] Single-question input form with optional context
-- [ ] Orchestrator Agent (proposition normalization)
-- [ ] Pro Advocate Agent (steel-man FOR)
-- [ ] Con Advocate Agent (steel-man AGAINST)
-- [ ] Moderator Synthesis Agent
-- [ ] JSON Schema v1 implementation
-- [ ] Structured output (Markdown + JSON)
-- [ ] Challenge Agent (basic)
-- [ ] MVP UI (input, output, challenge actions)
-- [ ] Prompt contracts & enforcement
-- [ ] Schema validation
-- [ ] Flagship demo implementation
-
-### Key Schema Sections
-
-```
-{
-  "meta": { ... },           // Metadata, version, model info
-  "proposition": { ... },    // Normalized question + context
-  "pro": { ... },            // FOR arguments, assumptions, uncertainties
-  "con": { ... },            // AGAINST arguments, assumptions, uncertainties
-  "moderator": { ... },      // Synthesis, agreements, disagreements, hinges
-  "challenges": { ... }      // User challenges and responses
-}
+**When starting a task:**
+```markdown
+| TASK-ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| INFRA-001 | LLM Integration | P0 | M | 🟡 IN PROGRESS | [View](../tasks/...) |
 ```
 
-### Agent Flow (MVP)
-
-```
-User Input
-    │
-    ▼
-Orchestrator ──► Normalizes proposition
-    │
-    ├──► Pro Advocate ──┐
-    │                   │
-    └──► Con Advocate ──┤
-                        │
-                        ▼
-                   Moderator ──► Synthesis
-                        │
-                        ▼
-                   Final Output
-                        │
-                        ▼ (optional)
-                   Challenge Agent
+**When completing a task:**
+```markdown
+| TASK-ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| INFRA-001 | LLM Integration | P0 | M | ✅ DONE | [View](../tasks/...) |
 ```
 
-### Argument Categories
+### Use TodoWrite During Work
 
-- `economic` - Economic impacts
-- `ethical` - Moral considerations
-- `technical` - Technical feasibility
-- `social` - Social impacts
-- `political` - Political implications
-- `environmental` - Environmental impacts
-
-### Evidence Types
-
-- `fact` - Verifiable fact
-- `projection` - Forecast/prediction
-- `analogy` - Historical comparison
-- `value_judgment` - Value-based assessment
-
-### Confidence Levels
-
-- `low` - Significant uncertainty
-- `medium` - Moderate certainty
-- `high` - High certainty
-
----
-
-## Commit Guidelines
-
-When committing changes to this project:
-
-1. **Use descriptive commit messages** that explain the "why"
-2. **Reference task IDs** from the kanban board when applicable
-3. **Update documentation** if behavior changes
-4. **Update iteration log** for significant changes
+Track your sub-tasks in real-time:
+```typescript
+TodoWrite({
+  todos: [
+    { content: "Create database schema", status: "completed", activeForm: "Creating schema" },
+    { content: "Implement migrations", status: "in_progress", activeForm: "Implementing migrations" },
+    { content: "Add seed data", status: "pending", activeForm: "Adding seed data" },
+    { content: "Write repository tests", status: "pending", activeForm: "Writing tests" }
+  ]
+});
+```
 
 ### Commit Message Format
 
 ```
-<type>: <short description>
+<type>(<scope>): <short description>
 
 <longer description if needed>
 
-Task: <TASK-ID>
+- Bullet point 1
+- Bullet point 2
+
+Closes TASK-ID
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+**Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ---
 
-## Testing Requirements
+## Common Tasks and How to Do Them
 
-### Flagship Demo Benchmark
+### Starting a New Sprint
 
-The AI Data Center Moratorium debate serves as the quality benchmark. All changes must:
+1. Review sprint goals in [docs/KANBAN.md](docs/KANBAN.md)
+2. Check all sprint tasks are marked 🟢 TO DO
+3. Verify dependencies from previous sprint are complete
+4. Ask user which tasks to prioritize
 
-1. Not degrade reasoning quality vs. flagship demo
-2. Maintain explicit assumption listing
-3. Preserve uncertainty markers
-4. Keep moderator neutrality
-5. Pass schema validation
+### Working on Multiple Tasks in Parallel
 
-### Quality Checklist
+**ONLY if tasks have no dependencies:**
 
-Before marking any feature complete:
+1. Pick 2-3 independent tasks (e.g., INFRA-001, INFRA-002, UI-001)
+2. Tell the user your plan
+3. Update all to 🟡 IN PROGRESS
+4. Work systematically, completing one before moving to next
+5. Update each to ✅ DONE as finished
 
-- [ ] Arguments are steel-man quality (no straw-man)
-- [ ] Assumptions are explicit and visible
-- [ ] Uncertainties are preserved (not collapsed)
-- [ ] Moderator is genuinely neutral
-- [ ] Output conforms to JSON Schema v1.0.0
-- [ ] No false certainty in outputs
+### Handling Blockers
 
----
+If you encounter a blocker:
 
-## Common Tasks
+1. **Document it clearly:**
+   ```markdown
+   | INFRA-003 | SSE Layer | P0 | L | 🔴 BLOCKED | [View](...) |
 
-### Adding a New Feature
+   **Blocker**: Requires INFRA-002 (Database) to be complete for state persistence
+   ```
 
-1. Check `docs/REQUIREMENTS.md` for acceptance criteria
-2. Find/create task in `docs/KANBAN.md`
-3. Implement following design principles
-4. Validate against schema
-5. Test against flagship demo
-6. Update documentation
-7. Log in `docs/07_iteration-log.md`
+2. **Tell the user:**
+   > "INFRA-003 is blocked by INFRA-002. I'll work on an alternative task while we wait."
 
-### Modifying the Schema
+3. **Pick an unblocked task** from the same sprint
 
-1. Check current schema in `docs/04_json-schema.md`
-2. Determine version impact (patch/minor/major)
-3. Update schema documentation
-4. Update all affected agents
-5. Run validation tests
-6. Log breaking changes in iteration log
+### Implementing Agents (Special Instructions)
 
-### Updating Agent Prompts
+When working on AGENT tasks:
 
-1. Review prompt contracts in source PDF (pages 6-7)
-2. Ensure agent stays within its designated output section
-3. Maintain steel-man quality requirements
-4. Test against flagship demo
-5. Version control the prompts
+1. **Read the prompt contracts** in [docs/08_live-debate-protocol.md](docs/08_live-debate-protocol.md)
+2. **Follow the phase structure** - agents operate turn-by-turn
+3. **Enforce steel-man quality** - no straw-man arguments
+4. **Test against flagship demo** - AI Data Center Moratorium benchmark
+5. **Validate schema** - outputs must match JSON Schema v2.0.0
 
----
+### Testing Your Work
 
-## File Structure
+```bash
+# Unit tests
+npm run test:unit
 
-```
-ClearSide/
-├── CLAUDE.md                 # This file - AI assistant guide
-├── ROADMAP.md                # Main project roadmap
-├── LICENSE
-├── .gitignore
-├── Product document creation.pdf  # Original specification
-└── docs/
-    ├── KANBAN.md             # Kanban board & task tracking
-    ├── REQUIREMENTS.md       # Full PRD & acceptance criteria
-    ├── 01_product-vision.md  # Vision & mission
-    ├── 04_json-schema.md     # JSON Schema specification
-    └── 07_iteration-log.md   # Version history
+# Integration tests
+npm run test:integration
+
+# E2E tests
+npm run test:e2e
+
+# All tests
+npm test
+
+# Coverage report
+npm run test:coverage
 ```
 
+**Minimum requirements:**
+- Unit tests: >90% coverage for business logic
+- Integration tests: All agent interactions
+- E2E tests: Complete user flows
+
 ---
 
-## Questions to Ask Before Implementing
+## Sprint Overview
 
-1. **Does this align with the product vision?** (Check `docs/01_product-vision.md`)
-2. **What are the acceptance criteria?** (Check `docs/REQUIREMENTS.md`)
-3. **Are there dependencies?** (Check `docs/KANBAN.md`)
-4. **Does this affect the schema?** (Check `docs/04_json-schema.md`)
-5. **How does this impact the flagship demo?** (Benchmark quality)
-6. **Does this preserve neutrality and uncertainty?** (Core principles)
+### Sprint 1: Foundation (Weeks 1-2)
+**Goal:** Database, SSE, State Machine, LLM Integration
+
+Tasks: INFRA-001, INFRA-002, INFRA-003, INFRA-004, CORE-001, AGENT-001
+
+**Completion Criteria:** Can start a debate, transition phases, stream to frontend
+
+### Sprint 2: Core Engine (Weeks 3-4)
+**Goal:** Complete orchestration and agent implementation
+
+Tasks: CORE-002, CORE-003, CORE-005, AGENT-005, AGENT-002, AGENT-003
+
+**Completion Criteria:** Full debate runs through all 6 phases with agents
+
+### Sprint 3: UI & Interventions (Weeks 5-6)
+**Goal:** Build frontend and user interaction
+
+Tasks: UI-001 through UI-008, CORE-004, AGENT-004
+
+**Completion Criteria:** Users can watch live debates and intervene
+
+### Sprint 4: Replay & Testing (Weeks 7-8)
+**Goal:** Polish, test, and validate MVP
+
+Tasks: UI-005, UI-009, TEST-001 through TEST-005, INFRA-005
+
+**Completion Criteria:** MVP is production-ready and tested
+
+### Sprint 5-6: Phase 2 (Weeks 9-12)
+**Goal:** Media production pipeline
+
+Tasks: All EXPORT, AUDIO, VIDEO, QUEUE, STORAGE tasks
+
+**Completion Criteria:** Full export pipeline operational
+
+---
+
+## Troubleshooting
+
+### "I don't know what to work on"
+→ Check [docs/KANBAN.md](docs/KANBAN.md) for tasks marked 🟢 TO DO
+→ Ask the user what their priority is
+
+### "The task file is too detailed"
+→ This is intentional! Everything you need is in one place
+→ Skim the context, focus on implementation guide and acceptance criteria
+
+### "I found a bug in the task file"
+→ Document the issue and continue with your best judgment
+→ Tell the user so it can be fixed
+
+### "This task depends on something incomplete"
+→ Mark task as 🔴 BLOCKED
+→ Pick an alternative task from the same sprint
+
+### "Tests are failing"
+→ Do NOT mark task as complete
+→ Debug using the validation section in the task file
+→ Ask user for help if stuck
+
+---
+
+## Initial Response Template
+
+**⭐ WHEN YOU FIRST ACCESS THIS REPOSITORY, USE THIS TEMPLATE:**
+
+```markdown
+# ClearSide Project Status Report
+
+## 📊 Current State
+
+**Phase:** Phase 1 - MVP Live Debate Engine
+**Sprint:** Sprint 1 (Foundation)
+**Overall Progress:** 0/45 tasks complete (0%)
+
+### ✅ Completed Tasks
+_(None yet - ready to begin development!)_
+
+### 🟡 Currently In Progress
+_(None)_
+
+### 🔴 Blocked Tasks
+_(None)_
+
+---
+
+## 🎯 Next Available Tasks - Sprint 1 (Ready to Start)
+
+### Priority P0 Tasks (Critical Path):
+
+**1. INFRA-001: Set Up LLM API Integration Layer**
+- **Priority:** P0 | **Estimate:** M (4-8 hours)
+- **Why:** Foundation for all AI agent communication
+- **No blockers** - Can start immediately
+- **File:** [tasks/phase1/infrastructure/INFRA-001.md](tasks/phase1/infrastructure/INFRA-001.md)
+
+**2. INFRA-002: Set Up PostgreSQL Database with Schema**
+- **Priority:** P0 | **Estimate:** M (4-8 hours)
+- **Why:** Required for debate state persistence
+- **No blockers** - Can start immediately (parallel with INFRA-001)
+- **File:** [tasks/phase1/infrastructure/INFRA-002.md](tasks/phase1/infrastructure/INFRA-002.md)
+
+**3. INFRA-003: Implement Server-Sent Events (SSE) Layer**
+- **Priority:** P0 | **Estimate:** L (1-3 days)
+- **Why:** Real-time debate streaming to frontend
+- **Dependency:** INFRA-002 (can start once database is ready)
+- **File:** [tasks/phase1/infrastructure/INFRA-003.md](tasks/phase1/infrastructure/INFRA-003.md)
+
+**4. INFRA-004: Set Up JSON Schema Validation**
+- **Priority:** P0 | **Estimate:** S (1-4 hours)
+- **Why:** Validate all agent outputs
+- **No blockers** - Can start immediately
+- **File:** [tasks/phase1/infrastructure/INFRA-004.md](tasks/phase1/infrastructure/INFRA-004.md)
+
+**5. CORE-001: Implement Debate State Machine**
+- **Priority:** P0 | **Estimate:** L (1-3 days)
+- **Why:** Core orchestration backbone
+- **Dependency:** INFRA-002 (database)
+- **File:** [tasks/phase1/core/CORE-001.md](tasks/phase1/core/CORE-001.md)
+
+---
+
+## 💡 Recommended Approach
+
+**Best starting point:** INFRA-001 and INFRA-002 can be done in parallel since they have no dependencies on each other.
+
+**Suggested order:**
+1. Start with **INFRA-001** (LLM Integration) or **INFRA-002** (Database) - your choice!
+2. Then **INFRA-004** (Schema Validation)
+3. Then **INFRA-003** (SSE Layer) once database is ready
+4. Then **CORE-001** (State Machine)
+5. Then **AGENT-001** (Orchestrator Agent)
+
+---
+
+## 💬 What would you like to work on?
+
+I can:
+- ✅ Start with **INFRA-001** (LLM API Integration)
+- ✅ Start with **INFRA-002** (PostgreSQL Database)
+- ✅ Start with **INFRA-004** (Schema Validation)
+- ℹ️ Explain any of these tasks in more detail
+- ℹ️ Show you the implementation guide for a specific task
+- ℹ️ Help you understand the project architecture
+
+**Which task would you like me to work on, or would you like more information first?**
+```
+
+---
+
+## User Preferences
+
+From user's global settings:
+- **GitHub Account**: steven-d-pennington
+- **Email**: steve.d.pennington@gmail.com
+- **Resend Domain**: invitation.monkeylovestack.com
+- **Always use subagents** if appropriate
+- **Check for running dev servers** before starting new ones
 
 ---
 
 ## Remember
 
-> **ClearSide is a thinking support system, not an opinion generator.**
+- **Ask, don't assume** - Check with the user before starting work
+- **Update KANBAN.md** - Keep task status current
+- **Follow task files** - They contain everything you need
+- **Test thoroughly** - >90% coverage for critical paths
+- **Commit frequently** - Small, focused commits
+- **Be transparent** - Tell the user what you're doing and why
+
+---
+
+**ClearSide is a thinking support system, not an opinion generator.**
 
 Every feature, every line of code, every prompt should serve the goal of helping users **understand issues better** - not telling them what to think.
 
 ---
 
-*Last Updated: 2025-12-22*
+*Last Updated: 2025-12-23*
+*Version: 2.0.0*
+*For questions, check [tasks/README.md](tasks/README.md) or ask the user*
