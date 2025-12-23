@@ -1,14 +1,15 @@
 # ClearSide Product Vision
 
-> Version: 1.0.0
+> Version: 2.0.0
+> Last Updated: 2025-12-23
 
 ---
 
 ## Mission Statement
 
-**ClearSide is a thinking support system, not an opinion generator.**
+**ClearSide is a live debate theater and thinking support system, not an opinion generator.**
 
-ClearSide exists to help users think clearly about complex, high-stakes questions by orchestrating adversarial reasoning and making internal logic transparent.
+ClearSide exists to help users think clearly about complex, high-stakes questions by orchestrating real-time adversarial debates they can watch, participate in, and export as shareable media.
 
 ---
 
@@ -36,15 +37,18 @@ Modern decision-making is overwhelmed by opinions but underserved in structured 
 
 ## Our Solution
 
-### Adversarial Reasoning Engine
+### Live Debate Theater
 
 ClearSide closes this gap by:
 
-1. **Dual Adversarial Agents**: Separate AI agents create the strongest possible arguments for AND against every proposition
-2. **Steel-man Enforcement**: Agents must assume competent critics; no straw-man arguments allowed
-3. **Moderator Synthesis**: A neutral moderator identifies agreement, disagreement, and decision hinges without choosing a winner
-4. **Transparent Assumptions**: Every argument lists its premises explicitly
-5. **User Challenge Loop**: Users can challenge any assumption and explore deeper reasoning
+1. **Real-Time Debate Streaming**: Watch AI agents debate following formal protocols with visible turn-taking
+2. **Dual Adversarial Agents**: Pro and Con advocates construct the strongest possible arguments through live dialogue
+3. **Steel-man Enforcement**: Agents must assume competent critics; no straw-man arguments allowed
+4. **User Participation**: Pause debates, ask questions, inject evidence, request clarifications at any time
+5. **Moderator Synthesis**: A neutral moderator synthesizes the debate without choosing a winner
+6. **Transparent Assumptions**: Every argument lists its premises explicitly
+7. **Hybrid Replay Model**: Live debates become instantly-replayable artifacts with timeline navigation
+8. **Multi-Format Export**: Transform debates into text transcripts, audio podcasts, or video content
 
 ---
 
@@ -105,12 +109,15 @@ ClearSide measures success by **clarity and understanding**, not clicks or final
 
 | Feature | Generic AI | ClearSide |
 |---------|------------|-----------|
-| Arguments | Single answer | Pro AND Con |
-| Assumptions | Hidden | Explicit |
-| Certainty | Overstated | Preserved |
+| Format | Static response | Live debate streaming |
+| Arguments | Single answer | Pro AND Con in real-time |
+| Assumptions | Hidden | Explicit and challengeable |
+| Certainty | Overstated | Preserved with uncertainties |
+| User Role | Passive recipient | Active participant |
 | Bias | One-sided risk | Adversarial balance |
 | Decision | Made for you | Made BY you |
-| Tone | Persuasive | Neutral |
+| Tone | Persuasive | Neutral, steel-man quality |
+| Reusability | One-time answer | Replayable artifact + media export |
 
 ### The ClearSide Promise
 
@@ -156,10 +163,13 @@ ClearSide measures success by **clarity and understanding**, not clicks or final
 ```
 NOW                    NEAR-TERM                MID-TERM                LONG-TERM
 ────────────────────────────────────────────────────────────────────────────────────
-MVP                    Enhanced                 Collaborative            Platform
-Single debates         Citations & weights      Saved & shared debates   API & Enterprise
-Core agents            Persona debates          Team workspaces          Integrations
-Basic challenges       Export formats           User accounts            Analytics
+Phase 1 (MVP)          Phase 2                  Phase 3                 Phase 4
+Live Debate Engine     Media Production         Collaboration           Scale & Growth
+Real-time streaming    Text transcripts         Saved debates           API access
+User interventions     Audio podcasts           Shareable links         Multi-agent (3v3)
+Timeline replay        Video generation         Embed codes             Custom formats
+Custom protocol        TTS voices               Collections             Analytics
+Hybrid model           Export queue             Annotations             Enterprise
 ```
 
 ---
@@ -170,25 +180,40 @@ Basic challenges       Export formats           User accounts            Analyti
 
 | Solution Type | Weakness |
 |---------------|----------|
-| Generic AI Chatbots | Collapse complexity, hide assumptions |
-| Pros/Cons Generators | Shallow, no adversarial rigor |
-| Decision Tools | Focus on process, not reasoning |
-| Debate Platforms | Human-driven, not AI-structured |
+| Generic AI Chatbots | Collapse complexity, hide assumptions, static responses |
+| Pros/Cons Generators | Shallow, no adversarial rigor, no live dialogue |
+| Decision Tools | Focus on process, not reasoning, no interactivity |
+| Debate Platforms | Human-driven, not AI-structured, slow |
+| Video Explainers | Pre-scripted, no user input, non-interactive |
 
 ### ClearSide's Position
 
-We occupy a unique position: **AI-powered structured adversarial reasoning** that:
-- Is more rigorous than pros/cons lists
-- More neutral than chatbots
-- More scalable than human debate
-- More transparent than prediction tools
+We occupy a unique position: **Live AI debate theater** that:
+- Is more rigorous than pros/cons lists (steel-man quality)
+- More neutral than chatbots (adversarial balance)
+- More scalable than human debate (instant 24/7)
+- More transparent than prediction tools (visible reasoning)
+- More interactive than video content (user participation)
+- More reusable than one-time answers (replay + export)
 
 ---
 
 ## The Tagline
 
-> **"Think both sides. Decide with clarity."**
+> **"Watch the debate. Think both sides. Decide with clarity."**
 
 ---
 
-*ClearSide: Where AI slows down to help humans think.*
+## Core Innovation
+
+**Hybrid Live-Replay Model**: Every debate is generated live with full user participation, then becomes an instantly-replayable artifact that can be exported to text, audio, or video formats.
+
+This unique approach combines:
+- **Live engagement** of watching a real debate unfold
+- **Interactivity** of pausing and participating
+- **Reusability** of replay and sharing
+- **Portability** of multi-format export
+
+---
+
+*ClearSide: Where AI debates live, so you can think clearly.*

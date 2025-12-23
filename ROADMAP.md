@@ -7,10 +7,13 @@
 
 ## Product Vision
 
-ClearSide is a thinking support system that helps users examine complex, high-stakes questions through structured adversarial reasoning. It generates steel-man arguments for and against propositions, moderates disagreements, and surfaces the assumptions and uncertainties that drive debate.
+ClearSide is a **live debate theater** and thinking support system that helps users examine complex, high-stakes questions through real-time structured adversarial reasoning. Users watch AI agents debate in real-time following formal protocols, participate actively through questions and interventions, and export debates as transcripts, podcasts, or videos.
 
 ### North Star Metric
 **Did the user understand the issue better than when they started?**
+
+### Core Innovation
+**Hybrid Live-Replay Model**: Every debate is generated live with full user participation, then becomes an instantly-replayable artifact that can be exported to multiple media formats.
 
 ---
 
@@ -29,97 +32,126 @@ ClearSide is a thinking support system that helps users examine complex, high-st
 ```
 Phase 1 (MVP)          Phase 2              Phase 3              Phase 4
 ─────────────────────────────────────────────────────────────────────────────
-Core Debate Engine     Enhanced Features    Collaboration        Scale & Growth
+Live Debate Engine     Media Production     Collaboration        Scale & Growth
 │                      │                    │                    │
-├─ Topic Intake        ├─ Citations Toggle  ├─ Saved Debates     ├─ API Access
-├─ Pro Advocate        ├─ Value Weightings  ├─ Shareable Links   ├─ Enterprise
-├─ Con Advocate        ├─ Persona Debates   ├─ User Accounts     ├─ Integrations
-├─ Moderator           ├─ Export Options    ├─ Team Workspaces   ├─ Analytics
-├─ Challenge Agent     └─ Debate History    └─ Comments          └─ Custom Domains
-├─ JSON Schema
-├─ MVP UI
-└─ Output Formats
+├─ Custom Protocol     ├─ Text Transcripts  ├─ Saved Debates     ├─ API Access
+├─ Real-Time Stream    ├─ TTS Integration   ├─ Shareable Links   ├─ Enterprise
+├─ State Machine       ├─ Audio Podcasts    ├─ User Accounts     ├─ Integrations
+├─ User Interventions  ├─ Video Generation  ├─ Embed Codes       ├─ Analytics
+├─ Live UI             ├─ Export Queue      ├─ Collections       ├─ Custom Formats
+├─ Transcript Schema   └─ Visual Templates  └─ Annotations       └─ Multi-Agent
+├─ Timeline Scrubber
+└─ Hybrid Replay Mode
 ```
 
 ---
 
-## Phase 1: MVP (Minimum Viable Product)
+## Phase 1: MVP (Live Debate Engine)
 
 ### Objective
-Deliver a functional single-page application where users can input questions, receive structured pro/con debates, and challenge assumptions.
+Deliver a live debate theater where users watch AI agents debate in real-time, intervene with questions and evidence, and receive structured transcripts with full replay capability.
+
+### Key Innovations
+- **Real-time streaming**: Debate unfolds live via Server-Sent Events (SSE)
+- **Full user participation**: Pause, question, clarify, inject evidence, direct questions
+- **Hybrid replay**: Completed debates load instantly with timeline scrubber
+- **Custom protocol**: Optimized for AI agents and digital consumption (25-30 min runtime)
 
 ### MVP Feature Breakdown
 
 | ID | Feature | Priority | Status | Dependencies |
 |----|---------|----------|--------|--------------|
 | MVP-001 | Single-question input form with optional context | P0 | Backlog | None |
-| MVP-002 | Orchestrator Agent (proposition normalization) | P0 | Backlog | MVP-001 |
-| MVP-003 | Pro Advocate Agent | P0 | Backlog | MVP-002 |
-| MVP-004 | Con Advocate Agent | P0 | Backlog | MVP-002 |
-| MVP-005 | Moderator Synthesis Agent | P0 | Backlog | MVP-003, MVP-004 |
-| MVP-006 | JSON Schema v1 implementation | P0 | Backlog | None |
-| MVP-007 | Structured output (Markdown) | P0 | Backlog | MVP-006 |
-| MVP-008 | Structured output (JSON) | P0 | Backlog | MVP-006 |
-| MVP-009 | Challenge Agent (basic) | P1 | Backlog | MVP-005 |
-| MVP-010 | MVP UI - Input Section | P0 | Backlog | None |
-| MVP-011 | MVP UI - Output Display | P0 | Backlog | MVP-006 |
-| MVP-012 | MVP UI - Challenge Actions | P1 | Backlog | MVP-009 |
-| MVP-013 | Prompt contracts & enforcement | P0 | Backlog | MVP-002 |
-| MVP-014 | Schema validation | P0 | Backlog | MVP-006 |
-| MVP-015 | Flagship demo implementation | P1 | Backlog | All above |
+| MVP-002 | Custom ClearSide debate protocol (6 phases) | P0 | Backlog | None |
+| MVP-003 | Debate Orchestrator (state machine + turn management) | P0 | Backlog | MVP-002 |
+| MVP-004 | Real-time streaming layer (Server-Sent Events) | P0 | Backlog | MVP-003 |
+| MVP-005 | Pro Advocate Agent (adapted for turn-based dialogue) | P0 | Backlog | MVP-003 |
+| MVP-006 | Con Advocate Agent (adapted for turn-based dialogue) | P0 | Backlog | MVP-003 |
+| MVP-007 | Moderator Agent (final synthesis phase) | P0 | Backlog | MVP-005, MVP-006 |
+| MVP-008 | User intervention system (pause, question, clarify, inject, direct) | P0 | Backlog | MVP-003 |
+| MVP-009 | Transcript Recorder with timestamps | P0 | Backlog | MVP-003 |
+| MVP-010 | JSON Schema v2.0.0 (transcript format) | P0 | Backlog | MVP-009 |
+| MVP-011 | Live Debate UI - Input Section | P0 | Backlog | None |
+| MVP-012 | Live Debate UI - Streaming Debate View | P0 | Backlog | MVP-004 |
+| MVP-013 | Live Debate UI - Intervention Panel | P0 | Backlog | MVP-008 |
+| MVP-014 | Live Debate UI - Timeline Scrubber | P0 | Backlog | MVP-009 |
+| MVP-015 | Hybrid replay mode (instant load of completed debates) | P0 | Backlog | MVP-009 |
+| MVP-016 | Database schema (debates, utterances, interventions) | P0 | Backlog | MVP-009 |
+| MVP-017 | Phase transition system | P0 | Backlog | MVP-003 |
+| MVP-018 | Prompt contracts for turn-based dialogue | P0 | Backlog | MVP-003 |
+| MVP-019 | Flagship demo implementation (live format) | P1 | Backlog | All above |
 
 ---
 
-## Phase 2: Enhanced Features
+## Phase 2: Media Production Pipeline
 
 ### Objective
-Add depth and customization to debates while maintaining neutrality and structured reasoning.
+Transform live debate transcripts into shareable media: text, audio, and video formats for consumption and distribution.
+
+### Key Features
+- **Text exports**: Markdown and PDF transcripts with timestamps
+- **Audio podcasts**: MP3 with distinct TTS voices, chapter markers
+- **Video debates**: MP4 with visual stage, subtitles, evidence overlays
+- **Background processing**: Async export queue for long-running tasks
 
 | ID | Feature | Priority | Status | Dependencies |
 |----|---------|----------|--------|--------------|
-| P2-001 | Citations toggle with source labeling | P1 | Backlog | MVP Complete |
-| P2-002 | Value-weighting sliders (economic, ethical, social, technical) | P2 | Backlog | MVP Complete |
-| P2-003 | Persona debates (economist vs ethicist vs environmentalist) | P2 | Backlog | MVP Complete |
-| P2-004 | Quick View output format | P1 | Backlog | MVP Complete |
-| P2-005 | Structured Report output format | P1 | Backlog | MVP Complete |
-| P2-006 | Debate Script output format | P2 | Backlog | MVP Complete |
-| P2-007 | Cross-examiner agent | P2 | Backlog | P2-003 |
-| P2-008 | Debate history (session-based) | P2 | Backlog | MVP Complete |
+| P2-001 | Text transcript export (Markdown format) | P0 | Backlog | MVP Complete |
+| P2-002 | Text transcript export (PDF format) | P1 | Backlog | P2-001 |
+| P2-003 | TTS voice integration (ElevenLabs/PlayHT API) | P0 | Backlog | MVP Complete |
+| P2-004 | Voice profile mapping (distinct voices per agent) | P0 | Backlog | P2-003 |
+| P2-005 | Audio podcast generator (MP3 with chapter markers) | P0 | Backlog | P2-003, P2-004 |
+| P2-006 | Video generation pipeline (Remotion + FFmpeg) | P1 | Backlog | P2-003 |
+| P2-007 | Visual debate stage templates | P1 | Backlog | P2-006 |
+| P2-008 | Subtitle/caption generation | P1 | Backlog | P2-006 |
+| P2-009 | Evidence visualization overlays | P2 | Backlog | P2-006 |
+| P2-010 | Export queue system (background job processing) | P1 | Backlog | P2-001 |
+| P2-011 | Export status tracking UI | P1 | Backlog | P2-010 |
+| P2-012 | Storage integration (S3/blob storage for media files) | P1 | Backlog | P2-005, P2-006 |
+| P2-013 | Download/share UI for exported media | P0 | Backlog | P2-010 |
 
 ---
 
-## Phase 3: Collaboration & Persistence
+## Phase 3: Collaboration & Sharing
 
 ### Objective
-Enable saving, sharing, and collaborative exploration of debates.
+Enable saving, sharing, and collaborative exploration of debates across teams and communities.
 
 | ID | Feature | Priority | Status | Dependencies |
 |----|---------|----------|--------|--------------|
 | P3-001 | User account system | P1 | Backlog | Phase 2 Complete |
-| P3-002 | Saved debates | P1 | Backlog | P3-001 |
-| P3-003 | Shareable debate links | P1 | Backlog | P3-002 |
-| P3-004 | Database persistence layer | P0 | Backlog | P3-001 |
-| P3-005 | Team workspaces | P2 | Backlog | P3-001 |
-| P3-006 | Comments and annotations | P2 | Backlog | P3-002 |
+| P3-002 | Debate library (save/organize completed debates) | P1 | Backlog | P3-001 |
+| P3-003 | Shareable debate links (public/private) | P0 | Backlog | P3-002 |
+| P3-004 | Embed codes for blogs/websites | P1 | Backlog | P3-003 |
+| P3-005 | Collections and tagging system | P2 | Backlog | P3-002 |
+| P3-006 | Comments and annotations on saved debates | P2 | Backlog | P3-002 |
+| P3-007 | Team workspaces | P2 | Backlog | P3-001 |
+| P3-008 | Collaborative viewing (watch debates together) | P2 | Backlog | P3-007 |
+| P3-009 | Debate forking (start from existing debate, modify) | P2 | Backlog | P3-002 |
 
 ---
 
-## Phase 4: Scale & Enterprise
+## Phase 4: Scale & Advanced Features
 
 ### Objective
-Expand ClearSide for enterprise use cases and third-party integrations.
+Expand ClearSide for enterprise use cases, advanced debate formats, and third-party integrations.
 
 | ID | Feature | Priority | Status | Dependencies |
 |----|---------|----------|--------|--------------|
 | P4-001 | Public API | P1 | Backlog | Phase 3 Complete |
-| P4-002 | Enterprise SSO | P2 | Backlog | P3-001 |
-| P4-003 | Custom branding/domains | P2 | Backlog | P4-001 |
-| P4-004 | Usage analytics dashboard | P2 | Backlog | P4-001 |
-| P4-005 | Third-party integrations (Slack, Notion, etc.) | P3 | Backlog | P4-001 |
+| P4-002 | Multi-agent debates (3v3 with domain specialists) | P1 | Backlog | MVP Complete |
+| P4-003 | Custom debate format builder | P2 | Backlog | MVP Complete |
+| P4-004 | Live audience participation (voting, questions) | P2 | Backlog | MVP Complete |
+| P4-005 | Enterprise SSO | P2 | Backlog | P3-001 |
+| P4-006 | Custom branding/domains | P2 | Backlog | P4-001 |
+| P4-007 | Usage analytics dashboard | P2 | Backlog | P4-001 |
+| P4-008 | Third-party integrations (Slack, Notion, etc.) | P3 | Backlog | P4-001 |
+| P4-009 | Citation toggle with source verification | P2 | Backlog | MVP Complete |
+| P4-010 | Value weighting system (economic/ethical/social priority) | P2 | Backlog | MVP Complete |
 
 ---
 
-## Agent Architecture Summary
+## Live Debate Architecture Summary
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -129,54 +161,88 @@ Expand ClearSide for enterprise use cases and third-party integrations.
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          ORCHESTRATOR AGENT                                  │
+│                          DEBATE ORCHESTRATOR                                 │
 │  • Normalizes proposition                                                    │
-│  • Extracts context (geography, timeframe, domain)                          │
-│  • Dispatches to advocates                                                   │
-│  • Outputs: proposition section only                                        │
+│  • Initializes debate state machine (6 phases)                              │
+│  • Manages turn-based dialogue                                              │
+│  • Handles user interventions queue                                         │
+│  • Coordinates streaming to UI                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
-                    ┌───────────────┴───────────────┐
-                    ▼                               ▼
-┌───────────────────────────────┐   ┌───────────────────────────────┐
-│      PRO ADVOCATE AGENT       │   │      CON ADVOCATE AGENT       │
-│  • Steel-man FOR position     │   │  • Steel-man AGAINST position │
-│  • Arguments by category      │   │  • Arguments by category      │
-│  • Explicit assumptions       │   │  • Explicit assumptions       │
-│  • Confidence levels          │   │  • Confidence levels          │
-│  • No rebuttals allowed       │   │  • No trivial objections      │
-│  • Outputs: pro section only  │   │  • Outputs: con section only  │
-└───────────────────────────────┘   └───────────────────────────────┘
-                    │                               │
-                    └───────────────┬───────────────┘
+              ┌─────────────────────┼─────────────────────┐
+              ▼                     ▼                     ▼
+┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│   PRO ADVOCATE      │  │   CON ADVOCATE      │  │    MODERATOR        │
+│   • Turn-based      │  │   • Turn-based      │  │    • Final phase    │
+│   • Steel-man       │  │   • Steel-man       │  │    • Synthesis      │
+│   • Cross-exam      │  │   • Cross-exam      │  │    • No winner      │
+│   • Rebuttals       │  │   • Rebuttals       │  │    • Hinges         │
+│   • Clarifications  │  │   • Clarifications  │  │                     │
+└─────────────────────┘  └─────────────────────┘  └─────────────────────┘
+              │                     │                     │
+              └─────────────────────┼─────────────────────┘
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          MODERATOR AGENT                                     │
-│  • Receives pro and con outputs                                             │
-│  • Identifies areas of agreement                                            │
-│  • Surfaces core disagreements with root causes                             │
-│  • Highlights assumption conflicts                                          │
-│  • Notes evidence gaps                                                      │
-│  • Defines decision hinges                                                  │
-│  • NEVER picks a winner or recommends action                                │
-│  • Outputs: moderator section only                                          │
+│                        TRANSCRIPT RECORDER                                   │
+│  • Records every utterance with timestamp                                   │
+│  • Tracks phase transitions                                                 │
+│  • Logs user interventions                                                  │
+│  • Generates structured JSON transcript                                     │
+│  • Compiles final structured analysis                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+              ┌─────────────────────┼─────────────────────┐
+              ▼                     ▼                     ▼
+┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
+│  STREAMING LAYER    │  │  USER INTERVENTION  │  │  REPLAY SYSTEM      │
+│  (Server-Sent       │  │  • Pause debate     │  │  • Instant load     │
+│   Events)           │  │  • Ask questions    │  │  • Timeline scrub   │
+│  • Push utterances  │  │  • Inject evidence  │  │  • Jump to phase    │
+│  • Phase updates    │  │  • Direct queries   │  │  • Export ready     │
+│  • Live to UI       │  │  • Clarifications   │  │                     │
+└─────────────────────┘  └─────────────────────┘  └─────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           FINAL OUTPUT                                       │
-│                    Assembled JSON + Rendered UI                              │
+│                              LIVE DEBATE UI                                  │
+│  [Streaming View] [Intervention Panel] [Timeline Scrubber] [Export]         │
 └─────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼ (Optional)
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        CHALLENGE AGENT (MVP)                                 │
-│  • Responds to user-initiated challenges                                    │
-│  • Analyzes specific assumptions or claims                                  │
-│  • Provides dependency analysis                                             │
-│  • Classifies as: factual, uncertain, or values-dependent                   │
-│  • Outputs: challenges section only                                         │
-└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Debate Protocol Phases (Custom ClearSide Format)
+
+```
+Phase 1: OPENING STATEMENTS (4 min)
+  ├─ Pro Advocate: 2 min opening
+  └─ Con Advocate: 2 min opening
+
+Phase 2: CONSTRUCTIVE ROUNDS (6 min)
+  ├─ Round 1: Economic/Technical (2 min each)
+  ├─ Round 2: Ethical/Social (2 min each)
+  └─ Round 3: Practical Implications (2 min each)
+
+Phase 3: CROSS-EXAMINATION (6 min)
+  ├─ Pro questions Con (3 min)
+  └─ Con questions Pro (3 min)
+
+Phase 4: REBUTTAL ROUND (4 min)
+  ├─ Con rebuts Pro (2 min)
+  └─ Pro rebuts Con (2 min)
+
+Phase 5: CLOSING STATEMENTS (4 min)
+  ├─ Con closing (2 min)
+  └─ Pro closing (2 min)
+
+Phase 6: MODERATOR SYNTHESIS (3 min)
+  └─ Neutral analysis, hinges, evidence gaps
+
+Total Runtime: ~27 minutes (+ user interventions)
+
+USER INTERVENTIONS: Can occur at ANY time
+  • Pause and ask questions
+  • Request clarifications
+  • Inject new evidence/context
+  • Direct questions to specific agents
 ```
 
 ---
@@ -250,6 +316,12 @@ Expand ClearSide for enterprise use cases and third-party integrations.
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1.0 | 2025-12-22 | Initial roadmap creation from product specification |
+| 0.2.0 | 2025-12-23 | Major expansion: Live Debate Theater architecture |
+|       |            | • Added real-time streaming debate engine |
+|       |            | • Added user intervention system |
+|       |            | • Added hybrid live-replay model |
+|       |            | • Added media production pipeline (Phase 2) |
+|       |            | • Restructured phases around live debate flow |
 
 ---
 
