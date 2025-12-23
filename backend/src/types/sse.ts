@@ -13,10 +13,15 @@ export type SSEEventType =
   | 'connected'              // Initial connection confirmation
   | 'utterance'              // New utterance from an agent
   | 'phase_transition'       // Debate moved to a new phase
+  | 'phase_start'            // Phase started
+  | 'phase_complete'         // Phase completed
   | 'intervention_response'  // Response to a user intervention
   | 'pause'                  // Debate paused by user
   | 'resume'                 // Debate resumed after pause
+  | 'debate_paused'          // Debate paused (alternative)
+  | 'debate_resumed'         // Debate resumed (alternative)
   | 'complete'               // Debate completed
+  | 'debate_complete'        // Debate completed (alternative)
   | 'error';                 // Error occurred during debate
 
 /**

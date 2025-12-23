@@ -1,0 +1,535 @@
+/**
+ * Turn Manager Unit Tests
+ *
+ * Comprehensive test suite for the TurnManager service
+ */
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { TurnManager } from '../src/services/debate/turn-manager.js';
+import { DebatePhase, Speaker } from '../src/types/debate.js';
+
+describe('TurnManager', () => {
+  let turnManager: TurnManager;
+
+  beforeEach(() => {
+    turnManager = new TurnManager();
+  });
+
+  describe('initialization', () => {
+    it('should initialize with INITIALIZING phase', () => {
+      expect(turnManager.getCurrentPhase()).toBe(DebatePhase.INITIALIZING);
+    });
+
+    it('should initialize with turn index 0', () => {
+      expect(turnManager.getCurrentTurnIndex()).toBe(0);
+    });
+
+    it('should return null for current turn in INITIALIZING phase', () => {
+      expect(turnManager.getCurrentTurn()).toBeNull();
+    });
+
+    it('should return empty turns array for INITIALIZING phase', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.INITIALIZING);
+      expect(turns).toEqual([]);
+    });
+  });
+
+  describe('Phase 1: Opening Statements', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_1_OPENING);
+    });
+
+    it('should have exactly 2 turns', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_1_OPENING);
+      expect(turns).toHaveLength(2);
+    });
+
+    it('should have Pro speaker first', () => {
+      const currentTurn = turnManager.getCurrentTurn();
+      expect(currentTurn).not.toBeNull();
+      expect(currentTurn?.speaker).toBe(Speaker.PRO);
+      expect(currentTurn?.promptType).toBe('opening_statement');
+    });
+
+    it('should have Con speaker second', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_1_OPENING);
+      expect(turns[1]?.speaker).toBe(Speaker.CON);
+      expect(turns[1]?.promptType).toBe('opening_statement');
+    });
+
+    it('should have 120 seconds per turn', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_1_OPENING);
+      expect(turns[0]?.durationSeconds).toBe(120);
+      expect(turns[1]?.durationSeconds).toBe(120);
+    });
+
+    it('should advance from turn 0 to turn 1', () => {
+      expect(turnManager.getCurrentTurnIndex()).toBe(0);
+      const nextTurn = turnManager.advanceTurn();
+      expect(turnManager.getCurrentTurnIndex()).toBe(1);
+      expect(nextTurn?.speaker).toBe(Speaker.CON);
+    });
+
+    it('should mark phase as complete after 2 turns', () => {
+      expect(turnManager.isPhaseComplete()).toBe(false);
+      turnManager.advanceTurn(); // Turn 1
+      expect(turnManager.isPhaseComplete()).toBe(false);
+      turnManager.advanceTurn(); // Beyond last turn
+      expect(turnManager.isPhaseComplete()).toBe(true);
+    });
+
+    it('should get correct turn progress', () => {
+      const progress = turnManager.getTurnProgress();
+      expect(progress.currentIndex).toBe(0);
+      expect(progress.totalTurns).toBe(2);
+      expect(progress.currentTurn?.speaker).toBe(Speaker.PRO);
+      expect(progress.nextTurn?.speaker).toBe(Speaker.CON);
+      expect(progress.isComplete).toBe(false);
+    });
+  });
+
+  describe('Phase 2: Constructive Arguments', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+    });
+
+    it('should have exactly 6 turns', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      expect(turns).toHaveLength(6);
+    });
+
+    it('should alternate Pro/Con speakers', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      expect(turns[0]?.speaker).toBe(Speaker.PRO);
+      expect(turns[1]?.speaker).toBe(Speaker.CON);
+      expect(turns[2]?.speaker).toBe(Speaker.PRO);
+      expect(turns[3]?.speaker).toBe(Speaker.CON);
+      expect(turns[4]?.speaker).toBe(Speaker.PRO);
+      expect(turns[5]?.speaker).toBe(Speaker.CON);
+    });
+
+    it('should have correct round metadata for Round 1 (economic)', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      expect(turns[0]?.metadata?.round).toBe(1);
+      expect(turns[0]?.metadata?.category).toBe('economic');
+      expect(turns[1]?.metadata?.round).toBe(1);
+      expect(turns[1]?.metadata?.category).toBe('economic');
+    });
+
+    it('should have correct round metadata for Round 2 (ethical)', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      expect(turns[2]?.metadata?.round).toBe(2);
+      expect(turns[2]?.metadata?.category).toBe('ethical');
+      expect(turns[3]?.metadata?.round).toBe(2);
+      expect(turns[3]?.metadata?.category).toBe('ethical');
+    });
+
+    it('should have correct round metadata for Round 3 (practical)', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      expect(turns[4]?.metadata?.round).toBe(3);
+      expect(turns[4]?.metadata?.category).toBe('practical');
+      expect(turns[5]?.metadata?.round).toBe(3);
+      expect(turns[5]?.metadata?.category).toBe('practical');
+    });
+
+    it('should have correct turn numbers', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      expect(turns[0]?.metadata?.turnNumber).toBe(1);
+      expect(turns[1]?.metadata?.turnNumber).toBe(2);
+      expect(turns[2]?.metadata?.turnNumber).toBe(3);
+      expect(turns[3]?.metadata?.turnNumber).toBe(4);
+      expect(turns[4]?.metadata?.turnNumber).toBe(5);
+      expect(turns[5]?.metadata?.turnNumber).toBe(6);
+    });
+
+    it('should have 120 seconds per turn', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      turns.forEach((turn) => {
+        expect(turn.durationSeconds).toBe(120);
+      });
+    });
+
+    it('should use constructive_argument prompt type', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      turns.forEach((turn) => {
+        expect(turn.promptType).toBe('constructive_argument');
+      });
+    });
+  });
+
+  describe('Phase 3: Cross-Examination', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_3_CROSSEXAM);
+    });
+
+    it('should have exactly 2 turns', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_3_CROSSEXAM);
+      expect(turns).toHaveLength(2);
+    });
+
+    it('should have Pro speaker first', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_3_CROSSEXAM);
+      expect(turns[0]?.speaker).toBe(Speaker.PRO);
+    });
+
+    it('should have Con speaker second', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_3_CROSSEXAM);
+      expect(turns[1]?.speaker).toBe(Speaker.CON);
+    });
+
+    it('should have 180 seconds per turn', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_3_CROSSEXAM);
+      expect(turns[0]?.durationSeconds).toBe(180);
+      expect(turns[1]?.durationSeconds).toBe(180);
+    });
+
+    it('should use cross_examination_question prompt type', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_3_CROSSEXAM);
+      turns.forEach((turn) => {
+        expect(turn.promptType).toBe('cross_examination_question');
+      });
+    });
+
+    it('should have questioning category metadata', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_3_CROSSEXAM);
+      expect(turns[0]?.metadata?.category).toBe('questioning');
+      expect(turns[1]?.metadata?.category).toBe('questioning');
+    });
+  });
+
+  describe('Phase 4: Rebuttals', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_4_REBUTTAL);
+    });
+
+    it('should have exactly 2 turns', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_4_REBUTTAL);
+      expect(turns).toHaveLength(2);
+    });
+
+    it('should have Con speaker first (standard debate format)', () => {
+      const currentTurn = turnManager.getCurrentTurn();
+      expect(currentTurn?.speaker).toBe(Speaker.CON);
+      expect(currentTurn?.promptType).toBe('rebuttal');
+    });
+
+    it('should have Pro speaker second', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_4_REBUTTAL);
+      expect(turns[1]?.speaker).toBe(Speaker.PRO);
+      expect(turns[1]?.promptType).toBe('rebuttal');
+    });
+
+    it('should have 120 seconds per turn', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_4_REBUTTAL);
+      expect(turns[0]?.durationSeconds).toBe(120);
+      expect(turns[1]?.durationSeconds).toBe(120);
+    });
+
+    it('should have rebuttal category metadata', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_4_REBUTTAL);
+      expect(turns[0]?.metadata?.category).toBe('rebuttal');
+      expect(turns[1]?.metadata?.category).toBe('rebuttal');
+    });
+  });
+
+  describe('Phase 5: Closing Statements', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_5_CLOSING);
+    });
+
+    it('should have exactly 2 turns', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_5_CLOSING);
+      expect(turns).toHaveLength(2);
+    });
+
+    it('should have Con speaker first (Pro gets last word)', () => {
+      const currentTurn = turnManager.getCurrentTurn();
+      expect(currentTurn?.speaker).toBe(Speaker.CON);
+      expect(currentTurn?.promptType).toBe('closing_statement');
+    });
+
+    it('should have Pro speaker second (last word)', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_5_CLOSING);
+      expect(turns[1]?.speaker).toBe(Speaker.PRO);
+      expect(turns[1]?.promptType).toBe('closing_statement');
+    });
+
+    it('should have 120 seconds per turn', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_5_CLOSING);
+      expect(turns[0]?.durationSeconds).toBe(120);
+      expect(turns[1]?.durationSeconds).toBe(120);
+    });
+
+    it('should have closing category metadata', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_5_CLOSING);
+      expect(turns[0]?.metadata?.category).toBe('closing');
+      expect(turns[1]?.metadata?.category).toBe('closing');
+    });
+  });
+
+  describe('Phase 6: Moderator Synthesis', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_6_SYNTHESIS);
+    });
+
+    it('should have exactly 1 turn', () => {
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PHASE_6_SYNTHESIS);
+      expect(turns).toHaveLength(1);
+    });
+
+    it('should only have Moderator speaker', () => {
+      const currentTurn = turnManager.getCurrentTurn();
+      expect(currentTurn?.speaker).toBe(Speaker.MODERATOR);
+    });
+
+    it('should use moderator_synthesis prompt type', () => {
+      const currentTurn = turnManager.getCurrentTurn();
+      expect(currentTurn?.promptType).toBe('moderator_synthesis');
+    });
+
+    it('should have 180 seconds duration', () => {
+      const currentTurn = turnManager.getCurrentTurn();
+      expect(currentTurn?.durationSeconds).toBe(180);
+    });
+
+    it('should have synthesis category metadata', () => {
+      const currentTurn = turnManager.getCurrentTurn();
+      expect(currentTurn?.metadata?.category).toBe('synthesis');
+    });
+
+    it('should be complete after 1 turn', () => {
+      expect(turnManager.isPhaseComplete()).toBe(false);
+      turnManager.advanceTurn();
+      expect(turnManager.isPhaseComplete()).toBe(true);
+    });
+  });
+
+  describe('special phases', () => {
+    it('should have no turns for COMPLETED phase', () => {
+      turnManager.setPhase(DebatePhase.COMPLETED);
+      const turns = turnManager.getTurnsForPhase(DebatePhase.COMPLETED);
+      expect(turns).toEqual([]);
+      expect(turnManager.getCurrentTurn()).toBeNull();
+    });
+
+    it('should have no turns for PAUSED phase', () => {
+      turnManager.setPhase(DebatePhase.PAUSED);
+      const turns = turnManager.getTurnsForPhase(DebatePhase.PAUSED);
+      expect(turns).toEqual([]);
+      expect(turnManager.getCurrentTurn()).toBeNull();
+    });
+
+    it('should have no turns for ERROR phase', () => {
+      turnManager.setPhase(DebatePhase.ERROR);
+      const turns = turnManager.getTurnsForPhase(DebatePhase.ERROR);
+      expect(turns).toEqual([]);
+      expect(turnManager.getCurrentTurn()).toBeNull();
+    });
+  });
+
+  describe('turn advancement', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_1_OPENING);
+    });
+
+    it('should advance to next turn correctly', () => {
+      expect(turnManager.getCurrentTurnIndex()).toBe(0);
+      const turn1 = turnManager.getCurrentTurn();
+      expect(turn1?.speaker).toBe(Speaker.PRO);
+
+      turnManager.advanceTurn();
+      expect(turnManager.getCurrentTurnIndex()).toBe(1);
+      const turn2 = turnManager.getCurrentTurn();
+      expect(turn2?.speaker).toBe(Speaker.CON);
+    });
+
+    it('should return null when advancing past last turn', () => {
+      turnManager.advanceTurn(); // Move to turn 1
+      const result = turnManager.advanceTurn(); // Move past turn 1
+      expect(result).toBeNull();
+      expect(turnManager.isPhaseComplete()).toBe(true);
+    });
+
+    it('should throw error when trying to advance past phase end', () => {
+      turnManager.advanceTurn(); // Turn 1
+      turnManager.advanceTurn(); // Past end
+      expect(() => turnManager.advanceTurn()).toThrow(
+        /Cannot advance turn: already at end of phase/
+      );
+    });
+
+    it('should reset turn index when changing phases', () => {
+      turnManager.advanceTurn(); // Move to turn 1
+      expect(turnManager.getCurrentTurnIndex()).toBe(1);
+
+      turnManager.setPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      expect(turnManager.getCurrentTurnIndex()).toBe(0);
+    });
+  });
+
+  describe('phase completion', () => {
+    it('should detect incomplete phase', () => {
+      turnManager.setPhase(DebatePhase.PHASE_1_OPENING);
+      expect(turnManager.isPhaseComplete()).toBe(false);
+    });
+
+    it('should detect phase completion', () => {
+      turnManager.setPhase(DebatePhase.PHASE_1_OPENING);
+      turnManager.advanceTurn();
+      turnManager.advanceTurn();
+      expect(turnManager.isPhaseComplete()).toBe(true);
+    });
+
+    it('should handle phase with no turns as complete', () => {
+      turnManager.setPhase(DebatePhase.INITIALIZING);
+      expect(turnManager.isPhaseComplete()).toBe(true);
+    });
+  });
+
+  describe('progress tracking', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+    });
+
+    it('should track progress at start of phase', () => {
+      const progress = turnManager.getTurnProgress();
+      expect(progress.currentIndex).toBe(0);
+      expect(progress.totalTurns).toBe(6);
+      expect(progress.currentTurn?.speaker).toBe(Speaker.PRO);
+      expect(progress.nextTurn?.speaker).toBe(Speaker.CON);
+      expect(progress.isComplete).toBe(false);
+    });
+
+    it('should track progress mid-phase', () => {
+      turnManager.advanceTurn(); // Turn 1
+      turnManager.advanceTurn(); // Turn 2
+      const progress = turnManager.getTurnProgress();
+      expect(progress.currentIndex).toBe(2);
+      expect(progress.totalTurns).toBe(6);
+      expect(progress.currentTurn?.speaker).toBe(Speaker.PRO);
+      expect(progress.isComplete).toBe(false);
+    });
+
+    it('should track progress at last turn', () => {
+      // Advance to last turn (index 5)
+      for (let i = 0; i < 5; i++) {
+        turnManager.advanceTurn();
+      }
+      const progress = turnManager.getTurnProgress();
+      expect(progress.currentIndex).toBe(5);
+      expect(progress.currentTurn?.speaker).toBe(Speaker.CON);
+      expect(progress.nextTurn).toBeNull();
+      expect(progress.isComplete).toBe(false);
+    });
+
+    it('should track progress when phase complete', () => {
+      // Advance past all turns
+      for (let i = 0; i < 6; i++) {
+        turnManager.advanceTurn();
+      }
+      const progress = turnManager.getTurnProgress();
+      expect(progress.currentIndex).toBe(6);
+      expect(progress.currentTurn).toBeNull();
+      expect(progress.nextTurn).toBeNull();
+      expect(progress.isComplete).toBe(true);
+    });
+  });
+
+  describe('time estimation', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_1_OPENING);
+    });
+
+    it('should calculate remaining time at start of phase', () => {
+      // Phase 1 has 2 turns × 120s = 240s = 240,000ms
+      const remaining = turnManager.getEstimatedPhaseRemainingTime();
+      expect(remaining).toBe(240000);
+    });
+
+    it('should calculate remaining time after first turn', () => {
+      turnManager.advanceTurn();
+      // 1 turn × 120s = 120s = 120,000ms remaining
+      const remaining = turnManager.getEstimatedPhaseRemainingTime();
+      expect(remaining).toBe(120000);
+    });
+
+    it('should return 0 remaining time when phase complete', () => {
+      turnManager.advanceTurn();
+      turnManager.advanceTurn();
+      const remaining = turnManager.getEstimatedPhaseRemainingTime();
+      expect(remaining).toBe(0);
+    });
+
+    it('should calculate remaining time for Phase 2', () => {
+      turnManager.setPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      // Phase 2 has 6 turns × 120s = 720s = 720,000ms
+      const remaining = turnManager.getEstimatedPhaseRemainingTime();
+      expect(remaining).toBe(720000);
+    });
+
+    it('should calculate remaining time for Phase 3', () => {
+      turnManager.setPhase(DebatePhase.PHASE_3_CROSSEXAM);
+      // Phase 3 has 2 turns × 180s = 360s = 360,000ms
+      const remaining = turnManager.getEstimatedPhaseRemainingTime();
+      expect(remaining).toBe(360000);
+    });
+
+    it('should track elapsed time since turn started', () => {
+      turnManager.setPhase(DebatePhase.PHASE_1_OPENING);
+      const elapsed1 = turnManager.getTurnElapsedTime();
+      expect(elapsed1).toBeGreaterThanOrEqual(0);
+
+      // Small delay
+      const start = Date.now();
+      while (Date.now() - start < 10) {
+        // wait ~10ms
+      }
+
+      const elapsed2 = turnManager.getTurnElapsedTime();
+      expect(elapsed2).toBeGreaterThan(elapsed1);
+    });
+  });
+
+  describe('reset', () => {
+    it('should reset to initial state', () => {
+      turnManager.setPhase(DebatePhase.PHASE_2_CONSTRUCTIVE);
+      turnManager.advanceTurn();
+      turnManager.advanceTurn();
+
+      turnManager.reset();
+
+      expect(turnManager.getCurrentPhase()).toBe(DebatePhase.INITIALIZING);
+      expect(turnManager.getCurrentTurnIndex()).toBe(0);
+      expect(turnManager.getCurrentTurn()).toBeNull();
+      expect(turnManager.getTurnElapsedTime()).toBe(0);
+    });
+  });
+
+  describe('getNextTurn', () => {
+    beforeEach(() => {
+      turnManager.setPhase(DebatePhase.PHASE_1_OPENING);
+    });
+
+    it('should preview next turn without advancing', () => {
+      const currentBefore = turnManager.getCurrentTurn();
+      const next = turnManager.getNextTurn();
+      const currentAfter = turnManager.getCurrentTurn();
+
+      expect(currentBefore).toEqual(currentAfter);
+      expect(next?.speaker).toBe(Speaker.CON);
+    });
+
+    it('should return null when on last turn', () => {
+      turnManager.advanceTurn(); // Move to last turn
+      const next = turnManager.getNextTurn();
+      expect(next).toBeNull();
+    });
+
+    it('should return null when phase is complete', () => {
+      turnManager.advanceTurn();
+      turnManager.advanceTurn();
+      const next = turnManager.getNextTurn();
+      expect(next).toBeNull();
+    });
+  });
+});
