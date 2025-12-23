@@ -1,0 +1,168 @@
+/**
+ * ClearSide Backend Server
+ * Main entry point for the Express application
+ */
+
+import express, { type Request, type Response } from 'express';
+import { config } from 'dotenv';
+import { sseManager } from './services/sse/index.js';
+import debateRoutes from './routes/debate-routes.js';
+import { logger } from './utils/logger.js';
+import { pool } from './db/connection.js';
+
+// Load environment variables
+config();
+
+const PORT = process.env.PORT || 3000;
+const app = express();
+
+/**
+ * Middleware
+ */
+
+// Enable CORS for all routes
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Last-Event-ID');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
+  next();
+});
+
+// Parse JSON request bodies
+app.use(express.json());
+
+// Request logging middleware
+app.use((req, _res, next) => {
+  logger.info(
+    {
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      ip: req.ip,
+    },
+    'Incoming request'
+  );
+  next();
+});
+
+/**
+ * Routes
+ */
+
+// Health check endpoint
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    activeConnections: sseManager.getClientCount(),
+  });
+});
+
+// API routes
+app.use('/api', debateRoutes);
+
+// 404 handler
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    error: 'Not found',
+    path: req.path,
+  });
+});
+
+// Error handler
+app.use((err: Error, req: Request, res: Response, _next: express.NextFunction) => {
+  logger.error({ error: err, path: req.path }, 'Unhandled error');
+
+  res.status(500).json({
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
+  });
+});
+
+/**
+ * Server lifecycle
+ */
+
+let server: ReturnType<typeof app.listen> | null = null;
+
+/**
+ * Start the server
+ */
+function start() {
+  server = app.listen(PORT, () => {
+    logger.info({ port: PORT, env: process.env.NODE_ENV }, 'Server started');
+  });
+
+  // Handle server errors
+  server.on('error', (error: Error) => {
+    logger.error({ error }, 'Server error');
+    process.exit(1);
+  });
+}
+
+/**
+ * Graceful shutdown
+ * Closes all connections cleanly before exiting
+ */
+async function shutdown(signal: string) {
+  logger.info({ signal }, 'Shutdown signal received');
+
+  // Stop accepting new requests
+  if (server) {
+    server.close(() => {
+      logger.info('HTTP server closed');
+    });
+  }
+
+  try {
+    // Shutdown SSE manager (closes all client connections)
+    sseManager.shutdown();
+
+    // Close database connection pool
+    await pool.end();
+    logger.info('Database connection pool closed');
+
+    logger.info('Graceful shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    logger.error({ error }, 'Error during shutdown');
+    process.exit(1);
+  }
+}
+
+/**
+ * Register shutdown handlers
+ */
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error: Error) => {
+  logger.error({ error }, 'Uncaught exception');
+  shutdown('uncaughtException');
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason: unknown) => {
+  logger.error({ reason }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection');
+});
+
+/**
+ * Start the server if this file is run directly
+ */
+if (import.meta.url === `file://${process.argv[1]}`) {
+  start();
+}
+
+// Export app for testing
+export { app, start, shutdown };
