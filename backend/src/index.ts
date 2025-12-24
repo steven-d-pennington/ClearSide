@@ -23,10 +23,13 @@ const app = express();
 
 // Enable CORS for all routes
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // In production, restrict to frontend URL; in development, allow all
+  const allowedOrigin = process.env.FRONTEND_URL || '*';
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Last-Event-ID');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Type, Last-Event-ID');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
