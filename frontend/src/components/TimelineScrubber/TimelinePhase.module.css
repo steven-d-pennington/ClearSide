@@ -1,0 +1,150 @@
+/* TimelinePhase styles */
+
+.phase {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  min-width: 60px;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+}
+
+/* Dot indicator */
+.dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-border);
+  transition: all var(--transition-base);
+}
+
+.completed .dot {
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.current .dot {
+  border-color: var(--color-primary);
+  animation: pulse 2s infinite;
+}
+
+.pending .dot {
+  opacity: 0.5;
+}
+
+.focused .dot {
+  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+}
+
+/* Check icon for completed */
+.checkIcon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-inverse);
+}
+
+/* Spinner for current */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--color-primary-alpha);
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+
+/* Label */
+.label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  transition: color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.completed .label {
+  color: var(--color-text-primary);
+}
+
+.current .label {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pending .label {
+  opacity: 0.5;
+}
+
+/* Connector line between phases */
+.connector {
+  position: absolute;
+  top: calc(var(--spacing-sm) + 16px);
+  left: calc(50% + 20px);
+  width: calc(100% - 40px);
+  height: 2px;
+  background: var(--color-border);
+  z-index: -1;
+}
+
+.connectorCompleted {
+  background: var(--color-success);
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .label {
+    font-size: 0.65rem;
+  }
+
+  .dot {
+    width: 28px;
+    height: 28px;
+  }
+
+  .connector {
+    top: calc(var(--spacing-sm) + 14px);
+    left: calc(50% + 18px);
+    width: calc(100% - 36px);
+  }
+}

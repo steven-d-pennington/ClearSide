@@ -1,0 +1,33 @@
+/* ProgressBar styles */
+
+.progressBar {
+  position: relative;
+  height: 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--color-primary) 0%,
+    var(--color-success) 100%
+  );
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+}
+
+.glow {
+  position: absolute;
+  top: -2px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 8px var(--color-primary);
+  transform: translateX(-50%);
+  opacity: 0.8;
+  transition: left var(--transition-slow);
+}

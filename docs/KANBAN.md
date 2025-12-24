@@ -1,7 +1,7 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2025-12-24
-> Version: 3.1.0 - All Agents Complete
+> Version: 3.2.0 - All UI Components Complete
 
 ---
 
@@ -117,9 +117,9 @@ Each task file includes:
 |---------|-----------|----------|----------|--------|-----------|
 | UI-001 | Create Input Section Component | P0 | S | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-001) |
 | UI-002 | Create Live Debate Stream Component | P0 | L | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-002) |
-| UI-003 | Create Timeline Scrubber Component | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-003) |
-| UI-004 | Create Intervention Panel Component | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-004) |
-| UI-005 | Create Playback Controls Component | P0 | S | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-005) |
+| UI-003 | Create Timeline Scrubber Component | P0 | M | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-003) |
+| UI-004 | Create Intervention Panel Component | P0 | M | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-004) |
+| UI-005 | Create Responsive Layout & Navigation | P0 | S | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-005) |
 | UI-006 | Implement Debate State Management (Zustand) | P0 | M | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-006) |
 | UI-007 | Create Phase Indicator Component | P0 | S | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-007) |
 | UI-008 | Create Speaker Indicator Component | P0 | XS | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#ui-008) |
