@@ -28,6 +28,9 @@ export {
 // Real agent implementations
 export { OrchestratorAgent } from './orchestrator-agent.js';
 export type { PropositionContext } from './orchestrator-agent.js';
+export { ProAdvocateAgent } from './pro-advocate-agent.js';
+export { ConAdvocateAgent } from './con-advocate-agent.js';
+export { ModeratorAgent } from './moderator-agent.js';
 
 // Prompt templates
 export {
