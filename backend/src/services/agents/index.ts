@@ -12,7 +12,7 @@ export type {
   ProAdvocateAgent,
   ConAdvocateAgent,
   ModeratorAgent,
-  OrchestratorAgent,
+  OrchestratorAgent as IOrchestratorAgent,
   AgentFactory,
 } from './types.js';
 
@@ -24,3 +24,14 @@ export {
   MockOrchestrator,
   mockAgentFactory,
 } from './mock-agents.js';
+
+// Real agent implementations
+export { OrchestratorAgent } from './orchestrator-agent.js';
+export type { PropositionContext } from './orchestrator-agent.js';
+
+// Prompt templates
+export {
+  ORCHESTRATOR_SYSTEM_PROMPT,
+  buildOrchestratorPrompt,
+  NORMALIZATION_EXAMPLES,
+} from './prompts/orchestrator-prompts.js';

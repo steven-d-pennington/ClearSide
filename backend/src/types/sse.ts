@@ -15,6 +15,7 @@ export type SSEEventType =
   | 'phase_transition'       // Debate moved to a new phase
   | 'phase_start'            // Phase started
   | 'phase_complete'         // Phase completed
+  | 'intervention_submitted' // User intervention submitted
   | 'intervention_response'  // Response to a user intervention
   | 'pause'                  // Debate paused by user
   | 'resume'                 // Debate resumed after pause
