@@ -482,78 +482,76 @@ Tasks: All EXPORT, AUDIO, VIDEO, QUEUE, STORAGE tasks
 ## 📊 Current State
 
 **Phase:** Phase 1 - MVP Live Debate Engine
-**Sprint:** Sprint 1 (Foundation)
-**Overall Progress:** 0/45 tasks complete (0%)
+**Sprint:** Sprint 3 (UI & Interventions)
+**Overall Progress:** 15/29 Phase 1 tasks complete (52%)
 
-### ✅ Completed Tasks
-_(None yet - ready to begin development!)_
+### ✅ Completed Categories
+- **Infrastructure (5/5):** LLM API, PostgreSQL, SSE, Schema Validation, Logging
+- **Core Engine (5/5):** State Machine, Orchestrator, Turn Manager, Interventions, Transcript
+- **AI Agents (5/5):** Orchestrator, Pro Advocate, Con Advocate, Moderator, Prompt Templates
 
 ### 🟡 Currently In Progress
 _(None)_
 
-### 🔴 Blocked Tasks
-_(None)_
+### 📋 Next Up
+- **UI Components (0/9):** Ready to start
+- **Testing (0/5):** Ready to start
 
 ---
 
-## 🎯 Next Available Tasks - Sprint 1 (Ready to Start)
+## 🎯 Next Available Tasks - Sprint 3 (Ready to Start)
 
-### Priority P0 Tasks (Critical Path):
+### Priority P0 Tasks (UI Foundation):
 
-**1. INFRA-001: Set Up LLM API Integration Layer**
+**1. UI-006: Implement Debate State Management (Zustand)**
 - **Priority:** P0 | **Estimate:** M (4-8 hours)
-- **Why:** Foundation for all AI agent communication
+- **Why:** Foundation for all other UI components
 - **No blockers** - Can start immediately
-- **File:** [tasks/phase1/infrastructure/INFRA-001.md](tasks/phase1/infrastructure/INFRA-001.md)
+- **File:** [tasks/phase1/ui/UI-006.md](tasks/phase1/ui/UI-006.md)
 
-**2. INFRA-002: Set Up PostgreSQL Database with Schema**
-- **Priority:** P0 | **Estimate:** M (4-8 hours)
-- **Why:** Required for debate state persistence
-- **No blockers** - Can start immediately (parallel with INFRA-001)
-- **File:** [tasks/phase1/infrastructure/INFRA-002.md](tasks/phase1/infrastructure/INFRA-002.md)
-
-**3. INFRA-003: Implement Server-Sent Events (SSE) Layer**
-- **Priority:** P0 | **Estimate:** L (1-3 days)
-- **Why:** Real-time debate streaming to frontend
-- **Dependency:** INFRA-002 (can start once database is ready)
-- **File:** [tasks/phase1/infrastructure/INFRA-003.md](tasks/phase1/infrastructure/INFRA-003.md)
-
-**4. INFRA-004: Set Up JSON Schema Validation**
+**2. UI-001: Create Input Section Component**
 - **Priority:** P0 | **Estimate:** S (1-4 hours)
-- **Why:** Validate all agent outputs
+- **Why:** User proposition entry point
 - **No blockers** - Can start immediately
-- **File:** [tasks/phase1/infrastructure/INFRA-004.md](tasks/phase1/infrastructure/INFRA-004.md)
+- **File:** [tasks/phase1/ui/UI-001.md](tasks/phase1/ui/UI-001.md)
 
-**5. CORE-001: Implement Debate State Machine**
+**3. UI-002: Create Live Debate Stream Component**
 - **Priority:** P0 | **Estimate:** L (1-3 days)
-- **Why:** Core orchestration backbone
-- **Dependency:** INFRA-002 (database)
-- **File:** [tasks/phase1/core/CORE-001.md](tasks/phase1/core/CORE-001.md)
+- **Why:** Real-time debate display with SSE
+- **Dependency:** UI-006 (state management)
+- **File:** [tasks/phase1/ui/UI-002.md](tasks/phase1/ui/UI-002.md)
+
+### Testing (Can Run in Parallel):
+
+**4. TEST-001: Create Unit Test Suite**
+- **Priority:** P0 | **Estimate:** M (4-8 hours)
+- **Why:** Cover existing backend code
+- **No blockers** - Can start immediately
+- **File:** [tasks/phase1/testing/TEST-001.md](tasks/phase1/testing/TEST-001.md)
 
 ---
 
 ## 💡 Recommended Approach
 
-**Best starting point:** INFRA-001 and INFRA-002 can be done in parallel since they have no dependencies on each other.
+**Best starting point:** UI-006 (Zustand state management) since most UI components depend on it.
 
 **Suggested order:**
-1. Start with **INFRA-001** (LLM Integration) or **INFRA-002** (Database) - your choice!
-2. Then **INFRA-004** (Schema Validation)
-3. Then **INFRA-003** (SSE Layer) once database is ready
-4. Then **CORE-001** (State Machine)
-5. Then **AGENT-001** (Orchestrator Agent)
+1. Start with **UI-006** (State Management) - foundation for all UI
+2. Then **UI-001** (Input Section) - simple, standalone
+3. Then **UI-002** (Live Stream) - uses SSE + state
+4. Parallel: **TEST-001** (Unit Tests) - can run alongside UI work
 
 ---
 
 ## 💬 What would you like to work on?
 
 I can:
-- ✅ Start with **INFRA-001** (LLM API Integration)
-- ✅ Start with **INFRA-002** (PostgreSQL Database)
-- ✅ Start with **INFRA-004** (Schema Validation)
-- ℹ️ Explain any of these tasks in more detail
-- ℹ️ Show you the implementation guide for a specific task
-- ℹ️ Help you understand the project architecture
+- ✅ Start with **UI-006** (Zustand State Management)
+- ✅ Start with **UI-001** (Input Section Component)
+- ✅ Start with **TEST-001** (Unit Test Suite)
+- ℹ️ Show the implementation details from [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md)
+- ℹ️ Explain how the agent system works
+- ℹ️ Review completed work
 
 **Which task would you like me to work on, or would you like more information first?**
 ```
