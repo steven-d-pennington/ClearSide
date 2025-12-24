@@ -110,10 +110,24 @@ export function setupSSEMock() {
     getInstance: () => eventSource,
 
     /**
-     * Cleanup mock
+     * Cleanup mock - only clears SSE-related state, preserves other global stubs
      */
     cleanup: () => {
       listeners.clear();
+      if (eventSource) {
+        eventSource.close();
+      }
+      eventSource = null;
+    },
+
+    /**
+     * Full cleanup including EventSource global stub
+     */
+    fullCleanup: () => {
+      listeners.clear();
+      if (eventSource) {
+        eventSource.close();
+      }
       eventSource = null;
       vi.unstubAllGlobals();
     },
