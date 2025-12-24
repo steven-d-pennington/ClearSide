@@ -205,7 +205,7 @@ router.post('/debates/:debateId/pause', async (req: Request, res: Response) => {
     }
 
     // Update debate status to paused
-    await debateRepository.updateStatus(debateId!, 'paused');
+    await debateRepository.updateStatus(debateId!, { status: 'paused' });
 
     // Broadcast pause event
     sseManager.broadcastToDebate(debateId!, 'debate_paused', {
@@ -261,7 +261,7 @@ router.post('/debates/:debateId/resume', async (req: Request, res: Response) => 
     }
 
     // Update debate status back to live
-    await debateRepository.updateStatus(debateId!, 'live');
+    await debateRepository.updateStatus(debateId!, { status: 'live' });
 
     // Broadcast resume event
     sseManager.broadcastToDebate(debateId!, 'debate_resumed', {

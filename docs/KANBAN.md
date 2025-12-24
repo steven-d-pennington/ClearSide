@@ -69,7 +69,7 @@ Each task file includes:
 | INFRA-002 | Set Up PostgreSQL Database with Schema | P0 | M | ✅ DONE | [View Task](../tasks/phase1/infrastructure/INFRA-002.md) |
 | INFRA-003 | Implement Server-Sent Events (SSE) Layer | P0 | L | ✅ DONE | [View Task](../tasks/phase1/infrastructure/INFRA-003.md) |
 | INFRA-004 | Set Up JSON Schema Validation | P0 | S | ✅ DONE | [View Task](../tasks/phase1/infrastructure/INFRA-004.md) |
-| INFRA-005 | Set Up Logging & Monitoring | P1 | M | 🟢 TO DO | [View Task](../tasks/phase1/infrastructure/INFRA-005.md) |
+| INFRA-005 | Set Up Logging & Monitoring | P1 | M | ✅ DONE | [View Task](../tasks/phase1/infrastructure/INFRA-005.md) |
 
 **Dependencies:** INFRA-001 and INFRA-002 can start immediately in parallel
 

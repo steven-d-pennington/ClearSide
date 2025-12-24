@@ -5,21 +5,21 @@
  * into structured, debatable formats.
  */
 
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OrchestratorAgent } from '../src/services/agents/orchestrator-agent.js';
 import type { LLMClient } from '../src/services/llm/client.js';
 import type { LLMResponse } from '../src/types/llm.js';
 
 // Mock LLM Client
-const createMockLLMClient = (): jest.Mocked<LLMClient> => {
+const createMockLLMClient = (): LLMClient => {
   return {
-    complete: jest.fn(),
-  } as unknown as jest.Mocked<LLMClient>;
+    complete: vi.fn(),
+  } as unknown as LLMClient;
 };
 
 describe('OrchestratorAgent', () => {
   let agent: OrchestratorAgent;
-  let mockLLMClient: jest.Mocked<LLMClient>;
+  let mockLLMClient: LLMClient;
 
   beforeEach(() => {
     mockLLMClient = createMockLLMClient();
@@ -53,7 +53,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -92,7 +92,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput, userContext);
 
@@ -124,7 +124,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -151,7 +151,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -175,7 +175,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -201,7 +201,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       await expect(agent.normalizeProposition(rawInput)).rejects.toThrow('Failed to parse');
     });
@@ -223,7 +223,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       await expect(agent.normalizeProposition(rawInput)).rejects.toThrow('Missing required field');
     });
@@ -231,7 +231,7 @@ describe('OrchestratorAgent', () => {
     it('should handle LLM errors gracefully', async () => {
       const rawInput = 'Test question';
 
-      mockLLMClient.complete.mockRejectedValue(new Error('LLM API error'));
+      vi.mocked(mockLLMClient.complete).mockRejectedValue(new Error('LLM API error'));
 
       await expect(agent.normalizeProposition(rawInput)).rejects.toThrow('LLM API error');
     });
@@ -253,7 +253,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -275,7 +275,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -354,7 +354,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -383,7 +383,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
@@ -414,7 +414,7 @@ describe('OrchestratorAgent', () => {
         provider: 'anthropic',
       };
 
-      mockLLMClient.complete.mockResolvedValue(mockResponse);
+      vi.mocked(mockLLMClient.complete).mockResolvedValue(mockResponse);
 
       const result = await agent.normalizeProposition(rawInput);
 
