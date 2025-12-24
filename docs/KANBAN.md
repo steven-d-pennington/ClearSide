@@ -102,7 +102,7 @@ Each task file includes:
 | AGENT-002 | Implement Pro Advocate Agent | P0 | XL | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-002) |
 | AGENT-003 | Implement Con Advocate Agent | P0 | XL | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-003) |
 | AGENT-004 | Implement Moderator Agent | P0 | L | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-004) |
-| AGENT-005 | Create Agent Prompt Templates | P0 | L | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-005) |
+| AGENT-005 | Create Agent Prompt Templates | P0 | L | ✅ DONE | [View Task](../tasks/phase1/agents/AGENT-005.md) |
 
 **Dependencies:**
 - AGENT-001 depends on INFRA-001
