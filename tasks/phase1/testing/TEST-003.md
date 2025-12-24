@@ -497,4 +497,36 @@ test.describe('Visual Regression', () => {
 
 ---
 
-**Last Updated:** 2025-12-23
+## Implementation Notes from Completed Tasks
+
+> Added 2025-12-24 after completing TEST-001 (Unit Test Suite)
+
+### Note on Test Frameworks
+
+- **Unit/Integration tests**: Use Vitest (already configured in `frontend/vitest.config.ts`)
+- **E2E tests**: This task correctly uses Playwright (separate from Vitest)
+
+### Frontend Dev Server
+
+Before running E2E tests, start the frontend:
+```bash
+cd frontend
+npm run dev  # Runs on http://localhost:5173
+```
+
+### Key Test Selectors
+
+From implemented components:
+- Input form: `getByLabelText(/question/i)`, `getByRole('button', { name: /start debate/i })`
+- Phase indicator: `getByRole('navigation', { name: /phase/i })`
+- Debate stream: `getByRole('main')`, speaker badges have `role="status"`
+
+### Related Files
+
+- `frontend/src/components/InputForm/` - Debate input form
+- `frontend/src/components/DebateStream/` - Live debate display
+- `frontend/src/styles/tokens.css` - CSS design tokens for consistent styling
+
+---
+
+**Last Updated:** 2025-12-24

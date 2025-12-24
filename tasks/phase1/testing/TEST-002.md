@@ -439,4 +439,48 @@ describe('State Management Integration', () => {
 
 ---
 
-**Last Updated:** 2025-12-23
+## Implementation Notes from Completed Tasks
+
+> Added 2025-12-24 after completing TEST-001 (Unit Test Suite)
+
+### Critical: Use Vitest, NOT Jest
+
+The task references Jest, but the project uses **Vitest**. Replace all Jest imports:
+
+```typescript
+// ❌ DON'T USE
+import { jest } from '@jest/globals';
+jest.mock(...)
+
+// ✅ USE VITEST
+import { vi } from 'vitest';
+vi.mock(...)
+```
+
+### Available Test Utilities
+
+- **Custom render**: `frontend/src/test-utils/index.tsx` - includes providers
+- **SSE mock**: `frontend/src/test-utils/sseMock.ts` - mock EventSource
+- **Custom matchers**: `frontend/src/test-utils/customMatchers.ts`
+
+### MSW with Vitest Setup
+
+```typescript
+// In vitest.config.ts or setupTests.ts
+import { server } from './test-utils/mswServer';
+import { beforeAll, afterEach, afterAll } from 'vitest';
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+```
+
+### Related Files
+
+- `frontend/src/stores/debate-store.ts` - Zustand store with SSE handling
+- `frontend/src/test-utils/sseMock.ts` - Use for SSE streaming tests
+- `frontend/src/setupTests.ts` - Test setup configuration
+
+---
+
+**Last Updated:** 2025-12-24

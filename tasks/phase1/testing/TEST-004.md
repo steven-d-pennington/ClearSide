@@ -344,4 +344,41 @@ describe('ARIA Attributes', () => {
 
 ---
 
-**Last Updated:** 2025-12-23
+## Implementation Notes from Completed Tasks
+
+> Added 2025-12-24 after completing TEST-001 (Unit Test Suite)
+
+### Use Vitest with @testing-library/jest-dom
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { axe, toHaveNoViolations } from 'jest-axe';
+
+// Add custom matcher (already in setupTests.ts)
+expect.extend(toHaveNoViolations);
+```
+
+### Accessibility Already Built Into Components
+
+The implemented UI components include accessibility features:
+- **Button**: Proper disabled state, loading state with aria
+- **Input**: Label association, error descriptions with aria-describedby
+- **Alert**: `role="alert"` for screen readers
+- **Modal**: Focus trap, aria-modal, aria-labelledby
+
+### Test File Locations
+
+Accessibility tests should be co-located with component tests:
+- `frontend/src/components/ui/Button/Button.test.tsx`
+- `frontend/src/components/ui/Alert/Alert.test.tsx`
+- etc.
+
+### Related Files
+
+- `frontend/src/components/ui/` - All UI components have accessibility built-in
+- `frontend/src/setupTests.ts` - Test setup with DOM matchers
+
+---
+
+**Last Updated:** 2025-12-24
