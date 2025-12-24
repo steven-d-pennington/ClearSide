@@ -1,0 +1,67 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--speaker-bg);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-medium);
+  color: var(--speaker-color);
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--speaker-color);
+}
+
+.name {
+  font-size: inherit;
+}
+
+/* Sizes */
+.sm {
+  font-size: var(--font-size-xs);
+  padding: 2px var(--spacing-xs);
+}
+
+.sm .indicator {
+  width: 6px;
+  height: 6px;
+}
+
+.md {
+  font-size: var(--font-size-sm);
+}
+
+.lg {
+  font-size: var(--font-size-base);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.lg .indicator {
+  width: 10px;
+  height: 10px;
+}
+
+/* Speaker-specific colors */
+.pro {
+  --speaker-color: var(--color-pro);
+  --speaker-bg: var(--color-pro-bg);
+}
+
+.con {
+  --speaker-color: var(--color-con);
+  --speaker-bg: var(--color-con-bg);
+}
+
+.moderator {
+  --speaker-color: var(--color-moderator);
+  --speaker-bg: var(--color-moderator-bg);
+}
+
+.system {
+  --speaker-color: var(--color-text-secondary);
+  --speaker-bg: var(--color-bg-tertiary);
+}
