@@ -1,0 +1,634 @@
+/**
+ * LLM Client Unit Tests
+ *
+ * Comprehensive tests for LLM client with retry logic, timeout handling,
+ * and provider-specific implementations (OpenAI and Anthropic).
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { LLMRequest } from '../src/types/llm.js';
+import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
+
+// Set test environment
+process.env.NODE_ENV = 'test';
+process.env.OPENAI_API_KEY = 'test-openai-key';
+process.env.ANTHROPIC_API_KEY = 'test-anthropic-key';
+process.env.LLM_PROVIDER = 'openai';
+
+// Mock OpenAI SDK
+const openaiCreateMock = vi.fn();
+vi.mock('openai', () => {
+  const MockOpenAI = vi.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: openaiCreateMock,
+      },
+    },
+  }));
+
+  MockOpenAI.APIError = class extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+      this.name = 'APIError';
+    }
+  };
+
+  return { default: MockOpenAI };
+});
+
+// Mock Anthropic SDK
+const anthropicCreateMock = vi.fn();
+vi.mock('@anthropic-ai/sdk', () => {
+  const MockAnthropic = vi.fn().mockImplementation(() => ({
+    messages: {
+      create: anthropicCreateMock,
+    },
+  }));
+
+  MockAnthropic.APIError = class extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+      this.name = 'APIError';
+    }
+  };
+
+  return { default: MockAnthropic };
+});
+
+// Mock pino logger
+vi.mock('pino', () => ({
+  default: () => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
+// Mock config to ensure clients are properly configured in tests
+vi.mock('../src/config/llm.js', () => ({
+  llmConfig: {
+    openai: {
+      apiKey: 'test-openai-key',
+      baseURL: undefined,
+    },
+    anthropic: {
+      apiKey: 'test-anthropic-key',
+      baseURL: undefined,
+    },
+    defaultProvider: 'openai',
+    defaultModels: {
+      openai: 'gpt-4-turbo-preview',
+      anthropic: 'claude-3-5-sonnet-20241022',
+    },
+    timeoutMs: 30000,
+    retry: {
+      maxRetries: 3,
+      baseDelay: 1000,
+      maxDelay: 10000,
+    },
+  },
+  validateLLMConfig: vi.fn(),
+}));
+
+// Import after mocks are set up
+import { LLMClient } from '../src/services/llm/client.js';
+import { LLMError } from '../src/types/llm.js';
+
+describe('LLMClient', () => {
+  let client: LLMClient;
+
+  beforeEach(() => {
+    // Reset mocks
+    vi.clearAllMocks();
+    openaiCreateMock.mockReset();
+    anthropicCreateMock.mockReset();
+
+    // Create client with test retry config (faster for tests)
+    client = new LLMClient({
+      maxRetries: 3,
+      baseDelay: 10, // 10ms for faster tests
+      maxDelay: 100,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('OpenAI Provider', () => {
+    const openaiRequest: LLMRequest = {
+      provider: 'openai',
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: 'Hello!' },
+      ],
+      temperature: 0.7,
+      maxTokens: 100,
+    };
+
+    it('should successfully complete an OpenAI request', async () => {
+      const mockResponse = {
+        id: 'chatcmpl-123',
+        object: 'chat.completion',
+        created: 1234567890,
+        model: 'gpt-4',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'Hello! How can I help you today?',
+            },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens: 20,
+          completion_tokens: 10,
+          total_tokens: 30,
+        },
+      };
+
+      openaiCreateMock.mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(openaiRequest);
+
+      expect(response).toEqual({
+        content: 'Hello! How can I help you today?',
+        model: 'gpt-4',
+        usage: {
+          promptTokens: 20,
+          completionTokens: 10,
+          totalTokens: 30,
+        },
+        finishReason: 'stop',
+        provider: 'openai',
+      });
+
+      expect(openaiCreateMock).toHaveBeenCalledWith({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'user', content: 'Hello!' },
+        ],
+        temperature: 0.7,
+        max_tokens: 100,
+        stream: false,
+      });
+    });
+
+    it('should retry on rate limit errors', async () => {
+      const rateLimitError = new (OpenAI as any).APIError('Rate limit exceeded', 429);
+      const mockResponse = {
+        id: 'chatcmpl-123',
+        object: 'chat.completion',
+        created: 1234567890,
+        model: 'gpt-4',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'Success after retry' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+      };
+
+      // Fail twice, then succeed
+      openaiCreateMock
+        .mockRejectedValueOnce(rateLimitError)
+        .mockRejectedValueOnce(rateLimitError)
+        .mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(openaiRequest);
+
+      expect(response.content).toBe('Success after retry');
+      expect(openaiCreateMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('should NOT retry on invalid request errors', async () => {
+      const invalidError = new (OpenAI as any).APIError('Invalid request', 400);
+
+      openaiCreateMock.mockRejectedValueOnce(invalidError);
+
+      await expect(client.complete(openaiRequest)).rejects.toThrow(LLMError);
+
+      // Should only be called once (no retry)
+      expect(openaiCreateMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle timeout', async () => {
+      // Mock a request that takes longer than timeout
+      openaiCreateMock.mockImplementation(
+        () => new Promise(resolve => setTimeout(resolve, 200))
+      );
+
+      const requestWithShortTimeout: LLMRequest = {
+        ...openaiRequest,
+        timeout: 50, // 50ms timeout
+      };
+
+      await expect(client.complete(requestWithShortTimeout)).rejects.toThrow(LLMError);
+
+      try {
+        await client.complete(requestWithShortTimeout);
+      } catch (error) {
+        expect(error).toBeInstanceOf(LLMError);
+        expect((error as LLMError).code).toBe('timeout');
+        expect((error as LLMError).retryable).toBe(true);
+      }
+    });
+
+    it('should track token usage', async () => {
+      const mockResponse = {
+        id: 'chatcmpl-123',
+        object: 'chat.completion',
+        created: 1234567890,
+        model: 'gpt-4',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'Response' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: {
+          prompt_tokens: 50,
+          completion_tokens: 25,
+          total_tokens: 75,
+        },
+      };
+
+      openaiCreateMock.mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(openaiRequest);
+
+      expect(response.usage).toEqual({
+        promptTokens: 50,
+        completionTokens: 25,
+        totalTokens: 75,
+      });
+    });
+
+    it('should handle authentication errors', async () => {
+      const authError = new (OpenAI as any).APIError('Invalid API key', 401);
+
+      openaiCreateMock.mockRejectedValueOnce(authError);
+
+      try {
+        await client.complete(openaiRequest);
+        expect.fail('Should have thrown LLMError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(LLMError);
+        expect((error as LLMError).code).toBe('authentication');
+        expect((error as LLMError).retryable).toBe(false);
+      }
+    });
+
+    it('should handle server errors with retry', async () => {
+      const serverError = new (OpenAI as any).APIError('Internal server error', 500);
+      const mockResponse = {
+        id: 'chatcmpl-123',
+        object: 'chat.completion',
+        created: 1234567890,
+        model: 'gpt-4',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'Success' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+      };
+
+      // Fail once with server error, then succeed
+      openaiCreateMock
+        .mockRejectedValueOnce(serverError)
+        .mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(openaiRequest);
+
+      expect(response.content).toBe('Success');
+      expect(openaiCreateMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('should exhaust retries and throw error', async () => {
+      const rateLimitError = new (OpenAI as any).APIError('Rate limit exceeded', 429);
+
+      // Always fail
+      openaiCreateMock.mockRejectedValue(rateLimitError);
+
+      try {
+        await client.complete(openaiRequest);
+        expect.fail('Should have thrown LLMError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(LLMError);
+        expect((error as LLMError).code).toBe('rate_limit');
+        // Should try: initial + 3 retries = 4 total
+        expect(openaiCreateMock).toHaveBeenCalledTimes(4);
+      }
+    });
+  });
+
+  describe('Anthropic Provider', () => {
+    const anthropicRequest: LLMRequest = {
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'user', content: 'Hello!' },
+      ],
+      temperature: 0.7,
+      maxTokens: 100,
+    };
+
+    it('should successfully complete an Anthropic request', async () => {
+      const mockResponse = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [
+          {
+            type: 'text',
+            text: 'Hello! How can I help you today?',
+          },
+        ],
+        model: 'claude-3-5-sonnet-20241022',
+        stop_reason: 'end_turn',
+        usage: {
+          input_tokens: 20,
+          output_tokens: 10,
+        },
+      };
+
+      anthropicCreateMock.mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(anthropicRequest);
+
+      expect(response).toEqual({
+        content: 'Hello! How can I help you today?',
+        model: 'claude-3-5-sonnet-20241022',
+        usage: {
+          promptTokens: 20,
+          completionTokens: 10,
+          totalTokens: 30,
+        },
+        finishReason: 'stop',
+        provider: 'anthropic',
+      });
+
+      expect(anthropicCreateMock).toHaveBeenCalledWith({
+        model: 'claude-3-5-sonnet-20241022',
+        system: 'You are a helpful assistant.',
+        messages: [
+          { role: 'user', content: 'Hello!' },
+        ],
+        temperature: 0.7,
+        max_tokens: 100,
+      });
+    });
+
+    it('should retry on Anthropic rate limit errors', async () => {
+      const rateLimitError = new (Anthropic as any).APIError('Rate limit exceeded', 429);
+      const mockResponse = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Success after retry' }],
+        model: 'claude-3-5-sonnet-20241022',
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 20, output_tokens: 10 },
+      };
+
+      // Fail once, then succeed
+      anthropicCreateMock
+        .mockRejectedValueOnce(rateLimitError)
+        .mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(anthropicRequest);
+
+      expect(response.content).toBe('Success after retry');
+      expect(anthropicCreateMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('should NOT retry on Anthropic invalid request errors', async () => {
+      const invalidError = new (Anthropic as any).APIError('Invalid request', 400);
+
+      anthropicCreateMock.mockRejectedValueOnce(invalidError);
+
+      await expect(client.complete(anthropicRequest)).rejects.toThrow(LLMError);
+
+      // Should only be called once (no retry)
+      expect(anthropicCreateMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle max_tokens finish reason', async () => {
+      const mockResponse = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Truncated response...' }],
+        model: 'claude-3-5-sonnet-20241022',
+        stop_reason: 'max_tokens',
+        usage: { input_tokens: 20, output_tokens: 100 },
+      };
+
+      anthropicCreateMock.mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(anthropicRequest);
+
+      expect(response.finishReason).toBe('length');
+    });
+
+    it('should track Anthropic token usage', async () => {
+      const mockResponse = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Response' }],
+        model: 'claude-3-5-sonnet-20241022',
+        stop_reason: 'end_turn',
+        usage: {
+          input_tokens: 50,
+          output_tokens: 25,
+        },
+      };
+
+      anthropicCreateMock.mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(anthropicRequest);
+
+      expect(response.usage).toEqual({
+        promptTokens: 50,
+        completionTokens: 25,
+        totalTokens: 75,
+      });
+    });
+
+    it('should handle multiple content blocks', async () => {
+      const mockResponse = {
+        id: 'msg_123',
+        type: 'message',
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'First part. ' },
+          { type: 'text', text: 'Second part.' },
+        ],
+        model: 'claude-3-5-sonnet-20241022',
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 20, output_tokens: 10 },
+      };
+
+      anthropicCreateMock.mockResolvedValueOnce(mockResponse);
+
+      const response = await client.complete(anthropicRequest);
+
+      expect(response.content).toBe('First part. \nSecond part.');
+    });
+  });
+
+  describe('Retry Logic', () => {
+    it('should use exponential backoff with jitter', async () => {
+      const testClient = new LLMClient({
+        maxRetries: 3,
+        baseDelay: 100,
+        maxDelay: 1000,
+      });
+
+      const rateLimitError = new (OpenAI as any).APIError('Rate limit exceeded', 429);
+      openaiCreateMock.mockRejectedValue(rateLimitError);
+
+      const startTime = Date.now();
+
+      try {
+        await testClient.complete({
+          provider: 'openai',
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'test' }],
+        });
+      } catch (error) {
+        // Expected to fail after retries
+      }
+
+      const duration = Date.now() - startTime;
+
+      // Should take at least the sum of exponential delays
+      // Attempt 0: 100ms, Attempt 1: 200ms, Attempt 2: 400ms
+      // Minimum total: ~700ms (accounting for jitter and execution time)
+      expect(duration).toBeGreaterThanOrEqual(600);
+    });
+
+    it('should respect maxDelay cap', async () => {
+      const testClient = new LLMClient({
+        maxRetries: 5,
+        baseDelay: 1000,
+        maxDelay: 2000, // Cap at 2 seconds
+      });
+
+      const rateLimitError = new (OpenAI as any).APIError('Rate limit exceeded', 429);
+      openaiCreateMock.mockRejectedValue(rateLimitError);
+
+      const startTime = Date.now();
+
+      try {
+        await testClient.complete({
+          provider: 'openai',
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'test' }],
+        });
+      } catch (error) {
+        // Expected to fail
+      }
+
+      const duration = Date.now() - startTime;
+
+      // Even with 5 retries, delays should be capped at 2000ms
+      // So total should be less than 5 * 2000 = 10000ms
+      expect(duration).toBeLessThan(12000);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should convert unknown errors to LLMError', async () => {
+      const unknownError = new Error('Something went wrong');
+
+      openaiCreateMock.mockRejectedValueOnce(unknownError);
+
+      try {
+        await client.complete({
+          provider: 'openai',
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'test' }],
+        });
+        expect.fail('Should have thrown LLMError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(LLMError);
+        expect((error as LLMError).code).toBe('unknown');
+      }
+    });
+
+    it('should preserve LLMError instances', async () => {
+      const customError = new LLMError('Custom error', 'invalid_request', false);
+
+      openaiCreateMock.mockRejectedValueOnce(customError);
+
+      try {
+        await client.complete({
+          provider: 'openai',
+          model: 'gpt-4',
+          messages: [{ role: 'user', content: 'test' }],
+        });
+        expect.fail('Should have thrown LLMError');
+      } catch (error) {
+        expect(error).toBe(customError);
+      }
+    });
+  });
+});
+
+describe('LLMError', () => {
+  it('should create error with all properties', () => {
+    const error = new LLMError('Test error', 'rate_limit', true, 429);
+
+    expect(error.message).toBe('Test error');
+    expect(error.code).toBe('rate_limit');
+    expect(error.retryable).toBe(true);
+    expect(error.statusCode).toBe(429);
+    expect(error.name).toBe('LLMError');
+  });
+
+  it('should detect rate limit errors from message', () => {
+    const error = LLMError.fromError(new Error('Rate limit exceeded'));
+
+    expect(error.code).toBe('rate_limit');
+    expect(error.retryable).toBe(true);
+  });
+
+  it('should detect authentication errors from message', () => {
+    const error = LLMError.fromError(new Error('Unauthorized: Invalid API key'));
+
+    expect(error.code).toBe('authentication');
+    expect(error.retryable).toBe(false);
+  });
+
+  it('should detect timeout errors from message', () => {
+    const error = LLMError.fromError(new Error('Request timed out'));
+
+    expect(error.code).toBe('timeout');
+    expect(error.retryable).toBe(true);
+  });
+
+  it('should handle non-Error objects', () => {
+    const error = LLMError.fromError('String error message');
+
+    expect(error).toBeInstanceOf(LLMError);
+    expect(error.message).toBe('String error message');
+  });
+});
