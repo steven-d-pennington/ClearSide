@@ -1,0 +1,13 @@
+.count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.warning {
+  color: var(--color-warning);
+}
+
+.error {
+  color: var(--color-error);
+}

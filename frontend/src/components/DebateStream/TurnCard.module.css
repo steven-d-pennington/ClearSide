@@ -1,0 +1,118 @@
+.turnCard {
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--color-border);
+  transition: all var(--transition-base);
+  cursor: default;
+}
+
+.turnCard[tabindex] {
+  cursor: pointer;
+}
+
+.turnCard:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.turnCard.selected {
+  box-shadow: var(--shadow-md);
+  border-left-width: 4px;
+}
+
+/* Speaker-specific border colors */
+.pro {
+  border-left-color: var(--color-pro);
+  background: linear-gradient(to right, var(--color-pro-bg), var(--color-bg-primary) 20%);
+}
+
+.con {
+  border-left-color: var(--color-con);
+  background: linear-gradient(to right, var(--color-con-bg), var(--color-bg-primary) 20%);
+}
+
+.moderator {
+  border-left-color: var(--color-moderator);
+  background: linear-gradient(to right, var(--color-moderator-bg), var(--color-bg-primary) 20%);
+}
+
+.system {
+  border-left-color: var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.phase {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}
+
+.time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-left: auto;
+}
+
+.content {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-primary);
+}
+
+.content p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.metadata {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.metaLabel {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+}
+
+.assumptions ul {
+  margin: var(--spacing-xs) 0 0 var(--spacing-md);
+  padding: 0;
+  list-style: disc;
+}
+
+.assumptions li {
+  margin-bottom: var(--spacing-xs);
+}
+
+.evidenceType,
+.uncertainty {
+  display: inline-block;
+  margin-right: var(--spacing-md);
+  padding: 2px var(--spacing-xs);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.uncertainty.low {
+  color: var(--color-success);
+}
+
+.uncertainty.medium {
+  color: var(--color-warning);
+}
+
+.uncertainty.high {
+  color: var(--color-error);
+}

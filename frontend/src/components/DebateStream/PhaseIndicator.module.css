@@ -1,0 +1,128 @@
+.phaseIndicator {
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.currentPhase {
+  text-align: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.phaseName {
+  display: block;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.phaseDescription {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+.timeline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  padding: var(--spacing-sm) 0;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--color-border);
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+.phase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 1;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-bg-tertiary);
+  border: 2px solid var(--color-border);
+  transition: all var(--transition-base);
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-top: var(--spacing-xs);
+  transition: color var(--transition-base);
+}
+
+/* Status styles */
+.completed .dot {
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.completed .label {
+  color: var(--color-success);
+}
+
+.active .dot {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px var(--color-primary-alpha);
+  animation: pulse 2s infinite;
+}
+
+.active .label {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.pending .dot {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
+}
+
+.pending .label {
+  color: var(--color-text-tertiary);
+}
+
+.error .dot {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.error .label {
+  color: var(--color-error);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--color-primary-alpha);
+  }
+  50% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+
+@media (max-width: 640px) {
+  .label {
+    display: none;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+  }
+}

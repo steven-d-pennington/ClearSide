@@ -1,0 +1,80 @@
+import React from 'react';
+import type { DebateTurn } from '../../types/debate';
+import { PHASE_INFO } from '../../types/debate';
+import { SpeakerBadge } from './SpeakerBadge';
+import styles from './TurnCard.module.css';
+
+interface TurnCardProps {
+  turn: DebateTurn;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  className?: string;
+}
+
+export const TurnCard: React.FC<TurnCardProps> = ({
+  turn,
+  isSelected = false,
+  onSelect,
+  className = '',
+}) => {
+  const phaseInfo = PHASE_INFO[turn.phase];
+
+  const formatTime = (date: Date) => {
+    return new Date(date).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <article
+      className={`${styles.turnCard} ${styles[turn.speaker.toLowerCase()]} ${isSelected ? styles.selected : ''} ${className}`}
+      onClick={onSelect}
+      tabIndex={onSelect ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (onSelect && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      aria-selected={isSelected}
+    >
+      <header className={styles.header}>
+        <SpeakerBadge speaker={turn.speaker} size="sm" />
+        <span className={styles.phase}>{phaseInfo.shortName}</span>
+        <span className={styles.time}>{formatTime(turn.timestamp)}</span>
+      </header>
+
+      <div className={styles.content}>
+        <p>{turn.content}</p>
+      </div>
+
+      {turn.metadata && (
+        <footer className={styles.metadata}>
+          {turn.metadata.assumptions && turn.metadata.assumptions.length > 0 && (
+            <div className={styles.assumptions}>
+              <span className={styles.metaLabel}>Assumptions:</span>
+              <ul>
+                {turn.metadata.assumptions.map((assumption, i) => (
+                  <li key={i}>{assumption}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {turn.metadata.evidenceType && (
+            <span className={styles.evidenceType}>
+              Evidence: {turn.metadata.evidenceType}
+            </span>
+          )}
+          {turn.metadata.uncertaintyLevel && (
+            <span className={`${styles.uncertainty} ${styles[turn.metadata.uncertaintyLevel]}`}>
+              Uncertainty: {turn.metadata.uncertaintyLevel}
+            </span>
+          )}
+        </footer>
+      )}
+    </article>
+  );
+};
+
+export default TurnCard;

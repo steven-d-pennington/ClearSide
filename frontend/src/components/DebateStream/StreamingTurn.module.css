@@ -1,0 +1,117 @@
+.streamingTurn {
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--color-border);
+  animation: fadeIn var(--transition-base);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Speaker-specific border colors */
+.pro {
+  border-left-color: var(--color-pro);
+  background: linear-gradient(to right, var(--color-pro-bg), var(--color-bg-primary) 20%);
+}
+
+.con {
+  border-left-color: var(--color-con);
+  background: linear-gradient(to right, var(--color-con-bg), var(--color-bg-primary) 20%);
+}
+
+.moderator {
+  border-left-color: var(--color-moderator);
+  background: linear-gradient(to right, var(--color-moderator-bg), var(--color-bg-primary) 20%);
+}
+
+.system {
+  border-left-color: var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.phase {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}
+
+.streaming {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
+.content {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-primary);
+  position: relative;
+}
+
+.content p {
+  margin: 0;
+  white-space: pre-wrap;
+  display: inline;
+}
+
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.2em;
+  background: var(--color-primary);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}

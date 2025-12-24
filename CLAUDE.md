@@ -173,7 +173,46 @@ After:  | INFRA-001 | ... | ✅ DONE | [View Task](...) |
 **Tell the user you're done:**
 > "✅ INFRA-001 is complete! All acceptance criteria met, tests passing. Ready for the next task."
 
-### Step 7: Commit Changes
+### Step 7: Knowledge Sharing (IMPORTANT)
+
+**After completing a task, evaluate your work for insights that would help future agents and developers:**
+
+1. **Review your implementation outputs:**
+   - What patterns or approaches worked well?
+   - Were there any gotchas, edge cases, or non-obvious solutions?
+   - Did you discover dependencies or integration points not documented in the task?
+
+2. **Identify relevant task files to update:**
+   - Check dependent tasks that will build on your work
+   - Look for related tasks in the same category
+   - Consider if the task summary (`TASK_CREATION_SUMMARY.md`) needs updates
+
+3. **Add helpful context to task files:**
+   - Add "Implementation Notes" sections with practical insights
+   - Document actual file paths, function names, or APIs created
+   - Note any deviations from the original implementation guide
+   - Include example usage or integration patterns
+
+**Example additions to a dependent task file:**
+```markdown
+## 📝 Implementation Notes from INFRA-001
+
+> Added by agent completing INFRA-001 on 2025-12-24
+
+- LLM client is exported from `src/lib/llm/client.ts`
+- Use `createLLMClient()` factory - supports both OpenAI and Anthropic
+- Rate limiter is configured in `src/lib/llm/rate-limiter.ts` (100 req/min default)
+- For streaming responses, use `client.streamChat()` not `client.chat()`
+```
+
+4. **Update `docs/IMPLEMENTATION_NOTES.md`** (create if needed):
+   - Add cross-cutting learnings that affect multiple tasks
+   - Document architectural decisions made during implementation
+   - Note any changes to the original design
+
+**This step ensures institutional knowledge is preserved and future agents don't repeat discoveries or make avoidable mistakes.**
+
+### Step 8: Commit Changes
 
 ```bash
 # Stage changes
@@ -577,6 +616,7 @@ From user's global settings:
 - **Test thoroughly** - >90% coverage for critical paths
 - **Commit frequently** - Small, focused commits
 - **Be transparent** - Tell the user what you're doing and why
+- **Share knowledge** - After completing a task, add helpful context to dependent task files for future agents
 
 ---
 
@@ -586,6 +626,6 @@ Every feature, every line of code, every prompt should serve the goal of helping
 
 ---
 
-*Last Updated: 2025-12-23*
-*Version: 2.0.0*
+*Last Updated: 2025-12-24*
+*Version: 2.1.0*
 *For questions, check [tasks/README.md](tasks/README.md) or ask the user*

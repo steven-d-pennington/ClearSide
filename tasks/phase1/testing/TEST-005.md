@@ -456,4 +456,33 @@ describe('Flagship Demo Benchmark', () => {
 
 ---
 
-**Last Updated:** 2025-12-23
+## Implementation Notes from Completed Tasks
+
+> Added 2025-12-24 after completing TEST-001 (Unit Test Suite)
+
+### This Task is Backend-Focused
+
+TEST-005 validates backend AI agent outputs. The frontend test infrastructure from TEST-001 doesn't directly apply here, but can be used for integration tests that verify agent output display.
+
+### Backend Testing
+
+Agent quality validation tests should use the backend's test framework. Check `backend/package.json` for the test configuration.
+
+### Custom Matchers
+
+Frontend has custom matchers in `frontend/src/test-utils/customMatchers.ts`:
+- `toHaveValidProposition()` - validates proposition structure
+- `toHaveValidArgument()` - validates argument structure
+- `toBeWithinCharacterLimit(min, max)` - validates text length
+
+These can be extended for agent output validation.
+
+### Related Files
+
+- `backend/src/services/agents/` - Agent implementations
+- `backend/src/services/agents/prompts/quality-validators.ts` - Quality validation
+- `docs/08_live-debate-protocol.md` - Debate protocol specification
+
+---
+
+**Last Updated:** 2025-12-24
