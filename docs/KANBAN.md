@@ -82,8 +82,8 @@ Each task file includes:
 | CORE-001 | Implement Debate State Machine | P0 | L | ✅ DONE | [View Task](../tasks/phase1/core/CORE-001.md) |
 | CORE-002 | Implement Debate Orchestrator | P0 | XL | ✅ DONE | [View Task](../tasks/phase1/core/CORE-002.md) |
 | CORE-003 | Implement Turn Management System | P0 | L | ✅ DONE | [View Task](../tasks/phase1/core/CORE-003.md) |
-| CORE-004 | Implement User Intervention Queue | P0 | M | 🟢 TO DO | [View Task](../tasks/phase1/core/CORE-004.md) |
-| CORE-005 | Implement Transcript Recorder | P0 | M | 🟢 TO DO | [View Task](../tasks/phase1/core/CORE-005.md) |
+| CORE-004 | Implement User Intervention Queue | P0 | M | ✅ DONE | [View Task](../tasks/phase1/core/CORE-004.md) |
+| CORE-005 | Implement Transcript Recorder | P0 | M | ✅ DONE | [View Task](../tasks/phase1/core/CORE-005.md) |
 
 **Dependencies:**
 - CORE-001 depends on INFRA-002 (database)

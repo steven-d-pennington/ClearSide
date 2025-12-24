@@ -7,6 +7,7 @@ import express, { type Request, type Response } from 'express';
 import { config } from 'dotenv';
 import { sseManager } from './services/sse/index.js';
 import debateRoutes from './routes/debate-routes.js';
+import interventionRoutes from './routes/intervention-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 
@@ -69,6 +70,7 @@ app.get('/health', (_req: Request, res: Response) => {
 
 // API routes
 app.use('/api', debateRoutes);
+app.use('/api', interventionRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

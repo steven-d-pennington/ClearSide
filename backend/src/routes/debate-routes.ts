@@ -175,6 +175,118 @@ router.get('/debates', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /debates/:debateId/pause
+ * Pause a live debate
+ */
+router.post('/debates/:debateId/pause', async (req: Request, res: Response) => {
+  const { debateId } = req.params;
+
+  logger.info({ debateId }, 'Pause request received');
+
+  try {
+    const debate = await debateRepository.findById(debateId!);
+
+    if (!debate) {
+      res.status(404).json({
+        error: 'Debate not found',
+        debateId,
+      });
+      return;
+    }
+
+    // Check if debate is in a pausable state
+    if (debate.status !== 'live') {
+      res.status(400).json({
+        error: 'Invalid debate status',
+        message: `Cannot pause debate with status: ${debate.status}`,
+        currentStatus: debate.status,
+      });
+      return;
+    }
+
+    // Update debate status to paused
+    await debateRepository.updateStatus(debateId!, 'paused');
+
+    // Broadcast pause event
+    sseManager.broadcastToDebate(debateId!, 'debate_paused', {
+      debateId,
+      pausedAt: new Date().toISOString(),
+      phase: debate.currentPhase,
+    });
+
+    logger.info({ debateId }, 'Debate paused');
+
+    res.json({
+      status: 'paused',
+      debateId,
+      pausedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error({ debateId, error }, 'Error pausing debate');
+    res.status(500).json({
+      error: 'Failed to pause debate',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * POST /debates/:debateId/resume
+ * Resume a paused debate
+ */
+router.post('/debates/:debateId/resume', async (req: Request, res: Response) => {
+  const { debateId } = req.params;
+
+  logger.info({ debateId }, 'Resume request received');
+
+  try {
+    const debate = await debateRepository.findById(debateId!);
+
+    if (!debate) {
+      res.status(404).json({
+        error: 'Debate not found',
+        debateId,
+      });
+      return;
+    }
+
+    // Check if debate is paused
+    if (debate.status !== 'paused') {
+      res.status(400).json({
+        error: 'Invalid debate status',
+        message: `Cannot resume debate with status: ${debate.status}`,
+        currentStatus: debate.status,
+      });
+      return;
+    }
+
+    // Update debate status back to live
+    await debateRepository.updateStatus(debateId!, 'live');
+
+    // Broadcast resume event
+    sseManager.broadcastToDebate(debateId!, 'debate_resumed', {
+      debateId,
+      resumedAt: new Date().toISOString(),
+      phase: debate.currentPhase,
+    });
+
+    logger.info({ debateId }, 'Debate resumed');
+
+    res.json({
+      status: 'live',
+      debateId,
+      resumedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error({ debateId, error }, 'Error resuming debate');
+    res.status(500).json({
+      error: 'Failed to resume debate',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
  * DELETE /debates/:debateId
  * Delete a debate and all associated data
  */
