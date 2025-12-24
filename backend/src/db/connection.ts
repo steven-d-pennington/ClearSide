@@ -24,6 +24,11 @@ const dbConfig = {
   // Or use DATABASE_URL if provided (common in cloud environments)
   connectionString: process.env.DATABASE_URL,
 
+  // SSL configuration for cloud databases (Supabase, Neon, etc.)
+  ssl: process.env.DATABASE_URL
+    ? { rejectUnauthorized: false }
+    : undefined,
+
   // Connection pool configuration
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds

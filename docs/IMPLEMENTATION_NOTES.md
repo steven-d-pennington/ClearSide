@@ -9,15 +9,15 @@
 
 ## Completed Implementation Summary
 
-### Phase 1 Progress: 72% Complete (21/29 tasks)
+### Phase 1 Progress: 76% Complete (22/29 tasks)
 
 | Category | Tasks Done | Total | Status |
 |----------|------------|-------|--------|
 | Infrastructure | 5 | 5 | ✅ Complete |
 | Core Engine | 5 | 5 | ✅ Complete |
 | AI Agents | 5 | 5 | ✅ Complete |
-| UI Components | 6 | 9 | 🟡 In Progress |
-| Testing | 1 | 5 | 🟡 In Progress |
+| UI Components | 9 | 9 | ✅ Complete |
+| Testing | 2 | 5 | 🟡 In Progress |
 
 ---
 
@@ -271,13 +271,37 @@ frontend/
 │   │   │   ├── CharacterCount.tsx
 │   │   │   └── index.ts
 │   │   │
-│   │   └── DebateStream/          # Live debate display (UI-002)
-│   │       ├── DebateStream.tsx   # Main container + auto-scroll
-│   │       ├── PhaseIndicator.tsx # 6-phase progress (UI-007)
-│   │       ├── SpeakerBadge.tsx   # Pro/Con/Moderator (UI-008)
-│   │       ├── TurnCard.tsx       # Completed turns
-│   │       ├── StreamingTurn.tsx  # Active streaming turn
-│   │       └── index.ts
+│   │   ├── DebateStream/          # Live debate display (UI-002)
+│   │   │   ├── DebateStream.tsx   # Main container + auto-scroll
+│   │   │   ├── PhaseIndicator.tsx # 6-phase progress (UI-007)
+│   │   │   ├── SpeakerBadge.tsx   # Pro/Con/Moderator (UI-008)
+│   │   │   ├── TurnCard.tsx       # Completed turns
+│   │   │   ├── StreamingTurn.tsx  # Active streaming turn
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── TimelineScrubber/      # Phase navigation (UI-003)
+│   │   │   ├── TimelineScrubber.tsx  # Interactive 6-phase timeline
+│   │   │   ├── TimelinePhase.tsx     # Individual phase indicator
+│   │   │   ├── ProgressBar.tsx       # Visual progress bar
+│   │   │   └── *.module.css
+│   │   │
+│   │   ├── InterventionPanel/     # User interventions (UI-004)
+│   │   │   ├── InterventionPanel.tsx # Main panel + modal
+│   │   │   ├── InterventionForm.tsx  # Submission form
+│   │   │   ├── InterventionCard.tsx  # Display submitted interventions
+│   │   │   └── *.module.css
+│   │   │
+│   │   └── Layout/                # App layout (UI-005)
+│   │       ├── AppLayout.tsx      # Main app shell
+│   │       ├── Header.tsx         # Sticky header
+│   │       ├── Navigation.tsx     # Desktop nav
+│   │       ├── MobileMenu.tsx     # Slide-out mobile nav
+│   │       ├── Footer.tsx
+│   │       ├── SkipLink.tsx       # Accessibility skip link
+│   │       └── *.module.css
+│   │
+│   ├── hooks/
+│   │   └── useMediaQuery.ts       # Responsive design hook
 │   │
 │   ├── stores/
 │   │   └── debate-store.ts        # ⭐ Zustand state + SSE
@@ -377,6 +401,7 @@ vi.stubGlobal('EventSource', MockEventSource);
 - Test utilities: `frontend/src/test-utils/index.tsx`
 - SSE mock: `frontend/src/test-utils/sseMock.ts`
 - Custom matchers: `frontend/src/test-utils/customMatchers.ts`
+- Integration tests: `frontend/src/__tests__/integration/`
 - Run tests: `cd frontend && npm run test:run`
 - Run coverage: `cd frontend && npm run test:coverage`
 
@@ -384,6 +409,67 @@ vi.stubGlobal('EventSource', MockEventSource);
 - Mock agents: `backend/src/services/agents/mock-agents.ts`
 - Prompt tester: `backend/src/services/agents/prompts/prompt-tester.ts`
 - Quality validators: `backend/src/services/agents/prompts/quality-validators.ts`
+
+---
+
+## Integration Testing Notes (Added from TEST-002)
+
+### SSE Mock Utility
+
+**Important:** `sseMock.cleanup()` only clears SSE-specific state (listeners, eventSource).
+It does NOT call `vi.unstubAllGlobals()` - this preserves other mocks like `fetch`.
+
+Use `sseMock.fullCleanup()` only when you need to remove ALL global stubs.
+
+### Fetch Mocking Pattern
+
+```typescript
+// At top of test file - mock fetch globally
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
+// In beforeEach - reset mock state
+beforeEach(() => {
+  vi.clearAllMocks();
+  useDebateStore.getState()._reset();
+});
+
+// In tests - set up responses
+mockFetch.mockResolvedValueOnce({
+  ok: true,
+  json: async () => ({ id: 'debate-123', status: 'initializing' }),
+});
+```
+
+### Store Internal Methods for Testing
+
+The debate store exposes internal methods prefixed with `_` for testing:
+
+```typescript
+const {
+  _handleSSEMessage,   // Process SSE events directly
+  _appendTurnChunk,    // Add streaming content
+  _completeTurn,       // Finalize a turn
+  _setConnectionStatus,// Update connection state
+  _setError,           // Set error state
+  _reset               // Reset to initial state
+} = useDebateStore.getState();
+```
+
+### Integration Test Coverage (TEST-002)
+
+Location: `frontend/src/__tests__/integration/debateFlow.test.tsx`
+
+Covers:
+- Debate start flow with SSE connection
+- SSE message handling (phase transitions, turn streaming, completion)
+- Intervention submission and addressing
+- Pause/resume functionality
+- Error handling
+- State selectors (`selectIsDebateActive`, `selectPendingInterventions`)
+- Full debate flow simulation
+
+**Total Tests:** 166 across 9 test files
 
 ### If working on Export tasks (Phase 2):
 
@@ -396,6 +482,8 @@ vi.stubGlobal('EventSource', MockEventSource);
 
 | Commit | Description |
 |--------|-------------|
+| `20b43bc` | TEST-002: Integration tests for debate flow (20 tests) |
+| `a042161` | UI-003/004/005: TimelineScrubber, InterventionPanel, Layout (68 tests) |
 | `866bc39` | UI-001/002/006/007/008/009 + TEST-001: Frontend components & test suite |
 | `ea6cd46` | AGENT-005: Comprehensive prompt template library |
 | `7db4ae9` | AGENT-001 to AGENT-004: All debate agents |
