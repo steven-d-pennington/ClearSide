@@ -98,10 +98,10 @@ Each task file includes:
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AGENT-001 | Implement Orchestrator Agent (Proposition Normalization) | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-001) |
-| AGENT-002 | Implement Pro Advocate Agent | P0 | XL | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-002) |
-| AGENT-003 | Implement Con Advocate Agent | P0 | XL | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-003) |
-| AGENT-004 | Implement Moderator Agent | P0 | L | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#agent-004) |
+| AGENT-001 | Implement Orchestrator Agent (Proposition Normalization) | P0 | M | ✅ DONE | [View Task](../tasks/phase1/agents/AGENT-001.md) |
+| AGENT-002 | Implement Pro Advocate Agent | P0 | XL | ✅ DONE | [View Task](../tasks/phase1/agents/AGENT-002.md) |
+| AGENT-003 | Implement Con Advocate Agent | P0 | XL | ✅ DONE | [View Task](../tasks/phase1/agents/AGENT-003.md) |
+| AGENT-004 | Implement Moderator Agent | P0 | L | ✅ DONE | [View Task](../tasks/phase1/agents/AGENT-004.md) |
 | AGENT-005 | Create Agent Prompt Templates | P0 | L | ✅ DONE | [View Task](../tasks/phase1/agents/AGENT-005.md) |
 
 **Dependencies:**
