@@ -381,4 +381,92 @@ Accessibility tests should be co-located with component tests:
 
 ---
 
-**Last Updated:** 2025-12-24
+## ✅ Completion Notes
+
+> Added 2025-12-25 after completing TEST-004
+
+### What Was Implemented
+
+**111 accessibility tests across 3 files:**
+
+1. **Color Contrast Tests** (`frontend/src/__tests__/a11y/colorContrast.test.ts`) - 60 tests
+   - WCAG 2.1 AA compliance for normal text (4.5:1)
+   - WCAG 2.1 AA compliance for large text (3:1)
+   - All design token color pairs validated
+   - Utility functions for runtime contrast checking
+
+2. **Component A11y Tests** (`frontend/src/__tests__/a11y/components.a11y.test.tsx`) - 28 tests
+   - axe-core automated testing for all UI components
+   - ARIA attribute verification
+   - Form label associations
+   - Error message announcements
+
+3. **Keyboard Navigation Tests** (`frontend/src/__tests__/a11y/keyboard.test.tsx`) - 23 tests
+   - Tab order validation
+   - Focus trap in modals
+   - Skip link functionality
+   - Enter/Space activation for buttons
+
+### Accessibility Utilities Created
+
+**Color Contrast Checker** (`frontend/src/utils/a11y/colorContrast.ts`):
+```typescript
+import { getContrastRatio, meetsWCAG_AA, meetsWCAG_AAA } from '@/utils/a11y/colorContrast';
+
+// Check if colors pass WCAG AA
+const passes = meetsWCAG_AA(foreground, background, 'normal'); // or 'large'
+```
+
+### Known Issues Documented
+
+Four color contrast issues were identified and documented in:
+`frontend/src/__tests__/a11y/ACCESSIBILITY_FINDINGS.md`
+
+1. Tertiary text color (#94a3b8) on white - ratio 3.0:1 (needs 4.5:1)
+2. Pro button text needs slightly darker background
+3. Moderator button text needs adjustment
+4. Challenge button (danger variant) needs contrast review
+
+### SSE Testing Context
+
+For testing SSE-based components:
+
+**Backend SSE Manager Location:** `backend/src/services/sse/sse-manager.ts`
+
+**Frontend SSE Mock Pattern:**
+```typescript
+// In frontend/src/test-utils/sseMock.ts
+import { vi } from 'vitest';
+
+let mockInstance: MockEventSource;
+class MockEventSource {
+  onopen: (() => void) | null = null;
+  onmessage: ((e: MessageEvent) => void) | null = null;
+  onerror: ((e: Event) => void) | null = null;
+  close = vi.fn();
+  constructor(url: string) { mockInstance = this; }
+}
+
+export const sseMock = {
+  setup: () => vi.stubGlobal('EventSource', MockEventSource),
+  getInstance: () => mockInstance,
+  simulateMessage: (data: unknown) => {
+    mockInstance.onmessage?.(new MessageEvent('message', { data: JSON.stringify(data) }));
+  },
+  cleanup: () => { /* clears state but preserves other mocks */ },
+};
+```
+
+**Integration with Zustand Store:**
+```typescript
+// The debate store handles SSE internally
+import { useDebateStore } from '@/stores/debate-store';
+
+// For testing, use internal methods
+const { _handleSSEMessage, _setConnectionStatus } = useDebateStore.getState();
+```
+
+---
+
+**Status:** ✅ DONE
+**Last Updated:** 2025-12-25

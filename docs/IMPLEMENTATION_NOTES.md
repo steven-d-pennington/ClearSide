@@ -637,4 +637,77 @@ interface MarkdownExportOptions {
 
 ---
 
+## Railway Deployment & Auto-Migrations
+
+### Overview
+
+The backend automatically runs database migrations on startup, enabling zero-downtime deployments on Railway.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `backend/src/db/runMigrations.ts` | Programmatic migration runner |
+| `backend/src/index.ts` | Calls migrations before server start |
+| `backend/package.json` | Build script copies SQL files to dist/ |
+| `backend/railway.toml` | Railway deployment configuration |
+
+### How It Works
+
+1. **On Build**: TypeScript compiles to `dist/`, then SQL migration files are copied:
+   ```json
+   "build": "tsc && npm run copy-migrations",
+   "copy-migrations": "cp -r src/db/migrations dist/db/"
+   ```
+
+2. **On Start**: Server runs migrations before accepting requests:
+   ```typescript
+   async function start() {
+     const migrationResult = await runMigrationsOnStartup();
+     if (!migrationResult.success) {
+       process.exit(1);  // Fail fast if migrations fail
+     }
+     server = app.listen(PORT, () => { /* ... */ });
+   }
+   ```
+
+3. **Migration Safety**:
+   - Checks `schema_migrations` table for already-applied migrations
+   - Only runs pending migrations
+   - Gracefully skips if `DATABASE_URL` not set (for local dev without DB)
+
+### Railway Configuration
+
+```toml
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+```
+
+### Troubleshooting
+
+**"Migration failed" with empty error:**
+- SQL files weren't copied to `dist/`. Ensure `copy-migrations` script runs.
+
+**DNS resolution errors:**
+- Network-restricted environment. Use Railway's internal networking or check firewall.
+
+**Connection errors:**
+- Verify `DATABASE_URL` environment variable is set in Railway dashboard.
+
+### Using Timescale Cloud
+
+ClearSide uses Timescale Cloud for PostgreSQL. Connection string format:
+```
+postgres://tsdbadmin@{host}.tsdb.cloud.timescale.com:{port}/tsdb?sslmode=require
+```
+
+Note: Timescale's SQL editor only allows single statements at a time. For initial setup, run each migration statement individually.
+
+---
+
 *This document should be updated as new features are implemented.*

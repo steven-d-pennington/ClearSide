@@ -183,4 +183,71 @@ export class PDFExporter {
 
 ---
 
-**Last Updated:** 2025-12-23
+## 📝 Implementation Notes from EXPORT-001
+
+> Added by agent completing EXPORT-001 on 2025-12-25
+
+### Existing Export Infrastructure
+
+EXPORT-001 (Markdown Export) has been completed and provides patterns to reuse:
+
+**Files to reference:**
+- `backend/src/services/export/types.ts` - Export interfaces (`ExportResult`, `MarkdownExportOptions`)
+- `backend/src/services/export/markdownExporter.ts` - MarkdownExporter class (481 lines)
+- `backend/src/routes/export-routes.ts` - API endpoint patterns
+- `backend/tests/export/markdownExporter.test.ts` - 40 comprehensive tests
+
+### Reusable Patterns
+
+**1. Export Options Interface:**
+```typescript
+// Extend for PDF-specific options
+interface PDFExportOptions extends MarkdownExportOptions {
+  pageSize?: 'A4' | 'Letter';
+  includeTableOfContents?: boolean;
+  includePageNumbers?: boolean;
+}
+```
+
+**2. API Endpoint Pattern:**
+```typescript
+// Follow existing pattern in export-routes.ts
+GET /api/exports/:debateId/pdf
+GET /api/exports/:debateId/pdf?download=true
+```
+
+**3. Use MarkdownExporter as Input:**
+The MarkdownExporter output can serve as clean text input for PDF generation:
+```typescript
+const markdownExporter = new MarkdownExporter();
+const markdown = markdownExporter.export(transcript, options);
+// Convert markdown to HTML, then to PDF
+```
+
+**4. Debate Transcript Structure:**
+```typescript
+interface DebateTranscript {
+  id: string;
+  proposition: { raw: string; normalized: string; context?: string };
+  phases: PhaseData[];  // 6 phases with turns
+  participants: { pro: Speaker; con: Speaker; moderator: Speaker };
+  metadata: { startedAt: Date; completedAt?: Date; totalDuration?: number };
+}
+```
+
+### Testing Approach
+
+Follow the same test structure:
+- Unit tests for PDF generation logic
+- Integration tests for HTML-to-PDF conversion
+- Visual regression tests for PDF output consistency
+
+### Dependencies
+
+Puppeteer requires additional setup on Railway:
+- Add `--no-sandbox` flag (already in spec above)
+- Consider using `puppeteer-core` with external Chrome binary for smaller deployment
+
+---
+
+**Last Updated:** 2025-12-25
