@@ -40,7 +40,9 @@ function isBreakingChange(v1: string, v2: string): boolean {
   const parts2 = v2.split('.').map(Number);
 
   // Major version change is breaking
-  if (parts2[0] > parts1[0]) {
+  const major1 = parts1[0] ?? 0;
+  const major2 = parts2[0] ?? 0;
+  if (major2 > major1) {
     return true;
   }
 
@@ -78,8 +80,8 @@ function findModified(arr1: string[], arr2: string[]): Array<{ before: string; a
         if (set1.has(line2.trim())) return false;
 
         // Check if lines share common structure (e.g., same prefix)
-        const prefix1 = line1.trim().split(' ')[0];
-        const prefix2 = line2.trim().split(' ')[0];
+        const prefix1 = line1.trim().split(' ')[0] ?? '';
+        const prefix2 = line2.trim().split(' ')[0] ?? '';
 
         return prefix1 === prefix2 && prefix1.length > 3;
       });
@@ -130,7 +132,9 @@ export class PromptVersionControl {
       );
 
       // Update latest
-      entry.latest = entry.versions[0];
+      if (entry.versions[0]) {
+        entry.latest = entry.versions[0];
+      }
     }
 
     // Update index
@@ -228,7 +232,6 @@ export class PromptVersionControl {
       const vars1 = new Set(prompt1.variables);
       const vars2 = new Set(prompt2.variables);
       const removedVars = [...vars1].filter((v) => !vars2.has(v));
-      const addedVars = [...vars2].filter((v) => !vars1.has(v));
 
       // Output format changes
       const formatChanged = prompt1.outputFormat !== prompt2.outputFormat;
@@ -269,7 +272,7 @@ export class PromptVersionControl {
    */
   deprecate(promptId: string, replacement?: string, reason?: string): void {
     // Find the prompt by ID
-    for (const [key, entry] of this.registry.entries()) {
+    for (const [_key, entry] of this.registry.entries()) {
       const hasPrompt = entry.versions.some((v) => v.id === promptId);
 
       if (hasPrompt) {
@@ -328,7 +331,7 @@ export class PromptVersionControl {
     phase?: DebatePhase | string,
     type?: PromptType
   ): string {
-    const parts = [agent];
+    const parts: string[] = [agent];
 
     if (phase) {
       parts.push(phase);

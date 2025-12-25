@@ -19,7 +19,7 @@ import {
   CON_ADVOCATE_PROMPTS,
   CON_PROMPT_BUILDERS,
 } from './prompts/con-advocate-prompts.js';
-import type { PromptBuilderContext } from './prompts/types.js';
+import type { PromptBuilderContext, ConstructiveRound } from './prompts/types.js';
 import type { Utterance } from '../../types/database.js';
 
 /**
@@ -195,7 +195,7 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
 
     try {
       // Determine which constructive round this is
-      const constructiveRound = (context.phaseMetadata?.constructiveRound as string) || 'economic_technical';
+      const constructiveRound: ConstructiveRound = (context.phaseMetadata?.constructiveRound as ConstructiveRound) || 'economic_technical';
 
       // Select appropriate prompt template
       let promptTemplate;

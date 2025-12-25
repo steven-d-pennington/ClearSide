@@ -6,18 +6,6 @@
 import pino from 'pino';
 
 /**
- * Log levels following standard severity hierarchy
- */
-const logLevels = {
-  fatal: 60,
-  error: 50,
-  warn: 40,
-  info: 30,
-  debug: 20,
-  trace: 10,
-};
-
-/**
  * Development transport configuration with pretty printing
  */
 const developmentTransport = {
