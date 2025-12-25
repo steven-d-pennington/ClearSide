@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './styles/tokens.css';
 import './App.css';
-import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Badge, Alert } from './components/ui';
+import { Button, Input, Card, CardFooter, Badge, Alert } from './components/ui';
 import { InputForm } from './components/InputForm';
 import { DebateStream } from './components/DebateStream';
 import { useDebateStore } from './stores/debate-store';
