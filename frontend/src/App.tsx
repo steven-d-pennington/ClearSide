@@ -2,10 +2,13 @@ import { useState } from 'react';
 import './styles/tokens.css';
 import './App.css';
 import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Badge, Alert } from './components/ui';
+import { InputForm } from './components/InputForm';
+import { DebateStream } from './components/DebateStream';
+import { useDebateStore } from './stores/debate-store';
 
 function App() {
-  const [proposition, setProposition] = useState('');
   const [showDemo, setShowDemo] = useState(false);
+  const debate = useDebateStore((state) => state.debate);
 
   return (
     <div className="app">
@@ -15,39 +18,25 @@ function App() {
       </header>
 
       <main className="app-main">
-        <Card padding="lg" variant="elevated">
-          <CardHeader>
-            <CardTitle>Start a New Debate</CardTitle>
-            <CardDescription>
-              Enter a proposition to explore through structured adversarial debate.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              label="Proposition"
-              placeholder="Enter a debatable proposition, e.g., 'The United States should implement a moratorium on new AI data centers'"
-              value={proposition}
-              onChange={(e) => setProposition(e.target.value)}
-              fullWidth
-              rows={3}
-              helperText="A good proposition is specific, debatable, and has strong arguments on both sides."
+        {/* Show InputForm when no debate, show DebateStream when debate exists */}
+        {!debate ? (
+          <Card padding="lg" variant="elevated">
+            <InputForm
+              onSuccess={(debateId) => console.log('Debate started:', debateId)}
+              onError={(error) => console.error('Error:', error)}
             />
-          </CardContent>
-          <CardFooter>
-            <Button
-              variant="secondary"
-              onClick={() => setShowDemo(!showDemo)}
-            >
-              {showDemo ? 'Hide Demo' : 'Show Demo Components'}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={!proposition.trim()}
-            >
-              Start Debate
-            </Button>
-          </CardFooter>
-        </Card>
+            <CardFooter>
+              <Button
+                variant="secondary"
+                onClick={() => setShowDemo(!showDemo)}
+              >
+                {showDemo ? 'Hide Demo Components' : 'Show Demo Components'}
+              </Button>
+            </CardFooter>
+          </Card>
+        ) : (
+          <DebateStream />
+        )}
 
         {showDemo && (
           <section className="demo-section">
