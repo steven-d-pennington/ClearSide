@@ -103,14 +103,18 @@ export const useDebateStore = create<DebateState>()(
        * Start a new debate with the given proposition
        */
       startDebate: async (proposition: string) => {
+        console.log('🟢 Store: startDebate called');
+        console.log('🟢 Store: API_BASE_URL =', API_BASE_URL);
         set({ isLoading: true, error: null });
 
         try {
+          console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);
           const response = await fetch(`${API_BASE_URL}/api/debates`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ proposition }),
           });
+          console.log('🟢 Store: Response status:', response.status);
 
           if (!response.ok) {
             throw new Error(`Failed to start debate: ${response.statusText}`);
@@ -134,6 +138,7 @@ export const useDebateStore = create<DebateState>()(
           // Connect to SSE stream
           get().connectToDebate(debate.id);
         } catch (error) {
+          console.error('🔴 Store: startDebate error:', error);
           set({
             isLoading: false,
             error: error instanceof Error ? error.message : 'Failed to start debate',
