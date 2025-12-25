@@ -112,7 +112,7 @@ export const useDebateStore = create<DebateState>()(
           const response = await fetch(`${API_BASE_URL}/api/debates`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ proposition }),
+            body: JSON.stringify({ propositionText: proposition }),
           });
           console.log('🟢 Store: Response status:', response.status);
 
