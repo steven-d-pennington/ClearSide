@@ -137,14 +137,18 @@ export const InputForm: React.FC<InputFormProps> = ({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      console.log('🔵 Form submitted');
+      console.log('🔵 Form state:', formState);
 
       // Mark all fields as touched
       setTouched(new Set(['question', 'context']));
 
       // Validate
       const validationErrors = validate();
+      console.log('🔵 Validation errors:', validationErrors);
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
+        console.log('🔴 Validation failed, stopping');
         return;
       }
 
@@ -154,7 +158,9 @@ export const InputForm: React.FC<InputFormProps> = ({
           ? `${formState.question.trim()}\n\nContext: ${formState.context.trim()}`
           : formState.question.trim();
 
+        console.log('🔵 Starting debate with proposition:', proposition);
         await startDebate(proposition);
+        console.log('🔵 startDebate returned');
 
         const debate = useDebateStore.getState().debate;
         if (debate) {
