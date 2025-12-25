@@ -1,7 +1,7 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2025-12-24
-> Version: 3.3.0 - All UI Components + Integration Tests Complete
+> Last Updated: 2025-12-25
+> Version: 3.4.0 - E2E Testing with Playwright Complete
 
 ---
 
@@ -139,9 +139,9 @@ Each task file includes:
 |---------|-----------|----------|----------|--------|-----------|
 | TEST-001 | Create Unit Test Suite | P0 | M | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-001) |
 | TEST-002 | Create Integration Tests for Debate Flow | P0 | L | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-002) |
-| TEST-003 | Test Flagship Demo (AI Data Center Moratorium) | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-003) |
+| TEST-003 | End-to-End Testing with Playwright | P1 | L | ✅ DONE | [View Task](../tasks/phase1/testing/TEST-003.md) |
 | TEST-004 | Load Test SSE Streaming | P1 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-004) |
-| TEST-005 | E2E Test User Interventions | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-005) |
+| TEST-005 | Agent Output Validation & Quality Testing | P0 | L | ✅ DONE | [View Task](../tasks/phase1/testing/TEST-005.md) |
 
 **Dependencies:**
 - TEST-001 can run in parallel with development
@@ -281,9 +281,9 @@ Each task file includes:
 
 - [ ] UI-005: Playback Controls
 - [ ] UI-009: Auto-scroll
-- [ ] TEST-001: Unit Tests
-- [ ] TEST-002: Integration Tests
-- [ ] TEST-003: Flagship Demo
+- [x] TEST-001: Unit Tests
+- [x] TEST-002: Integration Tests
+- [x] TEST-003: E2E Testing (Playwright)
 - [ ] TEST-004: Load Testing
 - [ ] TEST-005: E2E Tests
 - [ ] INFRA-005: Logging & Monitoring
