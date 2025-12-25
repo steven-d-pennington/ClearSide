@@ -117,7 +117,9 @@ export const useDebateStore = create<DebateState>()(
           console.log('🟢 Store: Response status:', response.status);
 
           if (!response.ok) {
-            throw new Error(`Failed to start debate: ${response.statusText}`);
+            const errorBody = await response.text();
+            console.log('🔴 Store: Error response body:', errorBody);
+            throw new Error(`Failed to start debate (${response.status}): ${errorBody}`);
           }
 
           const debate = await response.json();
