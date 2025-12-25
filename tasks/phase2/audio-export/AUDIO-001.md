@@ -142,4 +142,87 @@ export class ElevenLabsService {
 
 ---
 
-**Last Updated:** 2025-12-23
+## 📝 Implementation Notes from Export System
+
+> Added by agent completing EXPORT-001 on 2025-12-25
+
+### Integration with Export Infrastructure
+
+The text export system (EXPORT-001) provides clean text that can be fed directly to TTS:
+
+**Use MarkdownExporter for Text Extraction:**
+```typescript
+import { MarkdownExporter } from '../export/markdownExporter.js';
+
+// Get clean text for each speaker
+const exporter = new MarkdownExporter();
+const proText = exporter.formatProArguments(transcript.phases);
+const conText = exporter.formatConArguments(transcript.phases);
+const moderatorText = exporter.formatModeratorContent(transcript.phases);
+```
+
+**Key Files to Reference:**
+- `backend/src/services/export/types.ts` - DebateTranscript, PhaseData interfaces
+- `backend/src/services/export/markdownExporter.ts` - Text formatting utilities
+- `backend/src/types/debate.ts` - Speaker enum (Pro, Con, Moderator)
+
+### Speaker Mapping
+
+The debate system uses these speaker identifiers:
+```typescript
+// From backend/src/types/debate.ts
+const Speaker = {
+  PRO: 'pro',
+  CON: 'con',
+  MODERATOR: 'moderator',
+} as const;
+
+// Map to ElevenLabs voices
+const VOICE_MAP: Record<string, string> = {
+  [Speaker.PRO]: VOICE_PROFILES.pro.voiceId,
+  [Speaker.CON]: VOICE_PROFILES.con.voiceId,
+  [Speaker.MODERATOR]: VOICE_PROFILES.moderator.voiceId,
+};
+```
+
+### Phase-Based Audio Chapters
+
+The 6-phase debate structure maps naturally to audio chapters:
+1. Opening Statements
+2. Constructive Arguments
+3. Cross-Examination
+4. Rebuttal
+5. Closing Arguments
+6. Moderator Synthesis
+
+Each phase can be exported as a separate audio segment and concatenated.
+
+### API Pattern
+
+Follow the existing export route pattern:
+```typescript
+// Add to backend/src/routes/export-routes.ts
+router.get('/exports/:debateId/audio', async (req, res) => {
+  // Queue audio generation job (async due to TTS latency)
+  // Return job ID for status polling
+});
+
+router.get('/exports/:debateId/audio/status/:jobId', async (req, res) => {
+  // Check job status, return audio URL when complete
+});
+```
+
+### Caching Strategy
+
+Consider caching TTS output by:
+- Debate ID + Speaker + Phase (most granular)
+- Hash of text content (handles debate updates)
+
+### Rate Limiting
+
+ElevenLabs has API rate limits. Use the same rate limiter pattern as the LLM client:
+- `backend/src/services/llm/` - Bottleneck rate limiter pattern
+
+---
+
+**Last Updated:** 2025-12-25
