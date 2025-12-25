@@ -128,7 +128,7 @@ export class PromptTester {
 
       // Call LLM
       const response = await llmClient.complete({
-        provider: { name: 'anthropic', apiKey: process.env.ANTHROPIC_API_KEY || '' },
+        provider: 'anthropic',
         model: this.config.model,
         messages: [
           { role: 'system', content: processedTemplate },

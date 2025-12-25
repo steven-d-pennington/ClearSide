@@ -109,7 +109,7 @@ function generateRequestId(): string {
 export function errorLogger(
   err: Error,
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) {
   const requestId = (req as any).requestId || 'unknown';

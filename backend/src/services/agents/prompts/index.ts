@@ -249,11 +249,19 @@ export function getPrompt(
 
   // Handle variants for constructive and crossExam phases
   if (variant && typeof phasePrompts === 'object' && 'economic' in phasePrompts) {
-    return phasePrompts[variant as keyof typeof phasePrompts] || null;
+    const variantPrompt = phasePrompts[variant as keyof typeof phasePrompts];
+    if (variantPrompt && typeof variantPrompt === 'object' && 'id' in variantPrompt) {
+      return variantPrompt as PromptTemplate;
+    }
+    return null;
   }
 
   if (variant && typeof phasePrompts === 'object' && 'questioner' in phasePrompts) {
-    return phasePrompts[variant as keyof typeof phasePrompts] || null;
+    const variantPrompt = phasePrompts[variant as keyof typeof phasePrompts];
+    if (variantPrompt && typeof variantPrompt === 'object' && 'id' in variantPrompt) {
+      return variantPrompt as PromptTemplate;
+    }
+    return null;
   }
 
   // Return the prompt if it's a PromptTemplate

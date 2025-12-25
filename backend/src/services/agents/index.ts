@@ -9,9 +9,9 @@ export type {
   AgentContext,
   NormalizedProposition,
   BaseAgent,
-  ProAdvocateAgent,
-  ConAdvocateAgent,
-  ModeratorAgent,
+  ProAdvocateAgent as IProAdvocateAgent,
+  ConAdvocateAgent as IConAdvocateAgent,
+  ModeratorAgent as IModeratorAgent,
   OrchestratorAgent as IOrchestratorAgent,
   AgentFactory,
 } from './types.js';

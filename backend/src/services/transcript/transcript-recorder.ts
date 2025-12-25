@@ -348,8 +348,8 @@ export class TranscriptRecorder {
    */
   private buildMeta(
     debate: Debate,
-    utterances: Utterance[],
-    interventions: UserIntervention[]
+    _utterances: Utterance[],
+    _interventions: UserIntervention[]
   ): TranscriptMeta {
     const totalDurationMs = debate.totalDurationMs || 0;
 
@@ -471,7 +471,7 @@ export class TranscriptRecorder {
   /**
    * Build analysis for one side (Pro or Con)
    */
-  private buildSideAnalysis(utterances: Utterance[], side: 'pro' | 'con'): SideAnalysis {
+  private buildSideAnalysis(utterances: Utterance[], _side: 'pro' | 'con'): SideAnalysis {
     return {
       executive_summary: this.extractExecutiveSummary(utterances),
       arguments: this.extractArguments(utterances),
