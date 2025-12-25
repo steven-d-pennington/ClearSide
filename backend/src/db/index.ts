@@ -7,6 +7,9 @@
 export { pool, testConnection, closePool, query } from './connection.js';
 export type { Pool, PoolClient, QueryResult } from './connection.js';
 
+// Migrations
+export { runMigrationsOnStartup, isDatabaseReady } from './runMigrations.js';
+
 // Repositories
 export * as debateRepository from './repositories/debate-repository.js';
 export * as utteranceRepository from './repositories/utterance-repository.js';

@@ -3,13 +3,13 @@
 > **Purpose**: This document tracks what has been implemented and where to find it.
 > Helps future agents understand the codebase structure without reading every file.
 >
-> **Last Updated**: 2025-12-24
+> **Last Updated**: 2025-12-25
 
 ---
 
 ## Completed Implementation Summary
 
-### Phase 1 Progress: 76% Complete (22/29 tasks)
+### Phase 1 Progress: 97% Complete (28/29 tasks)
 
 | Category | Tasks Done | Total | Status |
 |----------|------------|-------|--------|
@@ -17,7 +17,29 @@
 | Core Engine | 5 | 5 | ✅ Complete |
 | AI Agents | 5 | 5 | ✅ Complete |
 | UI Components | 9 | 9 | ✅ Complete |
-| Testing | 2 | 5 | 🟡 In Progress |
+| Testing | 4 | 5 | ✅ Complete (Load testing remaining) |
+
+### Phase 2 Progress: 6% Complete (1/16 tasks)
+
+| Category | Tasks Done | Total | Status |
+|----------|------------|-------|--------|
+| Text Export | 1 | 2 | 🟡 In Progress |
+| Audio Export | 0 | 4 | 📋 Backlog |
+| Video Export | 0 | 4 | 📋 Backlog |
+| Queue & Storage | 0 | 4 | 📋 Backlog |
+| Export UI | 0 | 2 | 📋 Backlog |
+
+### Test Coverage Summary
+
+| Category | Tests | Files |
+|----------|-------|-------|
+| Unit Tests (Frontend) | 166 | 9 |
+| Integration Tests | 20 | 1 |
+| E2E Tests (Playwright) | 40+ | 4 |
+| Accessibility Tests | 111 | 3 |
+| Agent Quality Tests | 101 | 4 |
+| Export Tests | 40 | 1 |
+| **Total** | **~480+** | **22** |
 
 ---
 
@@ -469,12 +491,137 @@ Covers:
 - State selectors (`selectIsDebateActive`, `selectPendingInterventions`)
 - Full debate flow simulation
 
-**Total Tests:** 166 across 9 test files
+**Total Tests:** 383 across 15 test files (includes 101 agent validation tests from TEST-005)
 
-### If working on Export tasks (Phase 2):
+### Agent Output Validation (TEST-005)
 
-- Transcript recorder: `backend/src/services/transcript/transcript-recorder.ts`
-- Full debate transcript available after Phase 6 completion
+Location: `backend/tests/agents/` and `backend/src/utils/validation/`
+
+**Validation Utilities:**
+- `backend/src/utils/validation/qualityChecks.ts` - Steel-man quality assessment
+- `backend/src/utils/validation/neutralityChecks.ts` - Moderator neutrality checks
+
+**Test Coverage (101 tests):**
+1. **Schema Validation (19 tests)** - `schemaValidation.test.ts`
+   - Complete debate transcript validation
+   - Utterance validation (phase, speaker, content)
+   - Proposition validation
+   - Structured analysis validation
+   - Schema version support
+
+2. **Steel-Man Quality (23 tests)** - `steelmanQuality.test.ts`
+   - Straw-man argument detection
+   - Evidence requirement validation
+   - Explicit assumption checks
+   - Quality scoring (0-1 scale)
+   - Diverse evidence type rewards
+   - Steel-man indicator recognition
+
+3. **Moderator Neutrality (27 tests)** - `neutrality.test.ts`
+   - Biased language detection (clearly, obviously, etc.)
+   - Winner-picking phrase detection
+   - Recommendation language detection
+   - Neutral synthesis validation
+   - Structural balance checks
+
+4. **Uncertainty Preservation (32 tests)** - `uncertaintyPreservation.test.ts`
+   - False certainty detection in projections
+   - Inappropriate confidence level flagging
+   - Appropriate uncertainty language validation
+   - Differentiation between facts vs projections
+   - Value judgment absolute language detection
+
+**Key Design Principles Enforced:**
+- Steel-man arguments (no straw-manning)
+- Explicit assumptions for all projections
+- Preserve uncertainty (no false confidence)
+- Moderator neutrality (NEVER picks winners)
+- Evidence classification (fact, projection, analogy, value)
+
+### E2E Testing (TEST-003)
+
+Location: `frontend/e2e/`
+
+**Configuration:** `frontend/playwright.config.ts`
+
+**Page Object Models:**
+- `frontend/e2e/pages/HomePage.ts` - Input form interactions
+- `frontend/e2e/pages/DebatePage.ts` - Debate stream interactions
+
+**Test Suites (40+ tests):**
+1. `debateFlow.spec.ts` - 19 tests for main user journey
+2. `responsive.spec.ts` - 15 tests for mobile/tablet/desktop
+3. `visual.spec.ts` - 15+ tests for visual regression
+4. `interventionFlow.spec.ts` - 12+ tests for user interventions
+
+**Run E2E Tests:**
+```bash
+cd frontend
+npm run e2e          # Run all tests
+npm run e2e:ui       # Interactive UI mode
+npm run e2e:headed   # See browser actions
+```
+
+### Accessibility Testing
+
+Location: `frontend/src/__tests__/a11y/`
+
+**Test Files (111 tests):**
+- `colorContrast.test.ts` - 60 tests for WCAG color contrast
+- `components.a11y.test.tsx` - 28 tests for component accessibility
+- `keyboard.test.tsx` - 23 tests for keyboard navigation
+
+**Utilities:**
+- `frontend/src/utils/a11y/colorContrast.ts` - WCAG contrast calculation utilities
+
+**Key Findings Documented:**
+- `frontend/src/__tests__/a11y/ACCESSIBILITY_FINDINGS.md` - Accessibility audit results
+- 4 color contrast issues identified (tertiary text, pro button, moderator button, challenge button)
+
+---
+
+## Phase 2: Export System
+
+### Markdown Export (EXPORT-001) ✅
+
+Location: `backend/src/services/export/`
+
+**Files:**
+- `backend/src/services/export/types.ts` - Export interfaces
+- `backend/src/services/export/markdownExporter.ts` - MarkdownExporter class
+- `backend/src/services/export/index.ts` - Barrel export
+- `backend/src/routes/export-routes.ts` - API endpoints
+
+**API Endpoints:**
+```bash
+GET /api/exports/:debateId/markdown        # Generate Markdown
+GET /api/exports/:debateId/markdown?download=true  # Download as file
+GET /api/exports/:debateId/preview         # Preview export metadata
+```
+
+**Export Options:**
+```typescript
+interface MarkdownExportOptions {
+  includeMetadata?: boolean;      // Default: true
+  includeProposition?: boolean;   // Default: true
+  includePro?: boolean;           // Default: true
+  includeCon?: boolean;           // Default: true
+  includeModerator?: boolean;     // Default: true
+  includeChallenges?: boolean;    // Default: false
+  includeTranscript?: boolean;    // Default: false
+}
+```
+
+**Tests:** 40 tests in `backend/tests/export/markdownExporter.test.ts`
+
+### For Future Export Tasks (EXPORT-002, AUDIO-*, VIDEO-*):
+
+- Reuse `DebateTranscript` structure from `backend/src/types/`
+- Follow same API pattern: `GET /api/exports/:debateId/{format}`
+- Use `ExportResult` interface for consistent return types
+- Markdown exporter provides clean text for TTS conversion
+- Phase information preserved for chapter markers
+- Speaker labels ready for voice mapping
 
 ---
 

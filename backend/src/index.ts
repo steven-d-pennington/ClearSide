@@ -8,8 +8,10 @@ import { config } from 'dotenv';
 import { sseManager } from './services/sse/index.js';
 import debateRoutes from './routes/debate-routes.js';
 import interventionRoutes from './routes/intervention-routes.js';
+import exportRoutes from './routes/export-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
+import { runMigrationsOnStartup } from './db/runMigrations.js';
 
 // Load environment variables
 config();
@@ -74,6 +76,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // API routes
 app.use('/api', debateRoutes);
 app.use('/api', interventionRoutes);
+app.use('/api', exportRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -101,17 +104,42 @@ let server: ReturnType<typeof app.listen> | null = null;
 
 /**
  * Start the server
+ * Runs database migrations first, then starts accepting requests
  */
-function start() {
-  server = app.listen(PORT, () => {
-    logger.info({ port: PORT, env: process.env.NODE_ENV }, 'Server started');
-  });
+async function start() {
+  try {
+    // Run database migrations on startup
+    const migrationResult = await runMigrationsOnStartup();
 
-  // Handle server errors
-  server.on('error', (error: Error) => {
-    logger.error({ error }, 'Server error');
+    if (!migrationResult.success) {
+      logger.error(
+        { error: migrationResult.error },
+        'Database migration failed - server not started'
+      );
+      process.exit(1);
+    }
+
+    if (migrationResult.applied.length > 0) {
+      logger.info(
+        { applied: migrationResult.applied },
+        'Database migrations applied successfully'
+      );
+    }
+
+    // Start the HTTP server
+    server = app.listen(PORT, () => {
+      logger.info({ port: PORT, env: process.env.NODE_ENV }, 'Server started');
+    });
+
+    // Handle server errors
+    server.on('error', (error: Error) => {
+      logger.error({ error }, 'Server error');
+      process.exit(1);
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to start server');
     process.exit(1);
-  });
+  }
 }
 
 /**

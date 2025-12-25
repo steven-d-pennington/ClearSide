@@ -1,7 +1,7 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2025-12-24
-> Version: 3.3.0 - All UI Components + Integration Tests Complete
+> Last Updated: 2025-12-25
+> Version: 3.5.0 - Testing Complete + Phase 2 Started (Markdown Export)
 
 ---
 
@@ -139,9 +139,9 @@ Each task file includes:
 |---------|-----------|----------|----------|--------|-----------|
 | TEST-001 | Create Unit Test Suite | P0 | M | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-001) |
 | TEST-002 | Create Integration Tests for Debate Flow | P0 | L | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-002) |
-| TEST-003 | Test Flagship Demo (AI Data Center Moratorium) | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-003) |
+| TEST-003 | End-to-End Testing with Playwright | P1 | L | ✅ DONE | [View Task](../tasks/phase1/testing/TEST-003.md) |
 | TEST-004 | Load Test SSE Streaming | P1 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-004) |
-| TEST-005 | E2E Test User Interventions | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#test-005) |
+| TEST-005 | Agent Output Validation & Quality Testing | P0 | L | ✅ DONE | [View Task](../tasks/phase1/testing/TEST-005.md) |
 
 **Dependencies:**
 - TEST-001 can run in parallel with development
@@ -158,7 +158,7 @@ Each task file includes:
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| EXPORT-001 | Implement Markdown Transcript Export | P0 | S | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#export-001) |
+| EXPORT-001 | Implement Markdown Transcript Export | P0 | S | ✅ DONE | [View Task](../tasks/phase2/text-export/EXPORT-001.md) |
 | EXPORT-002 | Implement PDF Transcript Export | P1 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#export-002) |
 
 **Dependencies:** CORE-005 (Transcript Recorder)
@@ -279,14 +279,15 @@ Each task file includes:
 ### Sprint 4: Replay & Testing (Weeks 7-8)
 **Goal:** Polish, test, and validate MVP
 
-- [ ] UI-005: Playback Controls
-- [ ] UI-009: Auto-scroll
-- [ ] TEST-001: Unit Tests
-- [ ] TEST-002: Integration Tests
-- [ ] TEST-003: Flagship Demo
-- [ ] TEST-004: Load Testing
-- [ ] TEST-005: E2E Tests
-- [ ] INFRA-005: Logging & Monitoring
+- [x] UI-005: Playback Controls (previously completed)
+- [x] UI-009: Auto-scroll (previously completed)
+- [x] TEST-001: Unit Tests
+- [x] TEST-002: Integration Tests
+- [x] TEST-003: E2E Testing (Playwright) - 40+ tests, flagship demo coverage
+- [ ] TEST-004: Load Testing SSE
+- [x] TEST-005: Agent Output Validation - 101 quality tests
+- [x] INFRA-005: Logging & Monitoring (previously completed)
+- [x] Accessibility Testing - 111 tests added (axe-core, color contrast, keyboard nav)
 
 **Completion Criteria:** MVP is production-ready and tested
 
@@ -295,7 +296,7 @@ Each task file includes:
 ### Sprint 5: Media Production - Text & Audio (Weeks 9-10)
 **Goal:** Enable transcript and podcast export
 
-- [ ] EXPORT-001: Markdown Export
+- [x] EXPORT-001: Markdown Export - 40 tests, API endpoints, full formatting
 - [ ] EXPORT-002: PDF Export
 - [ ] AUDIO-001: ElevenLabs Integration
 - [ ] AUDIO-002: Voice Mapping
