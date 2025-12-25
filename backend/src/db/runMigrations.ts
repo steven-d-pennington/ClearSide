@@ -89,14 +89,23 @@ export async function runMigrationsOnStartup(): Promise<{
 
   console.log('\n🚀 Checking database migrations...');
 
+  // Check if DATABASE_URL is configured
+  if (!process.env.DATABASE_URL) {
+    console.log('⚠️  DATABASE_URL not set - skipping migrations');
+    console.log('ℹ️  Set DATABASE_URL environment variable to enable database features');
+    return { success: true, applied, skipped };
+  }
+
   try {
     // Test database connection first
+    console.log('📡 Connecting to database...');
     const client = await pool.connect();
     console.log('✅ Database connection successful');
     client.release();
 
     // Get and run migrations
     const migrations = getMigrationFiles();
+    console.log(`📂 Found ${migrations.length} migration file(s)`);
 
     if (migrations.length === 0) {
       console.log('ℹ️  No migration files found');
@@ -121,8 +130,30 @@ export async function runMigrationsOnStartup(): Promise<{
 
     return { success: true, applied, skipped };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Capture full error details
+    let errorMessage = 'Unknown error';
+    let errorDetails = '';
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      errorDetails = error.stack || '';
+      // Check for common PostgreSQL errors
+      const pgError = error as Error & { code?: string; detail?: string };
+      if (pgError.code) {
+        errorDetails += `\nPostgreSQL Error Code: ${pgError.code}`;
+      }
+      if (pgError.detail) {
+        errorDetails += `\nDetails: ${pgError.detail}`;
+      }
+    } else {
+      errorMessage = String(error);
+    }
+
     console.error('\n💥 Migration failed:', errorMessage);
+    if (errorDetails) {
+      console.error('Error details:', errorDetails);
+    }
+
     return { success: false, applied, skipped, error: errorMessage };
   }
 }
