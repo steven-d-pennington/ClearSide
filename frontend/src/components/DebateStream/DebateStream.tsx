@@ -1,11 +1,13 @@
-import React, { useEffect, useRef } from 'react';
-import { useDebateStore } from '../../stores/debate-store';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useDebateStore, selectIsAwaitingContinue, selectIsStepMode } from '../../stores/debate-store';
 import { PhaseIndicator } from './PhaseIndicator';
 import { TurnCard } from './TurnCard';
 import { StreamingTurn } from './StreamingTurn';
+import { InterventionPanel } from '../InterventionPanel';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';
 import { Badge } from '../ui/Badge';
+import { SPEAKER_INFO } from '../../types/debate';
 import styles from './DebateStream.module.css';
 
 interface DebateStreamProps {
@@ -26,7 +28,20 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
     resumeDebate,
     toggleAutoScroll,
     selectTurn,
+    continueDebate,
   } = useDebateStore();
+
+  const isAwaitingContinue = useDebateStore(selectIsAwaitingContinue);
+  const isStepMode = useDebateStore(selectIsStepMode);
+
+  // State for intervention panel visibility
+  const [isInterventionPanelOpen, setIsInterventionPanelOpen] = useState(false);
+
+  // Get the selected turn object for the InterventionPanel
+  const selectedTurn = useMemo(() => {
+    if (!debate || !selectedTurnId) return null;
+    return debate.turns.find((t) => t.id === selectedTurnId) ?? null;
+  }, [debate, selectedTurnId]);
 
   const streamRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -95,73 +110,132 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
 
       {/* Controls */}
       <div className={styles.controls}>
-        {isLive && (
-          <Button variant="secondary" size="sm" onClick={pauseDebate}>
-            Pause Debate
+        <div className={styles.controlsLeft}>
+          {isLive && (
+            <Button variant="secondary" size="sm" onClick={pauseDebate}>
+              Pause Debate
+            </Button>
+          )}
+          {isPaused && (
+            <Button variant="primary" size="sm" onClick={resumeDebate}>
+              Resume Debate
+            </Button>
+          )}
+          <Button
+            variant={isAutoScrollEnabled ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={toggleAutoScroll}
+          >
+            Auto-scroll: {isAutoScrollEnabled ? 'On' : 'Off'}
           </Button>
-        )}
-        {isPaused && (
-          <Button variant="primary" size="sm" onClick={resumeDebate}>
-            Resume Debate
+        </div>
+        <div className={styles.controlsRight}>
+          <Button
+            variant={isInterventionPanelOpen ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => setIsInterventionPanelOpen(!isInterventionPanelOpen)}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={styles.buttonIcon}
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {isInterventionPanelOpen ? 'Hide Interventions' : 'Interventions'}
           </Button>
-        )}
-        <Button
-          variant={isAutoScrollEnabled ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={toggleAutoScroll}
-        >
-          Auto-scroll: {isAutoScrollEnabled ? 'On' : 'Off'}
-        </Button>
+        </div>
       </div>
 
-      {/* Stream Content */}
-      <div className={styles.streamContent} ref={streamRef}>
-        {/* Completed Turns */}
-        {debate.turns.map((turn) => (
-          <TurnCard
-            key={turn.id}
-            turn={turn}
-            isSelected={selectedTurnId === turn.id}
-            onSelect={() => selectTurn(turn.id === selectedTurnId ? null : turn.id)}
-          />
-        ))}
+      {/* Main Content Area with Optional Sidebar */}
+      <div className={`${styles.mainArea} ${isInterventionPanelOpen ? styles.withSidebar : ''}`}>
+        {/* Stream Content */}
+        <div className={styles.streamContent} ref={streamRef}>
+          {/* Completed Turns */}
+          {debate.turns.map((turn) => (
+            <TurnCard
+              key={turn.id}
+              turn={turn}
+              isSelected={selectedTurnId === turn.id}
+              onSelect={() => selectTurn(turn.id === selectedTurnId ? null : turn.id)}
+            />
+          ))}
 
-        {/* Currently Streaming Turn */}
-        {streamingTurn && streamingTurn.isStreaming && (
-          <StreamingTurn
-            speaker={streamingTurn.speaker}
-            phase={streamingTurn.phase}
-            content={streamingTurn.content}
-          />
-        )}
+          {/* Currently Streaming Turn */}
+          {streamingTurn && streamingTurn.isStreaming && (
+            <StreamingTurn
+              speaker={streamingTurn.speaker}
+              phase={streamingTurn.phase}
+              content={streamingTurn.content}
+            />
+          )}
 
-        {/* Empty state for no turns */}
-        {debate.turns.length === 0 && !streamingTurn && isLive && (
-          <div className={styles.waitingState}>
-            <div className={styles.waitingDots}>
-              <span />
-              <span />
-              <span />
+          {/* Step Mode Continue Prompt */}
+          {isStepMode && isAwaitingContinue && (
+            <div className={styles.continuePrompt}>
+              <div className={styles.continueContent}>
+                <div className={styles.continueIcon}>⏸</div>
+                <div className={styles.continueText}>
+                  <h4>Turn Complete</h4>
+                  <p>
+                    {debate && debate.currentSpeaker && SPEAKER_INFO[debate.currentSpeaker]
+                      ? `Ready for ${SPEAKER_INFO[debate.currentSpeaker].name} to respond`
+                      : 'Ready for next turn'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={continueDebate}
+                className={styles.continueButton}
+              >
+                Continue to Next Turn
+              </Button>
             </div>
-            <p>Waiting for debate to begin...</p>
-          </div>
-        )}
+          )}
 
-        {/* Completion message */}
-        {isCompleted && (
-          <div className={styles.completionMessage}>
-            <h3>Debate Complete</h3>
-            <p>
-              Total time: {Math.round(debate.totalElapsedMs / 1000 / 60)} minutes
-            </p>
-            <p>
-              Review the {debate.turns.length} turns above to understand both sides of the argument.
-            </p>
-          </div>
-        )}
+          {/* Empty state for no turns */}
+          {debate.turns.length === 0 && !streamingTurn && isLive && (
+            <div className={styles.waitingState}>
+              <div className={styles.waitingDots}>
+                <span />
+                <span />
+                <span />
+              </div>
+              <p>Waiting for debate to begin...</p>
+            </div>
+          )}
 
-        {/* Scroll anchor */}
-        <div ref={bottomRef} />
+          {/* Completion message */}
+          {isCompleted && (
+            <div className={styles.completionMessage}>
+              <h3>Debate Complete</h3>
+              <p>
+                Total time: {Math.round(debate.totalElapsedMs / 1000 / 60)} minutes
+              </p>
+              <p>
+                Review the {debate.turns.length} turns above to understand both sides of the argument.
+              </p>
+            </div>
+          )}
+
+          {/* Scroll anchor */}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Intervention Panel Sidebar */}
+        {isInterventionPanelOpen && (
+          <InterventionPanel
+            selectedTurn={selectedTurn}
+            onClose={() => setIsInterventionPanelOpen(false)}
+            className={styles.interventionSidebar}
+          />
+        )}
       </div>
     </div>
   );

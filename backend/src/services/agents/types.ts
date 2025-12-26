@@ -7,6 +7,7 @@
 
 import type { DebatePhase, Speaker } from '../../types/debate.js';
 import type { Utterance } from '../../types/database.js';
+import type { DebateConfiguration } from '../../types/configuration.js';
 
 /**
  * Agent context - information available to agents when generating responses
@@ -41,6 +42,9 @@ export interface AgentContext {
 
   /** Optional: Phase-specific metadata */
   phaseMetadata?: Record<string, unknown>;
+
+  /** Debate configuration settings (brevity, temperature, citations, etc.) */
+  configuration?: DebateConfiguration;
 }
 
 /**

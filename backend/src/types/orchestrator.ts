@@ -281,6 +281,11 @@ export interface PhaseExecutionPlan {
 }
 
 /**
+ * Flow mode for debate execution
+ */
+export type FlowMode = 'auto' | 'step';
+
+/**
  * Orchestrator configuration
  */
 export interface OrchestratorConfig {
@@ -304,6 +309,9 @@ export interface OrchestratorConfig {
 
   /** Auto-save interval in milliseconds */
   autoSaveIntervalMs?: number;
+
+  /** Flow mode - auto continues automatically, step pauses after each turn */
+  flowMode?: FlowMode;
 }
 
 /**

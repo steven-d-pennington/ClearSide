@@ -75,11 +75,42 @@
 
 .controls {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-lg);
   background: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
+}
+
+.controlsLeft {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.controlsRight {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.buttonIcon {
+  margin-right: var(--spacing-xs);
+  vertical-align: middle;
+}
+
+/* Main Layout Area */
+.mainArea {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  transition: all var(--transition-normal);
+}
+
+.mainArea.withSidebar {
+  /* When sidebar is open, stream content shrinks */
 }
 
 .streamContent {
@@ -89,6 +120,28 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  min-width: 0; /* Allow shrinking */
+}
+
+/* Intervention Panel Sidebar */
+.interventionSidebar {
+  width: 380px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  overflow-y: auto;
+  animation: slideInRight 0.2s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .emptyState {
@@ -170,7 +223,75 @@
   color: var(--color-text-secondary);
 }
 
+/* Step Mode Continue Prompt */
+.continuePrompt {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, var(--color-primary-bg) 0%, var(--color-bg-secondary) 100%);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.continueContent {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  text-align: left;
+}
+
+.continueIcon {
+  font-size: var(--font-size-3xl);
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.continueText h4 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.continueText p {
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.continueButton {
+  min-width: 220px;
+}
+
 /* Responsive */
+@media (max-width: 1024px) {
+  .interventionSidebar {
+    width: 320px;
+  }
+}
+
 @media (max-width: 768px) {
   .header {
     padding: var(--spacing-md);
@@ -179,9 +300,44 @@
   .controls {
     padding: var(--spacing-sm) var(--spacing-md);
     flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+
+  .controlsLeft,
+  .controlsRight {
+    flex-wrap: wrap;
   }
 
   .streamContent {
     padding: var(--spacing-md);
+  }
+
+  .continuePrompt {
+    padding: var(--spacing-md);
+  }
+
+  .continueContent {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .continueButton {
+    width: 100%;
+  }
+
+  /* On mobile, sidebar becomes full-width overlay */
+  .mainArea.withSidebar {
+    position: relative;
+  }
+
+  .interventionSidebar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 400px;
+    z-index: 10;
+    box-shadow: var(--shadow-lg);
   }
 }

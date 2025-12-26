@@ -6,7 +6,7 @@
 import type { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../../utils/logger.js';
-import type { SSEClient, SSEEvent, SSEEventType } from '../../types/sse.js';
+import type { SSEClient, SSEEventType } from '../../types/sse.js';
 
 const logger = createLogger({ module: 'SSEManager' });
 
@@ -205,22 +205,24 @@ export class SSEManager {
     }
 
     // Create SSE event structure
-    const event: SSEEvent<T> = {
-      type: eventType,
+    // Use 'event' field to match frontend SSEMessage interface
+    const sseEvent = {
+      event: eventType,
       data,
       timestamp: new Date().toISOString(),
       ...(eventId && { id: eventId }),
     };
 
     // Format SSE message
+    // Don't use named events (event: ...) so frontend onmessage catches them
     let message = '';
 
     if (eventId) {
       message += `id: ${eventId}\n`;
     }
 
-    message += `event: ${eventType}\n`;
-    message += `data: ${JSON.stringify(event)}\n\n`;
+    // Just send data, no event name - caught by onmessage
+    message += `data: ${JSON.stringify(sseEvent)}\n\n`;
 
     // Write to stream
     res.write(message);

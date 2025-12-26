@@ -21,6 +21,8 @@ export type SSEEventType =
   | 'resume'                 // Debate resumed after pause
   | 'debate_paused'          // Debate paused (alternative)
   | 'debate_resumed'         // Debate resumed (alternative)
+  | 'awaiting_continue'      // Step mode: waiting for user to continue
+  | 'continuing'             // Step mode: user clicked continue, resuming
   | 'complete'               // Debate completed
   | 'debate_complete'        // Debate completed (alternative)
   | 'error';                 // Error occurred during debate
@@ -49,10 +51,11 @@ export interface SSEClient {
 /**
  * SSE Event
  * Standard structure for all SSE events sent to clients
+ * Note: Uses 'event' field to match frontend SSEMessage interface
  */
 export interface SSEEvent<T = unknown> {
-  /** Type of event */
-  type: SSEEventType;
+  /** Type of event (named 'event' to match frontend) */
+  event: SSEEventType;
 
   /** Event payload data */
   data: T;

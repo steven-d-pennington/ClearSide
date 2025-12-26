@@ -13,8 +13,29 @@ import type {
   Intervention,
   ConnectionStatus,
   SSEMessage,
+  FlowMode,
+  PresetMode,
 } from '../types/debate';
 import { DebatePhase, Speaker } from '../types/debate';
+import type { BrevityLevel } from '../types/configuration';
+
+/**
+ * Options for starting a new debate
+ */
+export interface StartDebateOptions {
+  /** Flow mode - auto continues automatically, step pauses after each turn */
+  flowMode?: FlowMode;
+  /** Preset mode (quick, balanced, deep_dive, research, custom) */
+  presetMode?: PresetMode;
+  /** Brevity level (1-5) */
+  brevityLevel?: BrevityLevel;
+  /** LLM temperature (0-1) */
+  llmTemperature?: number;
+  /** Maximum tokens per response */
+  maxTokensPerResponse?: number;
+  /** Whether citations are required */
+  requireCitations?: boolean;
+}
 
 /**
  * Streaming turn state for progressive display
@@ -44,14 +65,19 @@ interface DebateState {
   // Streaming state
   streamingTurn: StreamingTurn | null;
 
+  // Step mode state
+  isAwaitingContinue: boolean;
+
   // UI state
   isAutoScrollEnabled: boolean;
   selectedTurnId: string | null;
 
   // Actions
-  startDebate: (proposition: string) => Promise<void>;
+  startDebate: (proposition: string, options?: StartDebateOptions) => Promise<void>;
   pauseDebate: () => Promise<void>;
   resumeDebate: () => Promise<void>;
+  continueDebate: () => Promise<void>;
+  closeDebate: (status?: 'completed' | 'failed', reason?: string) => Promise<void>;
   submitIntervention: (intervention: Omit<Intervention, 'id' | 'debateId' | 'status' | 'timestamp'>) => Promise<void>;
 
   // SSE actions
@@ -82,6 +108,7 @@ const initialState = {
   eventSource: null,
   reconnectAttempts: 0,
   streamingTurn: null,
+  isAwaitingContinue: false,
   isAutoScrollEnabled: true,
   selectedTurnId: null,
 };
@@ -104,17 +131,41 @@ export const useDebateStore = create<DebateState>()(
       /**
        * Start a new debate with the given proposition
        */
-      startDebate: async (proposition: string) => {
-        console.log('🟢 Store: startDebate called');
+      startDebate: async (proposition: string, options: StartDebateOptions = {}) => {
+        const flowMode = options.flowMode ?? 'auto';
+        console.log('🟢 Store: startDebate called with options:', options);
         console.log('🟢 Store: API_BASE_URL =', API_BASE_URL);
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, isAwaitingContinue: false });
 
         try {
+          // Build request body with proposition and optional config fields
+          const requestBody: Record<string, unknown> = {
+            propositionText: proposition,
+            flowMode,
+          };
+
+          // Add configuration fields if provided
+          if (options.presetMode !== undefined) {
+            requestBody.presetMode = options.presetMode;
+          }
+          if (options.brevityLevel !== undefined) {
+            requestBody.brevityLevel = options.brevityLevel;
+          }
+          if (options.llmTemperature !== undefined) {
+            requestBody.llmTemperature = options.llmTemperature;
+          }
+          if (options.maxTokensPerResponse !== undefined) {
+            requestBody.maxTokensPerResponse = options.maxTokensPerResponse;
+          }
+          if (options.requireCitations !== undefined) {
+            requestBody.requireCitations = options.requireCitations;
+          }
+
           console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);
           const response = await fetch(`${API_BASE_URL}/api/debates`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ propositionText: proposition }),
+            body: JSON.stringify(requestBody),
           });
           console.log('🟢 Store: Response status:', response.status);
 
@@ -131,10 +182,17 @@ export const useDebateStore = create<DebateState>()(
               ...debate,
               turns: [],
               interventions: [],
+              flowMode: debate.flowMode || flowMode,
               currentPhase: DebatePhase.INITIALIZING,
               currentSpeaker: Speaker.SYSTEM,
               totalElapsedMs: 0,
               createdAt: new Date(debate.createdAt),
+              // Include config fields from response
+              presetMode: debate.presetMode || 'balanced',
+              brevityLevel: debate.brevityLevel || 3,
+              llmTemperature: debate.llmTemperature || 0.7,
+              maxTokensPerResponse: debate.maxTokensPerResponse || 1024,
+              requireCitations: debate.requireCitations || false,
             },
             isLoading: false,
           });
@@ -190,6 +248,70 @@ export const useDebateStore = create<DebateState>()(
         } catch (error) {
           set({
             error: error instanceof Error ? error.message : 'Failed to resume debate',
+          });
+        }
+      },
+
+      /**
+       * Continue to next turn (step mode only)
+       */
+      continueDebate: async () => {
+        const { debate } = get();
+        if (!debate) return;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/debates/${debate.id}/continue`, {
+            method: 'POST',
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to continue debate: ${response.statusText}`);
+          }
+
+          // The SSE 'continuing' event will clear isAwaitingContinue
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to continue debate',
+          });
+        }
+      },
+
+      /**
+       * Manually close a stalled debate (mark as completed or failed)
+       * Used when a debate is stuck in 'live' state after server restart
+       */
+      closeDebate: async (status = 'completed', reason) => {
+        const { debate, disconnectFromDebate } = get();
+        if (!debate) return;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/debates/${debate.id}/close`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status, reason }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to close debate: ${response.statusText}`);
+          }
+
+          // Update local state
+          set((state) => ({
+            debate: state.debate
+              ? {
+                  ...state.debate,
+                  status: status === 'failed' ? 'error' : 'completed',
+                  currentPhase: DebatePhase.COMPLETED,
+                  completedAt: new Date(),
+                }
+              : null,
+          }));
+
+          // Disconnect from SSE
+          disconnectFromDebate();
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to close debate',
           });
         }
       },
@@ -309,6 +431,11 @@ export const useDebateStore = create<DebateState>()(
        */
       _handleSSEMessage: (message: SSEMessage) => {
         switch (message.event) {
+          // Connection confirmation - just acknowledge
+          case 'connected':
+            console.log('📡 SSE connected to debate');
+            break;
+
           case 'debate_started':
             set((state) => ({
               debate: state.debate
@@ -472,13 +599,21 @@ export const useDebateStore = create<DebateState>()(
           // Backend sends 'utterance' for each agent response
           case 'utterance': {
             const data = message.data as {
-              debateId: string;
+              id: number;
+              timestamp_ms: number;
               phase: string;
               speaker: string;
               content: string;
-              timestampMs: number;
               metadata?: Record<string, unknown>;
             };
+
+            console.log('🎤 Utterance received:', {
+              id: data.id,
+              speaker: data.speaker,
+              phase: data.phase,
+              speakerValues: Object.values(Speaker),
+              isValidSpeaker: Object.values(Speaker).includes(data.speaker as Speaker)
+            });
 
             // Backend sends same string values as our enums, so direct cast works
             // Fallback to PHASE_1_OPENING/MODERATOR if unknown
@@ -490,14 +625,15 @@ export const useDebateStore = create<DebateState>()(
               ? data.speaker
               : Speaker.MODERATOR) as Speaker;
 
+            const currentDebate = get().debate;
             const newTurn: DebateTurn = {
-              id: `${data.debateId}-${data.timestampMs}`,
-              debateId: data.debateId,
+              id: `${currentDebate?.id ?? 'unknown'}-${data.id}`,
+              debateId: currentDebate?.id ?? '',
               phase,
               speaker,
               content: data.content,
-              turnNumber: get().debate?.turns.length ?? 0,
-              timestamp: new Date(message.timestamp),
+              turnNumber: currentDebate?.turns.length ?? 0,
+              timestamp: new Date(data.timestamp_ms),
               metadata: data.metadata as DebateTurn['metadata'],
             };
 
@@ -596,6 +732,18 @@ export const useDebateStore = create<DebateState>()(
             break;
           }
 
+          // Step mode: Backend waiting for user to continue
+          case 'awaiting_continue':
+            console.log('📍 Step mode: Waiting for continue');
+            set({ isAwaitingContinue: true });
+            break;
+
+          // Step mode: User clicked continue, resuming
+          case 'continuing':
+            console.log('📍 Step mode: Continuing to next turn');
+            set({ isAwaitingContinue: false });
+            break;
+
           default:
             console.warn('Unknown SSE event:', message.event);
         }
@@ -673,5 +821,14 @@ export const selectTurnCount = (state: DebateState) =>
 
 export const selectPendingInterventions = (state: DebateState) =>
   state.debate?.interventions.filter((i) => i.status === 'pending') ?? [];
+
+export const selectIsAwaitingContinue = (state: DebateState) =>
+  state.isAwaitingContinue;
+
+export const selectFlowMode = (state: DebateState) =>
+  state.debate?.flowMode ?? 'auto';
+
+export const selectIsStepMode = (state: DebateState) =>
+  state.debate?.flowMode === 'step';
 
 export default useDebateStore;

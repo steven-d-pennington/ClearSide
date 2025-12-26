@@ -6,6 +6,7 @@
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
   --color-primary-alpha: rgba(37, 99, 235, 0.1);
+  --color-primary-light: rgba(37, 99, 235, 0.1);
 
   /* Colors - Text */
   --color-text-primary: #0f172a;
@@ -26,24 +27,33 @@
   /* Colors - Semantic */
   --color-success: #10b981;
   --color-success-bg: #d1fae5;
+  --color-success-light: rgba(16, 185, 129, 0.1);
+  --color-success-dark: #059669;
   --color-error: #ef4444;
   --color-error-bg: #fee2e2;
+  --color-error-light: rgba(239, 68, 68, 0.1);
+  --color-error-dark: #dc2626;
   --color-warning: #f59e0b;
   --color-warning-bg: #fef3c7;
+  --color-warning-light: rgba(245, 158, 11, 0.1);
+  --color-warning-dark: #d97706;
   --color-info: #3b82f6;
   --color-info-bg: #dbeafe;
 
   /* Colors - Pro/Con */
   --color-pro: #059669;
   --color-pro-bg: #ecfdf5;
+  --color-pro-light: rgba(5, 150, 105, 0.1);
   --color-pro-dark: #047857;
   --color-con: #dc2626;
   --color-con-bg: #fef2f2;
+  --color-con-light: rgba(220, 38, 38, 0.1);
   --color-con-dark: #b91c1c;
 
   /* Colors - Moderator */
   --color-moderator: #6366f1;
   --color-moderator-bg: #eef2ff;
+  --color-moderator-light: rgba(99, 102, 241, 0.1);
   --color-moderator-dark: #4f46e5;
 
   /* Colors - Challenge */

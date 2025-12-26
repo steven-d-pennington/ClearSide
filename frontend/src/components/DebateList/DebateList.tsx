@@ -194,7 +194,7 @@ export function DebateList({ statusFilter, limit = 50, compact = false }: Debate
           className={styles.link}
         >
           <Card
-            className={`${styles.card} ${compact ? styles.compact : ''}`}
+            className={`${styles.card} ${styles[debate.status]} ${compact ? styles.compact : ''}`}
             padding={compact ? 'sm' : 'md'}
           >
             <div className={styles.header}>
@@ -213,14 +213,30 @@ export function DebateList({ statusFilter, limit = 50, compact = false }: Debate
               {truncate(debate.propositionText, compact ? 80 : 150)}
             </h3>
 
-            <div className={styles.meta}>
-              {debate.totalDurationMs && debate.totalDurationMs > 0 && (
-                <span className={styles.duration}>
-                  {formatDuration(debate.totalDurationMs)}
+            <div className={styles.footer}>
+              <div className={styles.meta}>
+                {debate.totalDurationMs && debate.totalDurationMs > 0 && (
+                  <span className={styles.duration}>
+                    {formatDuration(debate.totalDurationMs)}
+                  </span>
+                )}
+                <span className={styles.phase}>
+                  {debate.currentPhase.replace('PHASE_', '').replace(/_/g, ' ')}
                 </span>
-              )}
-              <span className={styles.phase}>
-                {debate.currentPhase.replace('PHASE_', '').replace(/_/g, ' ')}
+              </div>
+              <span className={styles.viewArrow}>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
               </span>
             </div>
           </Card>

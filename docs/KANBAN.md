@@ -1,9 +1,16 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2025-12-26
-> Version: 3.7.0 - Debate History & Replay Feature Added
+> Version: 3.8.0 - Configuration & Personas Feature Added
 
 ## 🔧 Recent Changes (2025-12-26)
+
+**NEW: Configuration & Personas Feature:**
+- Debate configuration system with presets (Quick, Balanced, Deep Dive, Research)
+- Per-debate LLM settings (brevity, temperature, max tokens, citations)
+- 6 debate personas (Theorist, Politician, Scientist, Lawyer, Economist, Ethicist)
+- Persona selection for Pro and Con advocates
+- See `tasks/phase1/configuration/` for implementation tasks
 
 **NEW: Debate History & Replay Feature:**
 - Browse all previous debates at `/history`
@@ -132,6 +139,39 @@ Each task file includes:
 - AGENT-001 depends on INFRA-001
 - AGENT-002, AGENT-003 depend on AGENT-005, CORE-002
 - AGENT-004 depends on AGENT-005, CORE-005
+
+---
+
+### ⚙️ Configuration & Personalization
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| CONFIG-001 | Database Migration for Configuration | P0 | S | ✅ DONE | [View Task](../tasks/phase1/configuration/CONFIG-001.md) |
+| CONFIG-002 | Configuration Types and Interfaces | P0 | S | ✅ DONE | [View Task](../tasks/phase1/configuration/CONFIG-002.md) |
+| CONFIG-003 | Update Debate Repository for Configuration | P0 | M | ✅ DONE | [View Task](../tasks/phase1/configuration/CONFIG-003.md) |
+| CONFIG-004 | Prompt Modifiers for Configuration | P0 | M | ✅ DONE | [View Task](../tasks/phase1/configuration/CONFIG-004.md) |
+| CONFIG-005 | Update Agents to Use Configuration | P0 | M | ✅ DONE | [View Task](../tasks/phase1/configuration/CONFIG-005.md) |
+| CONFIG-006 | API Endpoints for Configuration | P0 | S | ✅ DONE | [View Task](../tasks/phase1/configuration/CONFIG-006.md) |
+| CONFIG-007 | Frontend Configuration Panel | P0 | M | ✅ DONE | [View Task](../tasks/phase1/configuration/CONFIG-007.md) |
+| PERSONA-001 | Database Migration for Personas | P0 | S | 🟢 TO DO | [View Task](../tasks/phase1/configuration/PERSONA-001.md) |
+| PERSONA-002 | Persona Types and Repository | P0 | M | 🟢 TO DO | [View Task](../tasks/phase1/configuration/PERSONA-002.md) |
+| PERSONA-003 | Parameterize Agent Identity Prompts | P0 | L | 🟢 TO DO | [View Task](../tasks/phase1/configuration/PERSONA-003.md) |
+| PERSONA-004 | API Endpoints for Personas | P0 | S | 🟢 TO DO | [View Task](../tasks/phase1/configuration/PERSONA-004.md) |
+| PERSONA-005 | Frontend Persona Selector | P0 | M | 🟢 TO DO | [View Task](../tasks/phase1/configuration/PERSONA-005.md) |
+
+**Dependencies:**
+- CONFIG-001 can start immediately (no blockers)
+- CONFIG-002 depends on CONFIG-001 (schema reference)
+- CONFIG-003 depends on CONFIG-001, CONFIG-002
+- CONFIG-004 depends on CONFIG-002
+- CONFIG-005 depends on CONFIG-003, CONFIG-004
+- CONFIG-006 depends on CONFIG-003
+- CONFIG-007 depends on CONFIG-006
+- PERSONA-001 depends on CONFIG-001
+- PERSONA-002 depends on PERSONA-001, CONFIG-002
+- PERSONA-003 depends on PERSONA-002
+- PERSONA-004 depends on PERSONA-002
+- PERSONA-005 depends on PERSONA-004
 
 ---
 

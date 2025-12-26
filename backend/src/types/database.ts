@@ -3,11 +3,13 @@
  * Defines interfaces for debates, utterances, and user interventions
  */
 
+import type { PresetMode } from './configuration.js';
+
 /**
  * Debate status enum
  * Tracks the lifecycle of a debate from initialization to completion
  */
-export type DebateStatus = 'initializing' | 'live' | 'paused' | 'completed' | 'error';
+export type DebateStatus = 'initializing' | 'live' | 'paused' | 'completed' | 'error' | 'failed';
 
 /**
  * Current debate phase
@@ -26,6 +28,12 @@ export type DebatePhase =
  * Identifies who is currently speaking in the debate
  */
 export type Speaker = 'moderator' | 'pro_advocate' | 'con_advocate' | 'user';
+
+/**
+ * Flow mode for debate progression
+ * Controls whether debate runs automatically or pauses for user review
+ */
+export type FlowMode = 'auto' | 'step';
 
 /**
  * Intervention type
@@ -60,6 +68,27 @@ export interface Debate {
 
   /** Current speaker in the debate */
   currentSpeaker: Speaker;
+
+  /** Flow mode - auto continues automatically, step pauses after each turn */
+  flowMode: FlowMode;
+
+  /** Whether the debate is awaiting user continue signal (step mode) */
+  isAwaitingContinue: boolean;
+
+  /** Selected preset mode for this debate */
+  presetMode: PresetMode;
+
+  /** Brevity level (1 = detailed, 5 = concise) */
+  brevityLevel: number;
+
+  /** LLM temperature setting (0.0 - 1.0) */
+  llmTemperature: number;
+
+  /** Maximum tokens per response */
+  maxTokensPerResponse: number;
+
+  /** Whether citations are required */
+  requireCitations: boolean;
 
   /** Timestamp when debate started (ISO 8601) */
   startedAt: Date | null;
@@ -159,6 +188,13 @@ export interface DebateRow {
   status: DebateStatus;
   current_phase: DebatePhase;
   current_speaker: Speaker;
+  flow_mode: FlowMode;
+  is_awaiting_continue: boolean;
+  preset_mode: string;
+  brevity_level: number;
+  llm_temperature: number;
+  max_tokens_per_response: number;
+  require_citations: boolean;
   started_at: Date | null;
   completed_at: Date | null;
   total_duration_ms: number | null;
@@ -199,6 +235,13 @@ export interface UserInterventionRow {
 export interface CreateDebateInput {
   propositionText: string;
   propositionContext?: Record<string, unknown>;
+  flowMode?: FlowMode;
+  /** Configuration fields */
+  presetMode?: PresetMode;
+  brevityLevel?: number;
+  llmTemperature?: number;
+  maxTokensPerResponse?: number;
+  requireCitations?: boolean;
 }
 
 /**

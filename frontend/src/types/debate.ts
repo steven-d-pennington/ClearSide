@@ -217,6 +217,16 @@ export interface Intervention {
 }
 
 /**
+ * Flow mode for debate progression
+ */
+export type FlowMode = 'auto' | 'step';
+
+/**
+ * Preset mode for debate configuration
+ */
+export type PresetMode = 'quick' | 'balanced' | 'deep_dive' | 'research' | 'custom';
+
+/**
  * Complete debate data
  */
 export interface Debate {
@@ -226,6 +236,8 @@ export interface Debate {
   status: 'initializing' | 'live' | 'paused' | 'completed' | 'error';
   currentPhase: DebatePhase;
   currentSpeaker: Speaker;
+  /** Flow mode - auto continues automatically, step pauses after each turn */
+  flowMode: FlowMode;
   turns: DebateTurn[];
   interventions: Intervention[];
   createdAt: Date;
@@ -233,6 +245,18 @@ export interface Debate {
   completedAt?: Date;
   error?: string;
   totalElapsedMs: number;
+
+  // Configuration fields
+  /** Preset mode used for this debate */
+  presetMode: PresetMode;
+  /** Brevity level (1-5, where 1=detailed, 5=concise) */
+  brevityLevel: number;
+  /** LLM temperature (0-1) */
+  llmTemperature: number;
+  /** Maximum tokens per response */
+  maxTokensPerResponse: number;
+  /** Whether citations are required */
+  requireCitations: boolean;
 }
 
 /**
@@ -253,6 +277,8 @@ export type SSEEventType =
   | 'intervention_response'  // Backend sends this
   | 'debate_paused'
   | 'debate_resumed'
+  | 'awaiting_continue'  // Step mode: waiting for user to click Continue
+  | 'continuing'         // Step mode: user clicked Continue, resuming
   | 'debate_completed'
   | 'debate_complete'    // Backend sends this (without 'd')
   | 'debate_error'

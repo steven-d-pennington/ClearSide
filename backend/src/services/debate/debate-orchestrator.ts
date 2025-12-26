@@ -21,6 +21,8 @@ import type { DebateStateMachine } from './state-machine.js';
 import type { TurnManager } from './turn-manager.js';
 import type { SSEManager } from '../sse/sse-manager.js';
 import type { SchemaValidator } from '../validation/schema-validator.js';
+import type { DebateConfiguration, BrevityLevel } from '../../types/configuration.js';
+import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
 import type {
   ProAdvocateAgent,
   ConAdvocateAgent,
@@ -63,6 +65,7 @@ const DEFAULT_CONFIG: OrchestratorConfig = {
   broadcastEvents: true,
   autoSaveTranscript: true,
   autoSaveIntervalMs: 60000,
+  flowMode: 'auto',
 };
 
 /**
@@ -464,8 +467,19 @@ export class DebateOrchestrator {
     // Fetch all previous utterances
     const utterances = await utteranceRepo.findByDebateId(this.debateId);
 
-    // Fetch debate for context
+    // Fetch debate for context and configuration
     const debate = await debateRepo.findById(this.debateId);
+
+    // Build configuration from debate record
+    const configuration: DebateConfiguration = debate ? {
+      presetMode: debate.presetMode,
+      brevityLevel: debate.brevityLevel as BrevityLevel,
+      llmSettings: {
+        temperature: debate.llmTemperature,
+        maxTokensPerResponse: debate.maxTokensPerResponse,
+      },
+      requireCitations: debate.requireCitations,
+    } : DEFAULT_CONFIGURATION;
 
     return {
       debateId: this.debateId,
@@ -474,6 +488,7 @@ export class DebateOrchestrator {
       speaker,
       proposition,
       propositionContext: debate?.propositionContext,
+      configuration,
     };
   }
 
@@ -513,20 +528,66 @@ export class DebateOrchestrator {
       const persisted = await utteranceRepo.create(createInput);
       logger.info({ id: persisted.id }, 'Utterance persisted');
 
-      // Broadcast via SSE
+      // Broadcast via SSE - use original enum values for frontend compatibility
       if (this.config.broadcastEvents) {
         this.sseManager.broadcastToDebate(this.debateId, 'utterance', {
           id: persisted.id,
           timestamp_ms: persisted.timestampMs,
-          phase: persisted.phase,
-          speaker: persisted.speaker,
+          phase: utterance.phase, // Use original enum (PHASE_1_OPENING) not DB format (phase_1_opening)
+          speaker: utterance.speaker, // Use original enum (PRO/CON) not DB format (pro_advocate)
           content: persisted.content,
           metadata: persisted.metadata,
         });
       }
+
+      // Step mode: Wait for user to continue before next turn
+      if (this.config.flowMode === 'step') {
+        await this.waitForContinue(utterance.phase, utterance.speaker);
+      }
     } catch (error) {
       logger.error({ error }, 'Failed to record utterance');
       throw error;
+    }
+  }
+
+  /**
+   * Wait for user to click Continue (step mode only)
+   * Sets awaiting flag in DB, broadcasts event, and polls until flag is cleared
+   */
+  private async waitForContinue(currentPhase: DebatePhase, currentSpeaker: Speaker): Promise<void> {
+    logger.info({ debateId: this.debateId }, 'Step mode: Waiting for continue signal');
+
+    // Set awaiting flag in database
+    await debateRepo.setAwaitingContinue(this.debateId, true);
+
+    // Broadcast awaiting_continue event - use original enum values for frontend
+    if (this.config.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'awaiting_continue', {
+        debateId: this.debateId,
+        currentPhase: currentPhase, // Use original enum for frontend
+        currentSpeaker: currentSpeaker, // Use original enum for frontend
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Poll until continue signal received (flag cleared by /continue endpoint)
+    while (true) {
+      // Check if debate is still awaiting continue
+      const debate = await debateRepo.findById(this.debateId);
+
+      if (!debate || debate.status === 'completed' || debate.status === 'failed' || debate.status === 'error') {
+        // Debate ended, stop waiting
+        break;
+      }
+
+      if (!debate.isAwaitingContinue) {
+        // Continue signal received
+        logger.info({ debateId: this.debateId }, 'Step mode: Continue signal received');
+        break;
+      }
+
+      // Wait before polling again
+      await this.sleep(500);
     }
   }
 

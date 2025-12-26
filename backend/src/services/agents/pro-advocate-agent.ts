@@ -19,6 +19,9 @@ import {
   PRO_ADVOCATE_PROMPTS,
   PRO_PROMPT_BUILDERS,
 } from './prompts/pro-advocate-prompts.js';
+import { applyConfigurationToPrompt } from './prompts/prompt-modifiers.js';
+import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
+import type { DebateConfiguration } from '../../types/configuration.js';
 import type { PromptBuilderContext, ConstructiveRound } from './prompts/types.js';
 
 /**
@@ -151,6 +154,9 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
     }, 'Generating opening statement');
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
       // Build prompt context
       const promptContext: PromptBuilderContext = {
         proposition: context.proposition,
@@ -162,22 +168,28 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.opening(promptContext);
 
-      // Build LLM request
+      // Apply configuration modifiers to system prompt
+      const modifiedSystemPrompt = applyConfigurationToPrompt(
+        PRO_ADVOCATE_PROMPTS.opening.template,
+        config
+      );
+
+      // Build LLM request with configuration settings
       const llmRequest: LLMRequest = {
         provider: this.provider,
         model: this.modelName,
         messages: [
           {
             role: 'system',
-            content: PRO_ADVOCATE_PROMPTS.opening.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.7, // Balance creativity and consistency
-        maxTokens: 800,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -218,6 +230,9 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
     }, 'Generating constructive argument');
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
       // Determine constructive round from phase metadata
       const constructiveRound = this.determineConstructiveRound(context);
 
@@ -244,22 +259,28 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.constructive(promptContext);
 
-      // Build LLM request
+      // Apply configuration modifiers to system prompt
+      const modifiedSystemPrompt = applyConfigurationToPrompt(
+        promptTemplate.template,
+        config
+      );
+
+      // Build LLM request with configuration settings
       const llmRequest: LLMRequest = {
         provider: this.provider,
         model: this.modelName,
         messages: [
           {
             role: 'system',
-            content: promptTemplate.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 800,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -575,6 +596,13 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
   // ============================================================================
   // Internal Helper Methods
   // ============================================================================
+
+  /**
+   * Get configuration from context with fallback to defaults
+   */
+  private getConfiguration(context: AgentContext): DebateConfiguration {
+    return context.configuration ?? DEFAULT_CONFIGURATION;
+  }
 
   /**
    * Build context summary from previous utterances

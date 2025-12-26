@@ -1,5 +1,5 @@
 .phaseIndicator {
-  padding: var(--spacing-md);
+  padding: var(--spacing-lg);
   background: var(--color-bg-secondary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
@@ -7,21 +7,21 @@
 
 .currentPhase {
   text-align: center;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
 }
 
 .phaseName {
   display: block;
   font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
 }
 
 .phaseDescription {
   display: block;
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
-  margin-top: var(--spacing-xs);
 }
 
 .timeline {
@@ -80,7 +80,7 @@
 .active .dot {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px var(--color-primary-alpha);
+  box-shadow: 0 0 0 4px var(--color-primary-light);
   animation: pulse 2s infinite;
 }
 
@@ -109,7 +109,7 @@
 
 @keyframes pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 var(--color-primary-alpha);
+    box-shadow: 0 0 0 0 var(--color-primary-light);
   }
   50% {
     box-shadow: 0 0 0 6px transparent;

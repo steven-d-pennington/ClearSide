@@ -52,6 +52,15 @@ function formatDuration(ms: number): string {
   return `${minutes}m ${remainingSeconds}s`;
 }
 
+/**
+ * Map API status to internal Debate status
+ * API uses 'failed', internal type uses 'error'
+ */
+function mapApiStatus(apiStatus: string): Debate['status'] {
+  if (apiStatus === 'failed') return 'error';
+  return apiStatus as Debate['status'];
+}
+
 export function DebateViewPage() {
   const { debateId } = useParams<{ debateId: string }>();
   const navigate = useNavigate();
@@ -61,9 +70,18 @@ export function DebateViewPage() {
 
   // Get store state and actions
   const debate = useDebateStore((state) => state.debate);
+  const connectionStatus = useDebateStore((state) => state.connectionStatus);
+  const streamingTurn = useDebateStore((state) => state.streamingTurn);
   const setDebate = useDebateStore.setState;
   const connectToDebate = useDebateStore((state) => state.connectToDebate);
+  const closeDebate = useDebateStore((state) => state.closeDebate);
   const _reset = useDebateStore((state) => state._reset);
+
+  // Detect stalled debate: marked as 'live' but not actively streaming
+  const isStalled = debate?.status === 'live' &&
+    connectionStatus === 'connected' &&
+    !streamingTurn &&
+    debate.turns.length > 0;
 
   // Use empty string for relative URLs (goes through Vite proxy)
   const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -92,17 +110,44 @@ export function DebateViewPage() {
 
         const debateData: DebateResponse = await debateRes.json();
 
-        // For live debates, connect to SSE stream
+        // Fetch existing utterances for ALL debates (live, paused, or completed)
+        const utterancesRes = await fetch(
+          `${API_BASE_URL}/api/debates/${debateId}/utterances`
+        );
+
+        let utterances: UtteranceResponse[] = [];
+        if (utterancesRes.ok) {
+          const utteranceData = await utterancesRes.json();
+          utterances = utteranceData.utterances || [];
+        }
+
+        // Map utterances to turns
+        const turns: DebateTurn[] = utterances.map((u, index) => ({
+          id: u.id,
+          debateId: u.debateId,
+          phase: u.phase as DebatePhase,
+          speaker: u.speaker as Speaker,
+          content: u.content,
+          turnNumber: u.turnNumber ?? index,
+          timestamp: new Date(u.createdAt),
+          metadata: u.metadata as DebateTurn['metadata'],
+        }));
+
+        // Determine current phase/speaker from last turn or debate data
+        const lastTurn = turns[turns.length - 1];
+        const currentPhase = lastTurn?.phase || (debateData.currentPhase as DebatePhase);
+        const currentSpeaker = lastTurn?.speaker || Speaker.MODERATOR;
+
+        // For live/paused debates, set state and connect to SSE for new events
         if (debateData.status === 'live' || debateData.status === 'paused') {
-          // Set initial state
           setDebate({
             debate: {
               id: debateData.id,
               proposition: debateData.propositionText,
               status: debateData.status,
-              currentPhase: debateData.currentPhase as DebatePhase,
-              currentSpeaker: Speaker.MODERATOR,
-              turns: [],
+              currentPhase: currentPhase,
+              currentSpeaker: currentSpeaker,
+              turns: turns, // Include existing turns!
               interventions: [],
               createdAt: new Date(debateData.createdAt),
               totalElapsedMs: debateData.totalDurationMs || 0,
@@ -116,45 +161,19 @@ export function DebateViewPage() {
           return;
         }
 
-        // For completed/failed debates, fetch all utterances
-        const utterancesRes = await fetch(
-          `${API_BASE_URL}/api/debates/${debateId}/utterances`
-        );
-
-        let utterances: UtteranceResponse[] = [];
-        if (utterancesRes.ok) {
-          const utteranceData = await utterancesRes.json();
-          utterances = utteranceData.utterances || [];
-        }
-
-        // Map utterances to turns
-        const turns: DebateTurn[] = utterances.map((u) => ({
-          id: u.id,
-          debateId: u.debateId,
-          phase: u.phase as DebatePhase,
-          speaker: u.speaker as Speaker,
-          content: u.content,
-          turnNumber: u.turnNumber,
-          timestamp: new Date(u.createdAt),
-          metadata: u.metadata as DebateTurn['metadata'],
-        }));
-
-        // Determine current phase from last turn or debate data
-        const lastTurn = turns[turns.length - 1];
-        const currentPhase = lastTurn?.phase || (debateData.currentPhase as DebatePhase);
-        const currentSpeaker = lastTurn?.speaker || Speaker.MODERATOR;
-
-        // Build debate object
+        // For completed/failed debates, build the full debate object
+        // (utterances already fetched above)
+        const mappedStatus = mapApiStatus(debateData.status);
         const fullDebate: Debate = {
           id: debateData.id,
           proposition: debateData.propositionText,
-          status: debateData.status,
-          currentPhase: debateData.status === 'completed' ? DebatePhase.COMPLETED : currentPhase,
+          status: mappedStatus,
+          currentPhase: mappedStatus === 'completed' ? DebatePhase.COMPLETED : currentPhase,
           currentSpeaker,
           turns,
           interventions: [],
           createdAt: new Date(debateData.createdAt),
-          completedAt: debateData.status === 'completed' ? new Date(debateData.updatedAt) : undefined,
+          completedAt: mappedStatus === 'completed' ? new Date(debateData.updatedAt) : undefined,
           totalElapsedMs: debateData.totalDurationMs || 0,
         };
 
@@ -216,24 +235,26 @@ export function DebateViewPage() {
   // Debate loaded - show using DebateStream
   return (
     <div className={styles.container}>
-      <header className={styles.header}>
-        <Link to="/history" className={styles.backLink}>
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          Back to History
-        </Link>
+      <Link to="/history" className={styles.backLink}>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+        Back to History
+      </Link>
 
-        {debate && (
+      {debate && (
+        <header className={styles.header}>
+          <h1 className={styles.proposition}>"{debate.proposition}"</h1>
+
           <div className={styles.meta}>
             <Badge
               variant={
@@ -241,7 +262,7 @@ export function DebateViewPage() {
                   ? 'success'
                   : debate.status === 'live'
                   ? 'primary'
-                  : debate.status === 'failed'
+                  : debate.status === 'error'
                   ? 'error'
                   : 'warning'
               }
@@ -251,26 +272,64 @@ export function DebateViewPage() {
                 ? 'Completed'
                 : debate.status === 'live'
                 ? 'Live'
-                : debate.status === 'failed'
-                ? 'Failed'
+                : debate.status === 'error'
+                ? 'Error'
                 : 'Paused'}
             </Badge>
 
             {debate.totalElapsedMs > 0 && (
-              <span className={styles.duration}>
-                {formatDuration(debate.totalElapsedMs)}
+              <span className={styles.metaItem}>
+                <span className={styles.duration}>
+                  {formatDuration(debate.totalElapsedMs)}
+                </span>
               </span>
             )}
 
-            <span className={styles.turnCount}>
-              {debate.turns.length} turns
+            <span className={styles.metaItem}>
+              <span className={styles.turnCount}>
+                {debate.turns.length} turns
+              </span>
+            </span>
+
+            <span className={styles.metaItem}>
+              Started {new Date(debate.createdAt).toLocaleDateString()}
             </span>
           </div>
-        )}
-      </header>
+        </header>
+      )}
+
+      {/* Stalled debate warning */}
+      {isStalled && (
+        <Alert variant="warning" className={styles.stalledAlert}>
+          <div className={styles.stalledContent}>
+            <div>
+              <strong>This debate appears to be stalled.</strong>
+              <p>The server may have restarted. You can mark this debate as completed to preserve the transcript, or cancel it.</p>
+            </div>
+            <div className={styles.stalledActions}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => closeDebate('completed', 'Server restart - marked as complete')}
+              >
+                Mark as Completed
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => closeDebate('failed', 'Server restart - cancelled by user')}
+              >
+                Cancel Debate
+              </Button>
+            </div>
+          </div>
+        </Alert>
+      )}
 
       <main className={styles.main}>
-        <DebateStream />
+        <div className={styles.transcript}>
+          <DebateStream />
+        </div>
       </main>
 
       <footer className={styles.footer}>

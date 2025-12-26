@@ -12,7 +12,10 @@ import type {
   DebateStatus,
   DebatePhase,
   Speaker,
+  FlowMode,
 } from '../../types/database.js';
+import type { PresetMode } from '../../types/configuration.js';
+import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
 
 /**
  * Convert snake_case database row to camelCase Debate object
@@ -25,6 +28,15 @@ function rowToDebate(row: DebateRow): Debate {
     status: row.status,
     currentPhase: row.current_phase,
     currentSpeaker: row.current_speaker,
+    flowMode: row.flow_mode || 'auto',
+    isAwaitingContinue: row.is_awaiting_continue || false,
+    // Configuration fields
+    presetMode: (row.preset_mode as PresetMode) || 'balanced',
+    brevityLevel: row.brevity_level ?? 3,
+    llmTemperature: parseFloat(row.llm_temperature?.toString() ?? '0.7'),
+    maxTokensPerResponse: row.max_tokens_per_response ?? 1024,
+    requireCitations: row.require_citations ?? false,
+    // Timestamp fields
     startedAt: row.started_at,
     completedAt: row.completed_at,
     totalDurationMs: row.total_duration_ms,
@@ -39,15 +51,37 @@ function rowToDebate(row: DebateRow): Debate {
  * Create a new debate
  */
 export async function create(input: CreateDebateInput): Promise<Debate> {
+  // Apply defaults for config fields
+  const presetMode = input.presetMode ?? DEFAULT_CONFIGURATION.presetMode;
+  const brevityLevel = input.brevityLevel ?? DEFAULT_CONFIGURATION.brevityLevel;
+  const llmTemperature = input.llmTemperature ?? DEFAULT_CONFIGURATION.llmSettings.temperature;
+  const maxTokensPerResponse = input.maxTokensPerResponse ?? DEFAULT_CONFIGURATION.llmSettings.maxTokensPerResponse;
+  const requireCitations = input.requireCitations ?? DEFAULT_CONFIGURATION.requireCitations;
+
   const query = `
-    INSERT INTO debates (proposition_text, proposition_context)
-    VALUES ($1, $2)
+    INSERT INTO debates (
+      proposition_text,
+      proposition_context,
+      flow_mode,
+      preset_mode,
+      brevity_level,
+      llm_temperature,
+      max_tokens_per_response,
+      require_citations
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
   `;
 
   const values = [
     input.propositionText,
     JSON.stringify(input.propositionContext || {}),
+    input.flowMode || 'auto',
+    presetMode,
+    brevityLevel,
+    llmTemperature,
+    maxTokensPerResponse,
+    requireCitations,
   ];
 
   try {
@@ -313,6 +347,56 @@ export async function deleteById(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * Set the is_awaiting_continue flag for step mode
+ */
+export async function setAwaitingContinue(
+  id: string,
+  awaiting: boolean
+): Promise<Debate | null> {
+  const query = `
+    UPDATE debates
+    SET is_awaiting_continue = $2
+    WHERE id = $1
+    RETURNING *
+  `;
+
+  try {
+    const result = await pool.query<DebateRow>(query, [id, awaiting]);
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+    return rowToDebate(row);
+  } catch (error) {
+    console.error('Error setting awaiting continue:', error);
+    throw new Error(
+      `Failed to set awaiting continue: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
+ * Get the flow mode for a debate
+ */
+export async function getFlowMode(id: string): Promise<FlowMode | null> {
+  const query = 'SELECT flow_mode FROM debates WHERE id = $1';
+
+  try {
+    const result = await pool.query<{ flow_mode: FlowMode }>(query, [id]);
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+    return row.flow_mode;
+  } catch (error) {
+    console.error('Error getting flow mode:', error);
+    throw new Error(
+      `Failed to get flow mode: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 // Export all functions as default object for convenience
 export default {
   create,
@@ -324,4 +408,6 @@ export default {
   complete,
   list,
   deleteById,
+  setAwaitingContinue,
+  getFlowMode,
 };

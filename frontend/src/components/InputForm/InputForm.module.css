@@ -78,6 +78,74 @@
   color: var(--color-text-secondary);
 }
 
+/* Flow Mode Selector */
+.flowModeSelector {
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.flowModeLabel {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.flowModeOptions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.flowModeOption {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.flowModeOption:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.flowModeOption.flowModeActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+
+.flowModeOption input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+}
+
+.flowModeText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.flowModeText strong {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.flowModeText small {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-normal);
+}
+
 .apiError {
   margin-bottom: var(--spacing-lg);
 }
@@ -116,6 +184,10 @@
 
   .description {
     font-size: var(--font-size-base);
+  }
+
+  .flowModeOptions {
+    flex-direction: column;
   }
 
   .submitButton {

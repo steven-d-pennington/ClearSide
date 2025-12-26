@@ -5,6 +5,10 @@ import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Textarea';
 import { Alert } from '../ui/Alert';
 import { CharacterCount } from './CharacterCount';
+import { ConfigPanel } from '../ConfigPanel/ConfigPanel';
+import type { FlowMode } from '../../types/debate';
+import type { DebateConfiguration } from '../../types/configuration';
+import { DEFAULT_CONFIGURATION } from '../../types/configuration';
 import styles from './InputForm.module.css';
 
 interface InputFormProps {
@@ -16,6 +20,8 @@ interface InputFormProps {
 interface FormState {
   question: string;
   context: string;
+  flowMode: FlowMode;
+  configuration: DebateConfiguration;
 }
 
 interface ValidationErrors {
@@ -32,6 +38,8 @@ export const InputForm: React.FC<InputFormProps> = ({
   const [formState, setFormState] = useState<FormState>({
     question: '',
     context: '',
+    flowMode: 'auto',
+    configuration: DEFAULT_CONFIGURATION,
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -100,6 +108,13 @@ export const InputForm: React.FC<InputFormProps> = ({
   );
 
   /**
+   * Handle configuration change
+   */
+  const handleConfigChange = useCallback((config: DebateConfiguration) => {
+    setFormState((prev) => ({ ...prev, configuration: config }));
+  }, []);
+
+  /**
    * Handle paste event - suggest context field for long pastes
    */
   const handleQuestionPaste = useCallback(
@@ -158,8 +173,19 @@ export const InputForm: React.FC<InputFormProps> = ({
           ? `${formState.question.trim()}\n\nContext: ${formState.context.trim()}`
           : formState.question.trim();
 
-        console.log('🔵 Starting debate with proposition:', proposition);
-        await startDebate(proposition);
+        console.log('🔵 Starting debate with proposition:', proposition, 'flowMode:', formState.flowMode);
+        console.log('🔵 Configuration:', formState.configuration);
+
+        // Build start options including configuration
+        const { configuration } = formState;
+        await startDebate(proposition, {
+          flowMode: formState.flowMode,
+          presetMode: configuration.presetMode,
+          brevityLevel: configuration.brevityLevel,
+          llmTemperature: configuration.llmSettings.temperature,
+          maxTokensPerResponse: configuration.llmSettings.maxTokensPerResponse,
+          requireCitations: configuration.requireCitations,
+        });
         console.log('🔵 startDebate returned');
 
         const debate = useDebateStore.getState().debate;
@@ -262,6 +288,48 @@ export const InputForm: React.FC<InputFormProps> = ({
           </div>
         </div>
       )}
+
+      {/* Flow Mode Selector */}
+      <div className={styles.flowModeSelector}>
+        <span className={styles.flowModeLabel}>Debate Flow:</span>
+        <div className={styles.flowModeOptions}>
+          <label className={`${styles.flowModeOption} ${formState.flowMode === 'auto' ? styles.flowModeActive : ''}`}>
+            <input
+              type="radio"
+              name="flowMode"
+              value="auto"
+              checked={formState.flowMode === 'auto'}
+              onChange={() => setFormState((prev) => ({ ...prev, flowMode: 'auto' }))}
+              disabled={isLoading}
+            />
+            <span className={styles.flowModeText}>
+              <strong>Automatic</strong>
+              <small>Debate flows continuously</small>
+            </span>
+          </label>
+          <label className={`${styles.flowModeOption} ${formState.flowMode === 'step' ? styles.flowModeActive : ''}`}>
+            <input
+              type="radio"
+              name="flowMode"
+              value="step"
+              checked={formState.flowMode === 'step'}
+              onChange={() => setFormState((prev) => ({ ...prev, flowMode: 'step' }))}
+              disabled={isLoading}
+            />
+            <span className={styles.flowModeText}>
+              <strong>Step-by-Step</strong>
+              <small>Pause after each turn to review</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Configuration Panel */}
+      <ConfigPanel
+        configuration={formState.configuration}
+        onChange={handleConfigChange}
+        disabled={isLoading}
+      />
 
       {/* API Error Display */}
       {apiError && (
