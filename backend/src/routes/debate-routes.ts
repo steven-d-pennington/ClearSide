@@ -6,6 +6,7 @@
 import express, { type Request, type Response } from 'express';
 import { sseManager } from '../services/sse/index.js';
 import * as debateRepository from '../db/repositories/debate-repository.js';
+import * as utteranceRepository from '../db/repositories/utterance-repository.js';
 import { createLogger } from '../utils/logger.js';
 import type { CreateDebateInput } from '../types/database.js';
 
@@ -225,6 +226,40 @@ router.get('/debates/:debateId', async (req: Request, res: Response) => {
     logger.error({ debateId, error }, 'Error getting debate');
     res.status(500).json({
       error: 'Failed to get debate',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /debates/:debateId/utterances
+ * Get all utterances for a debate (for replay)
+ */
+router.get('/debates/:debateId/utterances', async (req: Request, res: Response) => {
+  const { debateId } = req.params;
+
+  try {
+    const debate = await debateRepository.findById(debateId!);
+
+    if (!debate) {
+      res.status(404).json({
+        error: 'Debate not found',
+        debateId,
+      });
+      return;
+    }
+
+    const utterances = await utteranceRepository.findByDebateId(debateId!);
+
+    res.json({
+      debateId,
+      utterances,
+      count: utterances.length,
+    });
+  } catch (error) {
+    logger.error({ debateId, error }, 'Error getting utterances');
+    res.status(500).json({
+      error: 'Failed to get utterances',
       message: error instanceof Error ? error.message : String(error),
     });
   }

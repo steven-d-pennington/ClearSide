@@ -1,9 +1,16 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2025-12-26
-> Version: 3.6.0 - Docker Containerization + Orchestrator Integration Fixed
+> Version: 3.7.0 - Debate History & Replay Feature Added
 
 ## 🔧 Recent Changes (2025-12-26)
+
+**NEW: Debate History & Replay Feature:**
+- Browse all previous debates at `/history`
+- Filter by status (completed, live, paused, failed)
+- View/replay any debate at `/debates/:id`
+- New endpoint: `GET /api/debates/:id/utterances`
+- See `docs/IMPLEMENTATION_NOTES.md` for details
 
 **Docker Containerization:**
 - Added full Docker development setup with hot reload

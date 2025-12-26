@@ -710,6 +710,87 @@ Note: Timescale's SQL editor only allows single statements at a time. For initia
 
 ---
 
+## Debate History & Replay Feature (Added 2025-12-26)
+
+### Overview
+
+Added ability to browse previous debates and view/replay completed debates.
+
+### New Files Created
+
+**Frontend Components:**
+- `frontend/src/components/DebateList/DebateList.tsx` - Lists all debates with filtering
+- `frontend/src/components/DebateList/DebateList.module.css` - Styles
+- `frontend/src/components/DebateList/index.ts` - Export
+
+**Pages:**
+- `frontend/src/pages/HomePage.tsx` - Main page with input form
+- `frontend/src/pages/HistoryPage.tsx` - Debate history with filters
+- `frontend/src/pages/DebateViewPage.tsx` - View/replay individual debate
+- `frontend/src/pages/index.ts` - Export
+
+### Routes
+
+| Path | Component | Description |
+|------|-----------|-------------|
+| `/` | HomePage | Start new debate or view current debate |
+| `/history` | HistoryPage | Browse all debates with status filters |
+| `/debates/:debateId` | DebateViewPage | View/replay specific debate |
+
+### API Endpoints Used
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/debates` | List all debates with filtering |
+| `GET /api/debates/:id` | Get debate details |
+| `GET /api/debates/:id/utterances` | Get all utterances for replay (NEW) |
+| `GET /api/debates/:id/stream` | SSE for live debates |
+
+### New Backend Endpoint
+
+Added `GET /api/debates/:debateId/utterances` in `backend/src/routes/debate-routes.ts`:
+
+```typescript
+router.get('/debates/:debateId/utterances', async (req, res) => {
+  const { debateId } = req.params;
+  const utterances = await utteranceRepository.findByDebateId(debateId);
+  res.json({ debateId, utterances, count: utterances.length });
+});
+```
+
+### How It Works
+
+1. **Browse History**: Navigate to `/history` to see all debates
+2. **Filter by Status**: Filter by completed, live, paused, or failed
+3. **Click to View**: Click any debate to view it at `/debates/:id`
+4. **Live vs Completed**:
+   - Live debates: Connect to SSE stream for real-time updates
+   - Completed debates: Load all utterances at once for replay
+
+### DebateList Component Usage
+
+```tsx
+import { DebateList } from '@/components/DebateList';
+
+// Show all debates
+<DebateList />
+
+// Filter by status
+<DebateList statusFilter="completed" />
+
+// Limit results
+<DebateList limit={10} />
+
+// Compact view
+<DebateList compact />
+```
+
+### Integration with Existing DebateStream
+
+The DebateViewPage loads debate data and populates the Zustand store, then renders the existing `DebateStream` component. This ensures consistent UI whether viewing live or replaying completed debates.
+
+---
+
 ## Docker Containerization for Local Development (Added 2025-12-26)
 
 ### Overview
