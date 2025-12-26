@@ -1,0 +1,38 @@
+{
+  "name": "clearside",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ClearSide - Live Debate Theater and AI-Powered Structured Reasoning Engine",
+  "scripts": {
+    "docker:up": "docker-compose --env-file .env.docker up",
+    "docker:up:build": "docker-compose --env-file .env.docker up --build",
+    "docker:up:detached": "docker-compose --env-file .env.docker up -d",
+    "docker:down": "docker-compose --env-file .env.docker down",
+    "docker:down:volumes": "docker-compose --env-file .env.docker down -v",
+    "docker:logs": "docker-compose --env-file .env.docker logs -f",
+    "docker:logs:backend": "docker-compose --env-file .env.docker logs -f backend",
+    "docker:logs:frontend": "docker-compose --env-file .env.docker logs -f frontend",
+    "docker:logs:db": "docker-compose --env-file .env.docker logs -f db",
+    "docker:ps": "docker-compose --env-file .env.docker ps",
+    "docker:restart": "docker-compose --env-file .env.docker restart",
+    "docker:restart:backend": "docker-compose --env-file .env.docker restart backend",
+    "docker:restart:frontend": "docker-compose --env-file .env.docker restart frontend",
+    "docker:shell:backend": "docker-compose --env-file .env.docker exec backend sh",
+    "docker:shell:frontend": "docker-compose --env-file .env.docker exec frontend sh",
+    "docker:shell:db": "docker-compose --env-file .env.docker exec db psql -U postgres -d clearside",
+    "docker:rebuild:backend": "docker-compose --env-file .env.docker up -d --build backend",
+    "docker:rebuild:frontend": "docker-compose --env-file .env.docker up -d --build frontend",
+    "docker:clean": "docker-compose --env-file .env.docker down -v --rmi local",
+    "docker:prune": "docker system prune -f"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steven-d-pennington/ClearSide.git"
+  },
+  "author": "steve.d.pennington@gmail.com",
+  "license": "MIT"
+}

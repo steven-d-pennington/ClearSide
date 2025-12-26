@@ -1,0 +1,23 @@
+# Backend Development Dockerfile
+FROM node:20-alpine
+
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+# Copy package files first for better layer caching
+COPY package.json package-lock.json* ./
+
+# Install all dependencies (including devDependencies)
+RUN npm install
+
+# Copy source code (will be overridden by volume mounts in development)
+COPY . .
+
+# Expose the backend port
+EXPOSE 3001
+
+# Use tsx watch for hot reload development
+# The --clear-screen=false prevents screen clearing issues in Docker logs
+CMD ["npx", "tsx", "watch", "--clear-screen=false", "src/index.ts"]

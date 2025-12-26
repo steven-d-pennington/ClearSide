@@ -1,0 +1,37 @@
+# Dependencies (will be installed in container)
+node_modules/
+
+# Build outputs
+dist/
+
+# Test artifacts
+coverage/
+
+# Environment files (use docker-compose env vars instead)
+.env
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Docker files (don't copy recursively)
+Dockerfile*
+docker-compose*.yml

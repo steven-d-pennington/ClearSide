@@ -89,7 +89,9 @@ const initialState = {
 /**
  * API base URL - configure based on environment
  */
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Use empty string for relative URLs (goes through Vite proxy in dev)
+// Only use VITE_API_URL for production deployments with absolute URLs
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 /**
  * Debate store

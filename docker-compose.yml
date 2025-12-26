@@ -1,0 +1,137 @@
+services:
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  db:
+    image: postgres:15-alpine
+    container_name: clearside-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: clearside_dev_password
+      POSTGRES_DB: clearside
+    ports:
+      - "5432:5432"
+    volumes:
+      - clearside-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clearside"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - clearside-network
+
+  # =============================================================================
+  # Backend API (Express/Node.js)
+  # =============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: clearside-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      # Database configuration (uses Docker service name)
+      DATABASE_URL: postgresql://postgres:clearside_dev_password@db:5432/clearside?sslmode=disable
+      # LLM Configuration (passed from host .env.docker)
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-gpt-4}
+      LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-30000}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-3}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Allow connections from frontend container
+      FRONTEND_URL: http://localhost:5173
+      # Polling for file watching on Windows
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+    volumes:
+      # Mount source code for hot reload
+      - ./backend/src:/app/src:cached
+      - ./backend/tests:/app/tests:cached
+      # Mount config files
+      - ./backend/package.json:/app/package.json:ro
+      - ./backend/tsconfig.json:/app/tsconfig.json:ro
+      - ./backend/vitest.config.ts:/app/vitest.config.ts:ro
+      # Use named volume for node_modules to avoid conflicts
+      - backend-node-modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - clearside-network
+
+  # =============================================================================
+  # Frontend (React/Vite)
+  # =============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: clearside-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      NODE_ENV: development
+      # Empty = use relative URLs, which go through Vite's proxy to backend
+      VITE_API_URL: ""
+      # Proxy target for Vite dev server (Docker service name)
+      VITE_PROXY_TARGET: http://backend:3001
+      # Polling for file watching on Windows
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "1000"
+      # Vite HMR settings for Docker
+      VITE_HMR_HOST: localhost
+      VITE_HMR_PORT: "5173"
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/src:/app/src:cached
+      - ./frontend/public:/app/public:cached
+      - ./frontend/e2e:/app/e2e:cached
+      # Mount config files
+      - ./frontend/package.json:/app/package.json:ro
+      - ./frontend/tsconfig.json:/app/tsconfig.json:ro
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json:ro
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - ./frontend/index.html:/app/index.html:ro
+      - ./frontend/eslint.config.js:/app/eslint.config.js:ro
+      # Use named volume for node_modules
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - clearside-network
+
+# =============================================================================
+# Named Volumes
+# =============================================================================
+volumes:
+  clearside-db-data:
+    driver: local
+  backend-node-modules:
+    driver: local
+  frontend-node-modules:
+    driver: local
+
+# =============================================================================
+# Network
+# =============================================================================
+networks:
+  clearside-network:
+    driver: bridge
