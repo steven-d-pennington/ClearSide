@@ -51,6 +51,40 @@ Each task file includes:
 
 ---
 
+## 🚀 NEXT SPRINT: What to Work On
+
+**MVP is complete!** Here are the priority items for the next sprint:
+
+### Option A: Persona System (Extends Configuration)
+
+| Task | Description | Estimate | Status |
+|------|-------------|----------|--------|
+| PERSONA-001 | Database migration for personas | S | 🟢 Ready |
+| PERSONA-002 | Persona types and repository | M | 🟢 Ready (after PERSONA-001) |
+| PERSONA-003 | Parameterize agent identity prompts | L | Depends on PERSONA-002 |
+| PERSONA-004 | API endpoints for personas | S | Depends on PERSONA-002 |
+| PERSONA-005 | Frontend PersonaSelector | M | Depends on PERSONA-004 |
+
+**Start with:** PERSONA-001 → PERSONA-002 → PERSONA-003/004 in parallel → PERSONA-005
+
+### Option B: Media Export Pipeline (Phase 2)
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| P2-003 | TTS voice integration (ElevenLabs/PlayHT) | P0 | 🟢 Ready |
+| P2-004 | Voice profile mapping (Pro/Con/Moderator) | P0 | Depends on P2-003 |
+| P2-005 | Audio podcast generator (MP3) | P0 | Depends on P2-003, P2-004 |
+| P2-002 | PDF export | P1 | 🟢 Ready (quick win) |
+
+**Start with:** P2-002 (quick win) or P2-003 (enables audio pipeline)
+
+### Recommendation
+
+For **user-facing features**: Start with PERSONA-001 (differentiated debates)
+For **content distribution**: Start with P2-003 (enables podcast export)
+
+---
+
 ## Board Overview
 
 ```

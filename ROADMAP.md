@@ -95,6 +95,53 @@ Deliver a live debate theater where users watch AI agents debate in real-time, i
 
 ---
 
+## 🎯 What's Next: Development Priorities
+
+### Immediate Priority: Phase 2 Media Production
+
+The MVP is complete. The next focus is enabling debate export to shareable formats.
+
+**Recommended order:**
+
+1. **P2-003: TTS Integration** (P0) - ElevenLabs/PlayHT API for voice synthesis
+   - Enables audio export pipeline
+   - No blockers - can start immediately
+
+2. **P2-004: Voice Profiles** (P0) - Distinct voices for Pro/Con/Moderator
+   - Depends on P2-003
+   - Critical for podcast quality
+
+3. **P2-005: Audio Podcast Generator** (P0) - MP3 with chapter markers
+   - Depends on P2-003, P2-004
+   - Deliverable: Downloadable podcast episodes
+
+4. **P2-002: PDF Export** (P1) - Formatted PDF transcripts
+   - Uses existing Markdown exporter
+   - Quick win, adds value
+
+### Secondary Priority: Persona System
+
+Extends configuration with argumentation styles (from plan file):
+
+| Task | Description | Status |
+|------|-------------|--------|
+| PERSONA-001 | Database migration for personas table | 📋 Planned |
+| PERSONA-002 | Persona types and repository | 📋 Planned |
+| PERSONA-003 | Parameterize agent identity prompts | 📋 Planned |
+| PERSONA-004 | API endpoints for personas | 📋 Planned |
+| PERSONA-005 | Frontend PersonaSelector component | 📋 Planned |
+
+**Personas planned:** Theorist, Politician, Scientist, Lawyer, Economist, Ethicist
+
+### Future Phases
+
+| Phase | Focus | Key Features |
+|-------|-------|--------------|
+| Phase 3 | Collaboration | User accounts, shareable links, collections |
+| Phase 4 | Scale | Public API, multi-agent debates, enterprise |
+
+---
+
 ## Phase 2: Media Production Pipeline
 
 ### Objective
