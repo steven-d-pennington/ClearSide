@@ -3,13 +3,13 @@
 > **Purpose**: This document tracks what has been implemented and where to find it.
 > Helps future agents understand the codebase structure without reading every file.
 >
-> **Last Updated**: 2025-12-25
+> **Last Updated**: 2025-12-26
 
 ---
 
 ## Completed Implementation Summary
 
-### Phase 1 Progress: 97% Complete (28/29 tasks)
+### Phase 1 Progress: 97% Complete (35/36 tasks)
 
 | Category | Tasks Done | Total | Status |
 |----------|------------|-------|--------|
@@ -18,6 +18,7 @@
 | AI Agents | 5 | 5 | ✅ Complete |
 | UI Components | 9 | 9 | ✅ Complete |
 | Testing | 4 | 5 | ✅ Complete (Load testing remaining) |
+| Configuration | 7 | 7 | ✅ Complete |
 
 ### Phase 2 Progress: 6% Complete (1/16 tasks)
 
@@ -56,10 +57,15 @@ backend/
 │   ├── db/
 │   │   ├── connection.ts       # PostgreSQL connection
 │   │   ├── migrate.ts          # Database migrations
+│   │   ├── migrations/         # SQL migration files
+│   │   │   ├── 001_initial_schema.sql
+│   │   │   ├── 002_add_flow_mode.sql
+│   │   │   └── 003_add_debate_configuration.sql  # ⭐ CONFIG-001
 │   │   └── repositories/
 │   │       ├── debate-repository.ts
 │   │       ├── utterance-repository.ts
-│   │       └── intervention-repository.ts
+│   │       ├── intervention-repository.ts
+│   │       └── preset-repository.ts  # ⭐ CONFIG-003
 │   │
 │   ├── routes/
 │   │   ├── debate-routes.ts    # /api/debates endpoints
@@ -82,6 +88,7 @@ backend/
 │   │   │       ├── pro-advocate-prompts.ts
 │   │   │       ├── con-advocate-prompts.ts
 │   │   │       ├── moderator-prompts.ts
+│   │   │       ├── prompt-modifiers.ts   # ⭐ CONFIG-004 (brevity/citation)
 │   │   │       ├── version-control.ts
 │   │   │       └── prompt-tester.ts
 │   │   │
@@ -113,6 +120,7 @@ backend/
 │   └── types/
 │       ├── debate.ts           # DebatePhase, Speaker enums
 │       ├── database.ts         # DB entity types
+│       ├── configuration.ts    # ⭐ CONFIG-002 (presets, brevity, LLM settings)
 │       ├── llm.ts              # LLM request/response
 │       ├── sse.ts              # SSE event types
 │       └── orchestrator.ts
@@ -289,8 +297,15 @@ frontend/
 │   │   │   └── index.ts           # Unified export
 │   │   │
 │   │   ├── InputForm/             # Proposition input (UI-001)
-│   │   │   ├── InputForm.tsx
+│   │   │   ├── InputForm.tsx      # Integrates ConfigPanel
 │   │   │   ├── CharacterCount.tsx
+│   │   │   └── index.ts
+│   │   │
+│   │   ├── ConfigPanel/           # ⭐ CONFIG-007 (debate settings)
+│   │   │   ├── ConfigPanel.tsx    # Preset selector + advanced settings
+│   │   │   ├── BrevitySlider.tsx  # 1-5 verbosity scale
+│   │   │   ├── TemperatureSlider.tsx  # 0-1 LLM temperature
+│   │   │   ├── *.module.css
 │   │   │   └── index.ts
 │   │   │
 │   │   ├── DebateStream/          # Live debate display (UI-002)
@@ -332,7 +347,8 @@ frontend/
 │   │   └── tokens.css             # ⭐ CSS design tokens
 │   │
 │   ├── types/
-│   │   └── debate.ts              # Debate types (const objects, not enums!)
+│   │   ├── debate.ts              # Debate types (const objects, not enums!)
+│   │   └── configuration.ts       # ⭐ Config types (presets, brevity, LLM settings)
 │   │
 │   ├── utils/
 │   │   └── validation.ts          # Form validation
@@ -1034,6 +1050,296 @@ export type SSEEventType =
   | 'error'              // Backend sends this
   | 'heartbeat';
 ```
+
+---
+
+## Configuration System (Added 2025-12-26)
+
+### Overview
+
+Added a comprehensive debate configuration system enabling customizable debate behavior through preset modes, LLM settings, brevity levels, and citation requirements.
+
+**Tasks Completed:** CONFIG-001 through CONFIG-007
+
+### Database Schema (CONFIG-001)
+
+Migration: `backend/src/db/migrations/003_add_debate_configuration.sql`
+
+**New columns on `debates` table:**
+```sql
+ALTER TABLE debates
+ADD COLUMN preset_mode VARCHAR(20) DEFAULT 'balanced',
+ADD COLUMN brevity_level INTEGER DEFAULT 3 CHECK (brevity_level BETWEEN 1 AND 5),
+ADD COLUMN llm_temperature DECIMAL(2,1) DEFAULT 0.7 CHECK (llm_temperature BETWEEN 0.0 AND 1.0),
+ADD COLUMN max_tokens_per_response INTEGER DEFAULT 1024,
+ADD COLUMN require_citations BOOLEAN DEFAULT false;
+```
+
+**New `debate_presets` table:**
+```sql
+CREATE TABLE debate_presets (
+  id VARCHAR(50) PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  brevity_level INTEGER NOT NULL,
+  llm_temperature DECIMAL(2,1) NOT NULL,
+  max_tokens_per_response INTEGER NOT NULL,
+  require_citations BOOLEAN NOT NULL,
+  is_system_preset BOOLEAN DEFAULT true
+);
+```
+
+**System Presets:**
+| ID | Name | Brevity | Temp | Tokens | Citations |
+|----|------|---------|------|--------|-----------|
+| `quick` | Quick Mode | 5 | 0.5 | 512 | No |
+| `balanced` | Balanced | 3 | 0.7 | 1024 | No |
+| `deep_dive` | Deep Dive | 1 | 0.7 | 2048 | No |
+| `research` | Research | 2 | 0.6 | 2048 | Yes |
+
+### Backend Types (CONFIG-002)
+
+Location: `backend/src/types/configuration.ts`
+
+```typescript
+// Preset modes (const object pattern for erasableSyntaxOnly)
+export const PRESET_MODES = {
+  QUICK: 'quick',
+  BALANCED: 'balanced',
+  DEEP_DIVE: 'deep_dive',
+  RESEARCH: 'research',
+  CUSTOM: 'custom',
+} as const;
+export type PresetMode = (typeof PRESET_MODES)[keyof typeof PRESET_MODES];
+
+// Type guards
+export function isPresetMode(value: unknown): value is PresetMode;
+export function isBrevityLevel(value: unknown): value is BrevityLevel;
+
+// Brevity levels (1-5 scale)
+export type BrevityLevel = 1 | 2 | 3 | 4 | 5;
+
+// Database entity
+export interface DebatePreset {
+  id: string;
+  name: string;
+  description: string | null;
+  brevityLevel: BrevityLevel;
+  llmTemperature: number;
+  maxTokensPerResponse: number;
+  requireCitations: boolean;
+  isSystemPreset: boolean;
+}
+
+// Default configuration
+export const DEFAULT_CONFIG = {
+  presetMode: PRESET_MODES.BALANCED,
+  brevityLevel: 3 as BrevityLevel,
+  llmTemperature: 0.7,
+  maxTokensPerResponse: 1024,
+  requireCitations: false,
+};
+```
+
+### Preset Repository (CONFIG-003)
+
+Location: `backend/src/db/repositories/preset-repository.ts`
+
+```typescript
+import * as presetRepository from './preset-repository.js';
+
+// Get all presets
+const presets = await presetRepository.findAll();
+
+// Get by ID
+const preset = await presetRepository.findById('balanced');
+
+// Get system presets only
+const systemPresets = await presetRepository.findSystemPresets();
+```
+
+### Prompt Modifiers (CONFIG-004)
+
+Location: `backend/src/services/agents/prompts/prompt-modifiers.ts`
+
+```typescript
+// Brevity instructions appended to agent prompts
+export const BREVITY_INSTRUCTIONS: Record<BrevityLevel, string> = {
+  1: 'Be comprehensive and detailed. Aim for 500-600 words with full explanations.',
+  2: 'Be thorough but focused. Aim for 400-500 words.',
+  3: 'Balance depth with conciseness. Aim for 300-400 words.',  // Default
+  4: 'Be concise and direct. Aim for 200-300 words.',
+  5: 'Be highly concise. Aim for 150-200 words. Use bullet points.',
+};
+
+// Citation requirements
+export const CITATION_INSTRUCTIONS = {
+  required: 'ALL factual claims MUST include citations. Use [FACT], [STUDY], or [EXPERT] tags.',
+  optional: 'Include evidence and citations where available to strengthen arguments.',
+};
+
+// Apply modifiers to prompts
+export function applyPromptModifiers(
+  basePrompt: string,
+  config: DebateConfiguration
+): string;
+```
+
+### Agent Configuration (CONFIG-005)
+
+All agents now accept configuration in their context:
+
+```typescript
+// In pro-advocate-agent.ts, con-advocate-agent.ts, moderator-agent.ts
+const context: AgentContext = {
+  debateId,
+  currentPhase,
+  previousUtterances,
+  speaker,
+  proposition,
+  propositionContext,
+  // New configuration fields:
+  config: {
+    brevityLevel: 3,
+    llmTemperature: 0.7,
+    maxTokensPerResponse: 1024,
+    requireCitations: false,
+  },
+};
+
+const response = await proAdvocate.generateOpeningStatement(context);
+```
+
+The orchestrator loads config from the database and passes it to agents:
+
+```typescript
+// debate-orchestrator.ts
+private async loadConfiguration(): Promise<DebateConfiguration> {
+  const debate = await debateRepository.findById(this.debateId);
+  return {
+    brevityLevel: debate.brevityLevel,
+    llmTemperature: debate.llmTemperature,
+    maxTokensPerResponse: debate.maxTokensPerResponse,
+    requireCitations: debate.requireCitations,
+  };
+}
+```
+
+### API Endpoints (CONFIG-006)
+
+**Updated `POST /api/debates`:**
+```typescript
+// Request body now accepts configuration
+{
+  propositionText: string;
+  propositionContext?: Record<string, unknown>;
+  flowMode?: 'auto' | 'step';
+  // New config fields:
+  presetMode?: 'quick' | 'balanced' | 'deep_dive' | 'research' | 'custom';
+  brevityLevel?: 1 | 2 | 3 | 4 | 5;
+  llmTemperature?: number;  // 0.0 - 1.0
+  maxTokensPerResponse?: number;  // 256 - 4096
+  requireCitations?: boolean;
+}
+```
+
+**New `GET /api/presets`:**
+```bash
+GET /api/presets          # List all presets
+GET /api/presets/:id      # Get specific preset
+```
+
+### Frontend ConfigPanel (CONFIG-007)
+
+Location: `frontend/src/components/ConfigPanel/`
+
+**Usage:**
+```tsx
+import { ConfigPanel } from '@/components/ConfigPanel';
+import { DEFAULT_CONFIGURATION, type DebateConfiguration } from '@/types/configuration';
+
+function InputForm() {
+  const [config, setConfig] = useState<DebateConfiguration>(DEFAULT_CONFIGURATION);
+
+  return (
+    <ConfigPanel
+      configuration={config}
+      onChange={setConfig}
+      disabled={isLoading}
+    />
+  );
+}
+```
+
+**ConfigPanel Features:**
+- Preset selector with 4 system presets + Custom
+- Collapsible "Advanced Settings" section
+- BrevitySlider (1-5) with descriptive labels
+- TemperatureSlider (0-1) with Focused/Creative labels
+- Max tokens input
+- Citations toggle
+
+**Frontend Types:**
+```typescript
+// frontend/src/types/configuration.ts
+export type PresetMode = 'quick' | 'balanced' | 'deep_dive' | 'research' | 'custom';
+export type BrevityLevel = 1 | 2 | 3 | 4 | 5;
+
+export interface DebateConfiguration {
+  presetMode: PresetMode;
+  brevityLevel: BrevityLevel;
+  llmSettings: {
+    temperature: number;
+    maxTokensPerResponse: number;
+  };
+  requireCitations: boolean;
+}
+
+export const DEFAULT_CONFIGURATION: DebateConfiguration = {
+  presetMode: 'balanced',
+  brevityLevel: 3,
+  llmSettings: { temperature: 0.7, maxTokensPerResponse: 1024 },
+  requireCitations: false,
+};
+```
+
+### Zustand Store Updates
+
+The debate store now accepts configuration in `startDebate`:
+
+```typescript
+// frontend/src/stores/debate-store.ts
+interface StartDebateOptions {
+  flowMode?: FlowMode;
+  presetMode?: PresetMode;
+  brevityLevel?: BrevityLevel;
+  llmTemperature?: number;
+  maxTokensPerResponse?: number;
+  requireCitations?: boolean;
+}
+
+const { startDebate } = useDebateStore();
+
+// Usage with configuration
+await startDebate('Should AI development be paused?', {
+  flowMode: 'auto',
+  presetMode: 'research',
+  brevityLevel: 2,
+  llmTemperature: 0.6,
+  maxTokensPerResponse: 2048,
+  requireCitations: true,
+});
+```
+
+### Full Configuration Flow
+
+1. User selects preset or customizes settings in ConfigPanel
+2. InputForm includes config in startDebate call
+3. Frontend sends config to `POST /api/debates`
+4. Backend validates config and creates debate with settings
+5. DebateOrchestrator loads config from database
+6. Agents receive config in context and apply modifiers
+7. Prompt modifiers adjust response length and citation requirements
 
 ---
 

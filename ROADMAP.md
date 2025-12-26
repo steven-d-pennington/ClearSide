@@ -61,25 +61,37 @@ Deliver a live debate theater where users watch AI agents debate in real-time, i
 
 | ID | Feature | Priority | Status | Dependencies |
 |----|---------|----------|--------|--------------|
-| MVP-001 | Single-question input form with optional context | P0 | Backlog | None |
-| MVP-002 | Custom ClearSide debate protocol (6 phases) | P0 | Backlog | None |
-| MVP-003 | Debate Orchestrator (state machine + turn management) | P0 | Backlog | MVP-002 |
-| MVP-004 | Real-time streaming layer (Server-Sent Events) | P0 | Backlog | MVP-003 |
-| MVP-005 | Pro Advocate Agent (adapted for turn-based dialogue) | P0 | Backlog | MVP-003 |
-| MVP-006 | Con Advocate Agent (adapted for turn-based dialogue) | P0 | Backlog | MVP-003 |
-| MVP-007 | Moderator Agent (final synthesis phase) | P0 | Backlog | MVP-005, MVP-006 |
-| MVP-008 | User intervention system (pause, question, clarify, inject, direct) | P0 | Backlog | MVP-003 |
-| MVP-009 | Transcript Recorder with timestamps | P0 | Backlog | MVP-003 |
-| MVP-010 | JSON Schema v2.0.0 (transcript format) | P0 | Backlog | MVP-009 |
-| MVP-011 | Live Debate UI - Input Section | P0 | Backlog | None |
-| MVP-012 | Live Debate UI - Streaming Debate View | P0 | Backlog | MVP-004 |
-| MVP-013 | Live Debate UI - Intervention Panel | P0 | Backlog | MVP-008 |
-| MVP-014 | Live Debate UI - Timeline Scrubber | P0 | Backlog | MVP-009 |
-| MVP-015 | Hybrid replay mode (instant load of completed debates) | P0 | Backlog | MVP-009 |
-| MVP-016 | Database schema (debates, utterances, interventions) | P0 | Backlog | MVP-009 |
-| MVP-017 | Phase transition system | P0 | Backlog | MVP-003 |
-| MVP-018 | Prompt contracts for turn-based dialogue | P0 | Backlog | MVP-003 |
-| MVP-019 | Flagship demo implementation (live format) | P1 | Backlog | All above |
+| MVP-001 | Single-question input form with optional context | P0 | ✅ Complete | None |
+| MVP-002 | Custom ClearSide debate protocol (6 phases) | P0 | ✅ Complete | None |
+| MVP-003 | Debate Orchestrator (state machine + turn management) | P0 | ✅ Complete | MVP-002 |
+| MVP-004 | Real-time streaming layer (Server-Sent Events) | P0 | ✅ Complete | MVP-003 |
+| MVP-005 | Pro Advocate Agent (adapted for turn-based dialogue) | P0 | ✅ Complete | MVP-003 |
+| MVP-006 | Con Advocate Agent (adapted for turn-based dialogue) | P0 | ✅ Complete | MVP-003 |
+| MVP-007 | Moderator Agent (final synthesis phase) | P0 | ✅ Complete | MVP-005, MVP-006 |
+| MVP-008 | User intervention system (pause, question, clarify, inject, direct) | P0 | ✅ Complete | MVP-003 |
+| MVP-009 | Transcript Recorder with timestamps | P0 | ✅ Complete | MVP-003 |
+| MVP-010 | JSON Schema v2.0.0 (transcript format) | P0 | ✅ Complete | MVP-009 |
+| MVP-011 | Live Debate UI - Input Section | P0 | ✅ Complete | None |
+| MVP-012 | Live Debate UI - Streaming Debate View | P0 | ✅ Complete | MVP-004 |
+| MVP-013 | Live Debate UI - Intervention Panel | P0 | ✅ Complete | MVP-008 |
+| MVP-014 | Live Debate UI - Timeline Scrubber | P0 | ✅ Complete | MVP-009 |
+| MVP-015 | Hybrid replay mode (instant load of completed debates) | P0 | ✅ Complete | MVP-009 |
+| MVP-016 | Database schema (debates, utterances, interventions) | P0 | ✅ Complete | MVP-009 |
+| MVP-017 | Phase transition system | P0 | ✅ Complete | MVP-003 |
+| MVP-018 | Prompt contracts for turn-based dialogue | P0 | ✅ Complete | MVP-003 |
+| MVP-019 | Flagship demo implementation (live format) | P1 | ✅ Complete | All above |
+
+### Configuration System (Added 2025-12-26)
+
+| ID | Feature | Priority | Status | Dependencies |
+|----|---------|----------|--------|--------------|
+| CONFIG-001 | Database migration for configuration fields | P1 | ✅ Complete | MVP Complete |
+| CONFIG-002 | Backend configuration types | P1 | ✅ Complete | CONFIG-001 |
+| CONFIG-003 | Preset repository (quick, balanced, deep_dive, research) | P1 | ✅ Complete | CONFIG-001 |
+| CONFIG-004 | Prompt modifiers (brevity, citations) | P1 | ✅ Complete | CONFIG-002 |
+| CONFIG-005 | Agent configuration integration | P1 | ✅ Complete | CONFIG-004 |
+| CONFIG-006 | API endpoints for presets and config | P1 | ✅ Complete | CONFIG-003 |
+| CONFIG-007 | Frontend ConfigPanel component | P1 | ✅ Complete | CONFIG-006 |
 
 ---
 
@@ -96,7 +108,7 @@ Transform live debate transcripts into shareable media: text, audio, and video f
 
 | ID | Feature | Priority | Status | Dependencies |
 |----|---------|----------|--------|--------------|
-| P2-001 | Text transcript export (Markdown format) | P0 | Backlog | MVP Complete |
+| P2-001 | Text transcript export (Markdown format) | P0 | ✅ Complete | MVP Complete |
 | P2-002 | Text transcript export (PDF format) | P1 | Backlog | P2-001 |
 | P2-003 | TTS voice integration (ElevenLabs/PlayHT API) | P0 | Backlog | MVP Complete |
 | P2-004 | Voice profile mapping (distinct voices per agent) | P0 | Backlog | P2-003 |
@@ -261,30 +273,40 @@ USER INTERVENTIONS: Can occur at ANY time
 
 ---
 
-## Technical Stack Considerations
+## Technical Stack (Implemented)
 
-### Recommended Architecture
-- **Frontend**: React/Vue.js or static HTML with serverless functions
-- **Backend**: Node.js or Python with LLM orchestration layer
-- **Schema Contract**: JSON Schema v1 (versioned)
-- **Model Agnostic**: Support multiple LLM providers behind the same interface
+### Current Architecture
+- **Frontend**: React 18 + Vite + TypeScript
+  - State management: Zustand
+  - Styling: CSS Modules + design tokens
+  - Testing: Vitest + Playwright
+- **Backend**: Node.js + Express + TypeScript
+  - Database: PostgreSQL (Timescale Cloud in production)
+  - Real-time: Server-Sent Events (SSE)
+  - LLM: OpenAI API (Claude-compatible)
+- **Infrastructure**:
+  - Development: Docker Compose (db, backend, frontend)
+  - Production: Railway (backend) + Vercel-ready (frontend)
+  - Auto-migrations on startup
+- **Schema Contract**: JSON Schema v2.0.0 (versioned)
+- **Model Agnostic**: Abstracted LLM client supports OpenAI/Anthropic
 
-### Key Technical Requirements
-- Response format enforcement (`response_format: json_schema`)
-- Schema validation for all agent outputs
-- Automated regression testing against flagship demo
-- Version-controlled prompt contracts
+### Key Technical Patterns
+- `erasableSyntaxOnly: true` - const objects instead of enums
+- Per-debate orchestrator instances with isolated state machines
+- Fire-and-forget debate execution (HTTP returns immediately)
+- Class-based EventSource mocking for tests
 
 ---
 
 ## Success Metrics
 
 ### MVP Success Criteria
-- [ ] User can input a question and receive structured pro/con debate
-- [ ] All agent outputs conform to JSON schema
-- [ ] Flagship demo produces consistent, high-quality reasoning
-- [ ] User can challenge at least one assumption and receive inline response
-- [ ] Output clearly separates pro, con, and moderator sections
+- [x] User can input a question and receive structured pro/con debate
+- [x] All agent outputs conform to JSON schema
+- [x] Flagship demo produces consistent, high-quality reasoning
+- [x] User can challenge at least one assumption and receive inline response
+- [x] Output clearly separates pro, con, and moderator sections
 
 ### Quality Benchmarks
 - Reasoning quality matches or exceeds flagship demo
@@ -322,6 +344,15 @@ USER INTERVENTIONS: Can occur at ANY time
 |       |            | • Added hybrid live-replay model |
 |       |            | • Added media production pipeline (Phase 2) |
 |       |            | • Restructured phases around live debate flow |
+| 1.0.0 | 2025-12-26 | **MVP Complete** |
+|       |            | • All Phase 1 features implemented and tested |
+|       |            | • 480+ tests across unit, integration, E2E, accessibility |
+|       |            | • Docker containerization for local development |
+|       |            | • Debate history and replay feature |
+|       |            | • Markdown export (Phase 2 started) |
+|       |            | • Configuration system (presets, brevity, LLM settings) |
+|       |            | • Flow mode (auto/step) for debate pacing |
+|       |            | • Production deployment on Railway + Timescale Cloud |
 
 ---
 

@@ -1,8 +1,8 @@
 # ClearSide Product Requirements Document (PRD)
 
-> Version: 2.0.0
-> Last Updated: 2025-12-23
-> Major Update: Live Debate Theater Architecture
+> Version: 3.0.0
+> Last Updated: 2025-12-26
+> Major Update: MVP Complete with Configuration System
 
 ---
 
@@ -376,6 +376,31 @@ ClearSide measures success by clarity and understanding, not clicks or final ans
 | FR-509 | Export progress SHALL be visible to user | P1 |
 | FR-510 | Completed exports SHALL be downloadable via link | P0 |
 | FR-511 | System SHALL store media files in blob storage (S3/equivalent) | P1 |
+
+### 3.9 Configuration & Personalization (FR-550) - Implemented
+
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-551 | System SHALL support preset modes (Quick, Balanced, Deep Dive, Research) | P1 | ✅ Done |
+| FR-552 | System SHALL allow brevity level selection (1-5 scale) | P1 | ✅ Done |
+| FR-553 | System SHALL allow LLM temperature configuration (0.0-1.0) | P1 | ✅ Done |
+| FR-554 | System SHALL allow max tokens per response configuration | P1 | ✅ Done |
+| FR-555 | System SHALL support citation requirement toggle | P1 | ✅ Done |
+| FR-556 | System SHALL support flow mode selection (auto/step) | P1 | ✅ Done |
+| FR-557 | Presets SHALL be stored in database with default values | P1 | ✅ Done |
+| FR-558 | Configuration SHALL be persisted per-debate | P1 | ✅ Done |
+| FR-559 | API SHALL expose preset endpoints (GET /presets) | P1 | ✅ Done |
+| FR-560 | Frontend SHALL display configuration panel with sliders | P1 | ✅ Done |
+
+### 3.10 Debate History & Replay (FR-600) - Implemented
+
+| ID | Requirement | Priority | Status |
+|----|-------------|----------|--------|
+| FR-601 | System SHALL list all debates with status filtering | P1 | ✅ Done |
+| FR-602 | System SHALL support debate status filters (completed, live, paused, failed) | P1 | ✅ Done |
+| FR-603 | System SHALL provide individual debate view page | P1 | ✅ Done |
+| FR-604 | Completed debates SHALL load all utterances for replay | P1 | ✅ Done |
+| FR-605 | API SHALL expose utterances endpoint (GET /debates/:id/utterances) | P1 | ✅ Done |
 
 ---
 

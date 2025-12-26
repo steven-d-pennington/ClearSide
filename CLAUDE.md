@@ -449,40 +449,35 @@ npm run test:coverage
 
 ## Sprint Overview
 
-### Sprint 1: Foundation (Weeks 1-2)
-**Goal:** Database, SSE, State Machine, LLM Integration
+### ✅ Sprint 1-4: MVP Complete (2025-12-26)
 
-Tasks: INFRA-001, INFRA-002, INFRA-003, INFRA-004, CORE-001, AGENT-001
+All Phase 1 tasks have been completed:
 
-**Completion Criteria:** Can start a debate, transition phases, stream to frontend
+| Category | Tasks | Status |
+|----------|-------|--------|
+| Infrastructure | INFRA-001 to INFRA-005 | ✅ Complete |
+| Core Engine | CORE-001 to CORE-005 | ✅ Complete |
+| AI Agents | AGENT-001 to AGENT-005 | ✅ Complete |
+| UI Components | UI-001 to UI-009 | ✅ Complete |
+| Testing | TEST-001 to TEST-005 | ✅ Complete (load testing optional) |
+| Configuration | CONFIG-001 to CONFIG-007 | ✅ Complete |
 
-### Sprint 2: Core Engine (Weeks 3-4)
-**Goal:** Complete orchestration and agent implementation
+### Current Focus: Phase 2
 
-Tasks: CORE-002, CORE-003, CORE-005, AGENT-005, AGENT-002, AGENT-003
+**Next Available Tasks:**
 
-**Completion Criteria:** Full debate runs through all 6 phases with agents
+| Task | Description | Priority |
+|------|-------------|----------|
+| EXPORT-002 | PDF export | P1 |
+| AUDIO-001 | TTS integration | P0 |
+| PERSONA-001 | Persona system database | P1 |
 
-### Sprint 3: UI & Interventions (Weeks 5-6)
-**Goal:** Build frontend and user interaction
+### Features Added Since Original Plan
 
-Tasks: UI-001 through UI-008, CORE-004, AGENT-004
-
-**Completion Criteria:** Users can watch live debates and intervene
-
-### Sprint 4: Replay & Testing (Weeks 7-8)
-**Goal:** Polish, test, and validate MVP
-
-Tasks: UI-005, UI-009, TEST-001 through TEST-005, INFRA-005
-
-**Completion Criteria:** MVP is production-ready and tested
-
-### Sprint 5-6: Phase 2 (Weeks 9-12)
-**Goal:** Media production pipeline
-
-Tasks: All EXPORT, AUDIO, VIDEO, QUEUE, STORAGE tasks
-
-**Completion Criteria:** Full export pipeline operational
+1. **Configuration System** - Presets, brevity, LLM settings
+2. **Flow Mode** - Auto vs Step-by-step debate pacing
+3. **Debate History** - Browse and replay completed debates
+4. **Docker Dev Environment** - Containerized local development
 
 ---
 
@@ -520,79 +515,55 @@ Tasks: All EXPORT, AUDIO, VIDEO, QUEUE, STORAGE tasks
 
 ## 📊 Current State
 
-**Phase:** Phase 1 - MVP Live Debate Engine
-**Sprint:** Sprint 3 (UI & Interventions)
-**Overall Progress:** 15/29 Phase 1 tasks complete (52%)
+**Phase:** MVP Complete - Starting Phase 2 (Media Production)
+**Version:** 1.0.0
+**Overall Progress:** 36/36 Phase 1 tasks complete (100%)
 
-### ✅ Completed Categories
+### ✅ Phase 1 Complete
 - **Infrastructure (5/5):** LLM API, PostgreSQL, SSE, Schema Validation, Logging
 - **Core Engine (5/5):** State Machine, Orchestrator, Turn Manager, Interventions, Transcript
 - **AI Agents (5/5):** Orchestrator, Pro Advocate, Con Advocate, Moderator, Prompt Templates
+- **UI Components (9/9):** Input, Stream, Timeline, Interventions, Layout, Design System
+- **Testing (5/5):** Unit, Integration, E2E, Accessibility, Agent Quality (480+ tests)
+- **Configuration (7/7):** Presets, Brevity, LLM Settings, API, Frontend ConfigPanel
 
-### 🟡 Currently In Progress
-_(None)_
-
-### 📋 Next Up
-- **UI Components (0/9):** Ready to start
-- **Testing (0/5):** Ready to start
-
----
-
-## 🎯 Next Available Tasks - Sprint 3 (Ready to Start)
-
-### Priority P0 Tasks (UI Foundation):
-
-**1. UI-006: Implement Debate State Management (Zustand)**
-- **Priority:** P0 | **Estimate:** M (4-8 hours)
-- **Why:** Foundation for all other UI components
-- **No blockers** - Can start immediately
-- **File:** [tasks/phase1/ui/UI-006.md](tasks/phase1/ui/UI-006.md)
-
-**2. UI-001: Create Input Section Component**
-- **Priority:** P0 | **Estimate:** S (1-4 hours)
-- **Why:** User proposition entry point
-- **No blockers** - Can start immediately
-- **File:** [tasks/phase1/ui/UI-001.md](tasks/phase1/ui/UI-001.md)
-
-**3. UI-002: Create Live Debate Stream Component**
-- **Priority:** P0 | **Estimate:** L (1-3 days)
-- **Why:** Real-time debate display with SSE
-- **Dependency:** UI-006 (state management)
-- **File:** [tasks/phase1/ui/UI-002.md](tasks/phase1/ui/UI-002.md)
-
-### Testing (Can Run in Parallel):
-
-**4. TEST-001: Create Unit Test Suite**
-- **Priority:** P0 | **Estimate:** M (4-8 hours)
-- **Why:** Cover existing backend code
-- **No blockers** - Can start immediately
-- **File:** [tasks/phase1/testing/TEST-001.md](tasks/phase1/testing/TEST-001.md)
+### 📋 Phase 2 Started
+- **Text Export (1/2):** Markdown export complete, PDF pending
+- **Audio Export (0/4):** TTS, Voice Profiles, Podcast Generator pending
+- **Video Export (0/4):** Remotion pipeline pending
 
 ---
 
-## 💡 Recommended Approach
+## 🎯 Available Tasks
 
-**Best starting point:** UI-006 (Zustand state management) since most UI components depend on it.
+### Phase 2 (Media Production):
 
-**Suggested order:**
-1. Start with **UI-006** (State Management) - foundation for all UI
-2. Then **UI-001** (Input Section) - simple, standalone
-3. Then **UI-002** (Live Stream) - uses SSE + state
-4. Parallel: **TEST-001** (Unit Tests) - can run alongside UI work
+**1. EXPORT-002: PDF Export**
+- **Priority:** P1 | Uses Markdown exporter as base
+- **File:** [tasks/phase2/text-export/EXPORT-002.md](tasks/phase2/text-export/EXPORT-002.md)
+
+**2. AUDIO-001: TTS Integration**
+- **Priority:** P0 | ElevenLabs/PlayHT API
+- **File:** [tasks/phase2/audio-export/AUDIO-001.md](tasks/phase2/audio-export/AUDIO-001.md)
+
+### Configuration Enhancements (Planned):
+
+**3. PERSONA-001: Persona System Database**
+- **Priority:** P1 | 6 argumentation archetypes
+- Add persona selection to debates
 
 ---
 
 ## 💬 What would you like to work on?
 
 I can:
-- ✅ Start with **UI-006** (Zustand State Management)
-- ✅ Start with **UI-001** (Input Section Component)
-- ✅ Start with **TEST-001** (Unit Test Suite)
-- ℹ️ Show the implementation details from [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md)
-- ℹ️ Explain how the agent system works
-- ℹ️ Review completed work
+- ✅ Continue Phase 2: **Audio/Video export pipeline**
+- ✅ Add features: **Persona system, Team debates, Interactive modes**
+- ✅ Improve UI: **Debate history design, mobile optimization**
+- ℹ️ Review implementation: [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md)
+- ℹ️ View changelog: [CHANGELOG.md](CHANGELOG.md)
 
-**Which task would you like me to work on, or would you like more information first?**
+**What would you like to focus on?**
 ```
 
 ---
@@ -626,6 +597,6 @@ Every feature, every line of code, every prompt should serve the goal of helping
 
 ---
 
-*Last Updated: 2025-12-24*
-*Version: 2.1.0*
+*Last Updated: 2025-12-26*
+*Version: 3.0.0 (MVP Complete)*
 *For questions, check [tasks/README.md](tasks/README.md) or ask the user*
