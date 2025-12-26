@@ -242,15 +242,21 @@ export type SSEEventType =
   | 'connected'
   | 'debate_started'
   | 'phase_transition'
+  | 'phase_start'        // Backend sends this
+  | 'phase_complete'     // Backend sends this
   | 'turn_start'
   | 'turn_chunk'
   | 'turn_complete'
+  | 'utterance'          // Backend sends this for each agent response
   | 'intervention_received'
   | 'intervention_addressed'
+  | 'intervention_response'  // Backend sends this
   | 'debate_paused'
   | 'debate_resumed'
   | 'debate_completed'
+  | 'debate_complete'    // Backend sends this (without 'd')
   | 'debate_error'
+  | 'error'              // Backend sends this
   | 'heartbeat';
 
 /**

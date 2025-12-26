@@ -469,6 +469,133 @@ export const useDebateStore = create<DebateState>()(
             // Heartbeat - just confirms connection is alive
             break;
 
+          // Backend sends 'utterance' for each agent response
+          case 'utterance': {
+            const data = message.data as {
+              debateId: string;
+              phase: string;
+              speaker: string;
+              content: string;
+              timestampMs: number;
+              metadata?: Record<string, unknown>;
+            };
+
+            // Backend sends same string values as our enums, so direct cast works
+            // Fallback to PHASE_1_OPENING/MODERATOR if unknown
+            const phase = (Object.values(DebatePhase).includes(data.phase as DebatePhase)
+              ? data.phase
+              : DebatePhase.PHASE_1_OPENING) as DebatePhase;
+
+            const speaker = (Object.values(Speaker).includes(data.speaker as Speaker)
+              ? data.speaker
+              : Speaker.MODERATOR) as Speaker;
+
+            const newTurn: DebateTurn = {
+              id: `${data.debateId}-${data.timestampMs}`,
+              debateId: data.debateId,
+              phase,
+              speaker,
+              content: data.content,
+              turnNumber: get().debate?.turns.length ?? 0,
+              timestamp: new Date(message.timestamp),
+              metadata: data.metadata as DebateTurn['metadata'],
+            };
+
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'live',
+                    currentPhase: newTurn.phase,
+                    currentSpeaker: newTurn.speaker,
+                    turns: [...state.debate.turns, newTurn],
+                  }
+                : null,
+              streamingTurn: null,
+            }));
+            break;
+          }
+
+          // Backend sends phase_start when entering a new phase
+          case 'phase_start': {
+            const data = message.data as { phase: string; debateId: string };
+            // Backend sends same string values as our enums
+            const phase = Object.values(DebatePhase).includes(data.phase as DebatePhase)
+              ? (data.phase as DebatePhase)
+              : null;
+            if (phase) {
+              set((state) => ({
+                debate: state.debate
+                  ? {
+                      ...state.debate,
+                      status: 'live',
+                      currentPhase: phase,
+                    }
+                  : null,
+              }));
+            }
+            break;
+          }
+
+          // Backend sends phase_complete when a phase ends
+          case 'phase_complete': {
+            // Just log it - the next phase_start will update the phase
+            console.log('Phase complete:', message.data);
+            break;
+          }
+
+          // Backend sends 'debate_complete' (not 'debate_completed')
+          case 'debate_complete':
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'completed',
+                    currentPhase: DebatePhase.COMPLETED,
+                    completedAt: new Date(message.timestamp),
+                  }
+                : null,
+              streamingTurn: null,
+            }));
+            get().disconnectFromDebate();
+            break;
+
+          // Backend sends 'error' for failures
+          case 'error': {
+            const data = message.data as { error: string; debateId: string };
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'error',
+                    currentPhase: DebatePhase.ERROR,
+                    error: data.error,
+                  }
+                : null,
+              error: data.error,
+              streamingTurn: null,
+            }));
+            break;
+          }
+
+          // Backend sends intervention_response
+          case 'intervention_response': {
+            const data = message.data as { interventionId: string; response: string };
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    interventions: state.debate.interventions.map((i) =>
+                      i.id === data.interventionId
+                        ? { ...i, status: 'addressed' as const, response: data.response }
+                        : i
+                    ),
+                  }
+                : null,
+            }));
+            break;
+          }
+
           default:
             console.warn('Unknown SSE event:', message.event);
         }

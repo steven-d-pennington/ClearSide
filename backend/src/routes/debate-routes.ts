@@ -9,8 +9,83 @@ import * as debateRepository from '../db/repositories/debate-repository.js';
 import { createLogger } from '../utils/logger.js';
 import type { CreateDebateInput } from '../types/database.js';
 
+// Orchestrator and dependencies
+import { DebateOrchestrator, DebateStateMachine, turnManager } from '../services/debate/index.js';
+import { defaultLLMClient } from '../services/llm/index.js';
+import {
+  ProAdvocateAgent,
+  ConAdvocateAgent,
+  ModeratorAgent,
+  OrchestratorAgent,
+} from '../services/agents/index.js';
+import { schemaValidator } from '../services/validation/index.js';
+
 const router = express.Router();
 const logger = createLogger({ module: 'DebateRoutes' });
+
+/**
+ * Start the debate orchestrator in the background
+ * This is a fire-and-forget operation - the HTTP response is sent before this completes
+ */
+async function startDebateOrchestrator(
+  debateId: string,
+  propositionText: string,
+  propositionContext?: Record<string, unknown>
+): Promise<void> {
+  logger.info({ debateId, propositionText }, 'Starting debate orchestrator');
+
+  try {
+    // Create per-debate state machine
+    const stateMachine = new DebateStateMachine(debateId);
+
+    // Create per-debate agent instances
+    const agents = {
+      pro: new ProAdvocateAgent(defaultLLMClient),
+      con: new ConAdvocateAgent(defaultLLMClient),
+      moderator: new ModeratorAgent(defaultLLMClient),
+      orchestrator: new OrchestratorAgent(defaultLLMClient),
+    };
+
+    // Create orchestrator with all dependencies
+    const orchestrator = new DebateOrchestrator(
+      debateId,
+      stateMachine,
+      turnManager,
+      sseManager,
+      schemaValidator,
+      agents,
+      {
+        validateUtterances: true,
+        broadcastEvents: true,
+        autoSaveTranscript: true,
+      }
+    );
+
+    // Start the debate - this runs all 6 phases
+    const transcript = await orchestrator.startDebate(propositionText, propositionContext);
+
+    logger.info(
+      { debateId, phases: transcript.utterances.length },
+      'Debate completed successfully'
+    );
+  } catch (error) {
+    logger.error({ debateId, error }, 'Debate orchestrator failed');
+
+    // Broadcast error to connected SSE clients
+    sseManager.broadcastToDebate(debateId, 'error', {
+      debateId,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
+
+    // Update debate status to failed
+    try {
+      await debateRepository.updateStatus(debateId, { status: 'failed' });
+    } catch (updateError) {
+      logger.error({ debateId, updateError }, 'Failed to update debate status to failed');
+    }
+  }
+}
 
 /**
  * GET /debates/:debateId/stream
@@ -76,7 +151,7 @@ router.get('/debates/:debateId/stream', async (req: Request, res: Response) => {
 
 /**
  * POST /debates
- * Create a new debate
+ * Create a new debate and start the orchestrator
  */
 router.post('/debates', async (req: Request, res: Response) => {
   try {
@@ -94,12 +169,24 @@ router.post('/debates', async (req: Request, res: Response) => {
       return;
     }
 
-    // Create debate
+    // Create debate in database
     const debate = await debateRepository.create(input);
 
     logger.info({ debateId: debate.id, propositionText: debate.propositionText }, 'Debate created');
 
+    // Return 201 immediately - don't wait for orchestrator
     res.status(201).json(debate);
+
+    // Start orchestrator in background (fire and forget)
+    // The .catch() ensures errors don't crash the server
+    startDebateOrchestrator(
+      debate.id,
+      input.propositionText,
+      input.propositionContext as Record<string, unknown> | undefined
+    ).catch((error) => {
+      // This catch is a safety net - startDebateOrchestrator has its own error handling
+      logger.error({ debateId: debate.id, error }, 'Unhandled orchestrator error');
+    });
   } catch (error) {
     logger.error({ error }, 'Error creating debate');
     res.status(500).json({

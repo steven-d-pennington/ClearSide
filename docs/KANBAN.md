@@ -1,7 +1,24 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2025-12-25
-> Version: 3.5.0 - Testing Complete + Phase 2 Started (Markdown Export)
+> Last Updated: 2025-12-26
+> Version: 3.6.0 - Docker Containerization + Orchestrator Integration Fixed
+
+## 🔧 Recent Changes (2025-12-26)
+
+**Docker Containerization:**
+- Added full Docker development setup with hot reload
+- Created `docker-compose.yml`, Dockerfiles for backend/frontend
+- See `docs/IMPLEMENTATION_NOTES.md` for usage instructions
+
+**Critical Fix - Orchestrator Integration:**
+- DebateOrchestrator (CORE-002) was implemented but **never wired to routes**
+- Fixed: `backend/src/routes/debate-routes.ts` now starts orchestrator on debate creation
+- Debates now actually run through all 6 phases with LLM calls
+
+**SSE Event Type Mismatch:**
+- Frontend expected different event names than backend sends
+- Fixed: Added handlers for `utterance`, `phase_start`, `phase_complete`, `debate_complete`, `error`
+- See `docs/IMPLEMENTATION_NOTES.md` for full mapping
 
 ---
 

@@ -710,4 +710,250 @@ Note: Timescale's SQL editor only allows single statements at a time. For initia
 
 ---
 
+## Docker Containerization for Local Development (Added 2025-12-26)
+
+### Overview
+
+Full Docker setup for local development with hot reload support on Windows.
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Orchestrates db, backend, frontend services |
+| `backend/Dockerfile.dev` | Node 20 Alpine with tsx watch |
+| `frontend/Dockerfile.dev` | Node 20 Alpine with Vite dev server |
+| `backend/.dockerignore` | Excludes node_modules, dist, etc. |
+| `frontend/.dockerignore` | Excludes node_modules, dist, etc. |
+| `.env.docker.example` | Template for LLM API keys |
+| `package.json` (root) | Docker convenience scripts |
+
+### Usage
+
+```bash
+# First time setup
+copy .env.docker.example .env.docker
+# Edit .env.docker with your OPENAI_API_KEY
+
+# Start all services
+npm run docker:up:build
+
+# Daily use
+npm run docker:up
+
+# View logs
+npm run docker:logs
+
+# Access
+# Frontend: http://localhost:5173
+# Backend:  http://localhost:3001
+# Database: localhost:5432
+```
+
+### Key Configuration Details
+
+**Docker Compose Services:**
+- `db`: PostgreSQL 15-alpine with health check
+- `backend`: Express/Node with tsx watch for hot reload
+- `frontend`: Vite dev server with HMR
+
+**Hot Reload on Windows:**
+- `CHOKIDAR_USEPOLLING=true` enables file watching in Docker
+- Source code mounted with `:cached` for performance
+- Named volumes for `node_modules` to avoid Windows path conflicts
+
+**Vite Proxy Configuration:**
+- `VITE_API_URL=""` (empty) - uses relative URLs like `/api/debates`
+- `VITE_PROXY_TARGET=http://backend:3001` - Docker service networking
+- Vite proxies `/api/*` requests to backend container
+
+**Database Connection:**
+- `DATABASE_URL=postgresql://postgres:clearside_dev_password@db:5432/clearside?sslmode=disable`
+- Note: `?sslmode=disable` required for Docker internal networking
+
+### Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `OPENAI_API_KEY variable is not set` | Use `--env-file .env.docker` flag (already in npm scripts) |
+| `net::ERR_NAME_NOT_RESOLVED` for backend:3001 | Set `VITE_API_URL=""` for relative URLs |
+| SSL connection errors | Add `?sslmode=disable` to DATABASE_URL |
+| Hot reload not working | Restart container: `npm run docker:down && npm run docker:up` |
+
+---
+
+## Debate Orchestrator Integration (Added 2025-12-26)
+
+### Background
+
+The DebateOrchestrator class (CORE-002) was implemented but **never wired to the routes**. This caused debates to be created in the database but never actually run - the frontend showed "Setting up debate" indefinitely.
+
+### The Fix
+
+Modified `backend/src/routes/debate-routes.ts` to start the orchestrator after creating a debate:
+
+```typescript
+import { DebateOrchestrator, DebateStateMachine, turnManager } from '../services/debate/index.js';
+import { defaultLLMClient } from '../services/llm/index.js';
+import {
+  ProAdvocateAgent,
+  ConAdvocateAgent,
+  ModeratorAgent,
+  OrchestratorAgent,
+} from '../services/agents/index.js';
+import { schemaValidator } from '../services/validation/index.js';
+
+async function startDebateOrchestrator(
+  debateId: string,
+  propositionText: string,
+  propositionContext?: Record<string, unknown>
+): Promise<void> {
+  // Create per-debate instances
+  const stateMachine = new DebateStateMachine(debateId);
+  const agents = {
+    pro: new ProAdvocateAgent(defaultLLMClient),
+    con: new ConAdvocateAgent(defaultLLMClient),
+    moderator: new ModeratorAgent(defaultLLMClient),
+    orchestrator: new OrchestratorAgent(defaultLLMClient),
+  };
+
+  const orchestrator = new DebateOrchestrator(
+    debateId,
+    stateMachine,
+    turnManager,
+    sseManager,
+    schemaValidator,
+    agents,
+    { validateUtterances: true, broadcastEvents: true, autoSaveTranscript: true }
+  );
+
+  await orchestrator.startDebate(propositionText, propositionContext);
+}
+
+// In POST /debates handler:
+router.post('/debates', async (req, res) => {
+  // ... create debate in DB ...
+  res.status(201).json(debate);
+
+  // Fire-and-forget: Start orchestrator in background
+  startDebateOrchestrator(debate.id, input.propositionText, input.propositionContext)
+    .catch((error) => logger.error({ debateId: debate.id, error }, 'Orchestrator error'));
+});
+```
+
+### Key Design Decisions
+
+1. **Fire-and-forget pattern**: HTTP response returns immediately (201); orchestrator runs in background
+2. **Per-debate instances**: Each debate gets its own state machine, agents, and orchestrator
+3. **Error broadcasting**: On failure, error event is broadcast to SSE clients
+4. **Database status update**: On failure, debate status updated to 'failed'
+
+### Dependencies for Orchestrator
+
+- `DebateStateMachine` - Manages phase transitions
+- `turnManager` - Coordinates turn-taking between agents
+- `sseManager` - Broadcasts events to connected clients
+- `schemaValidator` - Validates agent outputs
+- `defaultLLMClient` - OpenAI/Anthropic client instance
+- 4 Agent classes: Pro, Con, Moderator, Orchestrator
+
+---
+
+## SSE Event Type Mapping (Added 2025-12-26)
+
+### Problem
+
+Backend and frontend used **different event names** for the same concepts:
+
+| Backend Sends | Frontend Expected |
+|---------------|-------------------|
+| `utterance` | `turn_complete` |
+| `phase_start` | `phase_transition` |
+| `phase_complete` | _(not handled)_ |
+| `debate_complete` | `debate_completed` |
+| `error` | `debate_error` |
+
+### The Fix
+
+Updated `frontend/src/stores/debate-store.ts` to handle backend event names:
+
+```typescript
+case 'utterance': {
+  const data = message.data as {
+    debateId: string;
+    phase: string;
+    speaker: string;
+    content: string;
+    timestampMs: number;
+    metadata?: Record<string, unknown>;
+  };
+
+  // Direct cast - backend sends same enum values as frontend
+  const phase = Object.values(DebatePhase).includes(data.phase as DebatePhase)
+    ? data.phase as DebatePhase
+    : DebatePhase.PHASE_1_OPENING;
+
+  const speaker = Object.values(Speaker).includes(data.speaker as Speaker)
+    ? data.speaker as Speaker
+    : Speaker.MODERATOR;
+
+  const newTurn: DebateTurn = {
+    id: `${data.debateId}-${data.timestampMs}`,
+    debateId: data.debateId,
+    phase,
+    speaker,
+    content: data.content,
+    turnNumber: get().debate?.turns.length ?? 0,
+    timestamp: new Date(message.timestamp),
+  };
+
+  set((state) => ({
+    debate: state.debate ? {
+      ...state.debate,
+      status: 'live',
+      currentPhase: newTurn.phase,
+      currentSpeaker: newTurn.speaker,
+      turns: [...state.debate.turns, newTurn],
+    } : null,
+  }));
+  break;
+}
+```
+
+Also added handlers for:
+- `phase_start` - Updates current phase
+- `phase_complete` - Logs completion
+- `debate_complete` - Marks debate complete
+- `error` - Sets error state
+- `intervention_response` - Updates intervention status
+
+### Updated Type Definitions
+
+`frontend/src/types/debate.ts` now includes:
+
+```typescript
+export type SSEEventType =
+  | 'connected'
+  | 'debate_started'
+  | 'phase_transition'
+  | 'phase_start'        // Backend sends this
+  | 'phase_complete'     // Backend sends this
+  | 'turn_start'
+  | 'turn_chunk'
+  | 'turn_complete'
+  | 'utterance'          // Backend sends this for each agent response
+  | 'intervention_received'
+  | 'intervention_addressed'
+  | 'intervention_response'  // Backend sends this
+  | 'debate_paused'
+  | 'debate_resumed'
+  | 'debate_completed'
+  | 'debate_complete'    // Backend sends this (without 'd')
+  | 'debate_error'
+  | 'error'              // Backend sends this
+  | 'heartbeat';
+```
+
+---
+
 *This document should be updated as new features are implemented.*
