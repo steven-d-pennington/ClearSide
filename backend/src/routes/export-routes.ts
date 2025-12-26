@@ -12,7 +12,12 @@ import { createLogger } from '../utils/logger.js';
 import type { MarkdownExportOptions } from '../services/export/types.js';
 import {
   createAudioExportOrchestrator,
+  getAvailableProviders,
+  getDefaultProvider,
+  getProvidersWithStatus,
+  isProviderAvailable,
   type AudioExportOptions,
+  type TTSProvider,
 } from '../services/audio/index.js';
 
 const router = express.Router();
@@ -22,14 +27,22 @@ const logger = createLogger({ module: 'ExportRoutes' });
 const transcriptRecorder = createTranscriptRecorder(schemaValidator);
 const markdownExporter = createMarkdownExporter();
 
-// Audio orchestrator (lazy init to avoid requiring API key at startup)
-let audioOrchestrator: ReturnType<typeof createAudioExportOrchestrator> | null = null;
+// Audio orchestrators per provider (lazy init to avoid requiring API keys at startup)
+const audioOrchestrators = new Map<TTSProvider, ReturnType<typeof createAudioExportOrchestrator>>();
 
-function getAudioOrchestrator() {
-  if (!audioOrchestrator) {
-    audioOrchestrator = createAudioExportOrchestrator();
+function getAudioOrchestrator(provider?: TTSProvider): ReturnType<typeof createAudioExportOrchestrator> {
+  const selectedProvider = provider || getDefaultProvider();
+
+  // Check if we already have an orchestrator for this provider
+  const cached = audioOrchestrators.get(selectedProvider);
+  if (cached) {
+    return cached;
   }
-  return audioOrchestrator;
+
+  // Create new orchestrator with the selected provider
+  const orchestrator = createAudioExportOrchestrator({ provider: selectedProvider });
+  audioOrchestrators.set(selectedProvider, orchestrator);
+  return orchestrator;
 }
 
 /**
@@ -198,10 +211,36 @@ router.get('/exports/:debateId/preview', async (req: Request, res: Response) => 
 // ============================================================================
 
 /**
+ * GET /exports/audio/providers
+ * Get list of available TTS providers
+ *
+ * Returns provider info with availability status based on configured API keys
+ */
+router.get('/exports/audio/providers', async (_req: Request, res: Response) => {
+  try {
+    const providers = getProvidersWithStatus();
+    const defaultProvider = getDefaultProvider();
+
+    res.json({
+      providers,
+      defaultProvider,
+      availableProviders: getAvailableProviders(),
+    });
+  } catch (error) {
+    logger.error({ error }, 'Error getting TTS providers');
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
  * POST /exports/:debateId/audio
  * Start an audio export job
  *
  * Request body (optional):
+ * - provider: 'elevenlabs' | 'gemini' | 'google-cloud' | 'azure' | 'edge' (default: auto-detect)
  * - format: 'mp3' | 'wav' | 'ogg' (default: 'mp3')
  * - includeBackgroundMusic: boolean (default: false)
  * - backgroundMusicVolume: number 0-1 (default: 0.1)
@@ -209,20 +248,31 @@ router.get('/exports/:debateId/preview', async (req: Request, res: Response) => 
  * - includeIntroOutro: boolean (default: true)
  * - normalizeAudio: boolean (default: true)
  *
- * Returns: { jobId, status, message }
+ * Returns: { jobId, status, message, provider }
  */
 router.post('/exports/:debateId/audio', async (req: Request, res: Response) => {
   const { debateId } = req.params;
+  const requestedProvider = req.body.provider as TTSProvider | undefined;
 
-  logger.info({ debateId }, 'Audio export requested');
+  logger.info({ debateId, requestedProvider }, 'Audio export requested');
 
   try {
-    // Check for ElevenLabs API key
-    if (!process.env.ELEVENLABS_API_KEY) {
-      logger.error('ELEVENLABS_API_KEY not configured');
+    // Determine which provider to use
+    const provider = requestedProvider || getDefaultProvider();
+
+    // Check if the requested provider is available
+    if (!isProviderAvailable(provider)) {
+      const available = getAvailableProviders();
+      const providerInfo = getProvidersWithStatus().find((p) => p.id === provider);
+
+      logger.error({ provider, available }, 'Requested TTS provider not available');
       res.status(503).json({
-        error: 'Audio export not available',
-        message: 'ElevenLabs API key not configured. Set ELEVENLABS_API_KEY environment variable.',
+        error: 'TTS provider not available',
+        message: providerInfo?.requiresApiKey
+          ? `${providerInfo.name} requires ${providerInfo.envVar} environment variable to be set.`
+          : `${provider} is not available.`,
+        provider,
+        availableProviders: available,
         debateId,
       });
       return;
@@ -251,17 +301,18 @@ router.post('/exports/:debateId/audio', async (req: Request, res: Response) => {
       normalizeAudio: req.body.normalizeAudio !== false,
     };
 
-    // Start export job
-    const orchestrator = getAudioOrchestrator();
+    // Start export job with selected provider
+    const orchestrator = getAudioOrchestrator(provider);
     const jobId = await orchestrator.startExport(transcript, options);
 
-    logger.info({ debateId, jobId }, 'Audio export job started');
+    logger.info({ debateId, jobId, provider }, 'Audio export job started');
 
     res.status(202).json({
       jobId,
       debateId,
+      provider,
       status: 'pending',
-      message: 'Audio export job started. Use GET /exports/audio/:jobId/status to check progress.',
+      message: `Audio export job started using ${provider}. Use GET /exports/audio/:jobId/status to check progress.`,
       statusUrl: `/api/exports/audio/${jobId}/status`,
     });
   } catch (error) {

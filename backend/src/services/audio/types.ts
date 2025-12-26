@@ -13,6 +13,30 @@
 export type VoiceType = 'pro' | 'con' | 'moderator' | 'narrator';
 
 /**
+ * Available TTS providers
+ *
+ * - elevenlabs: Premium quality, paid API ($5+ per month)
+ * - gemini: Google Gemini 2.5 TTS via AI Studio API
+ * - google-cloud: Google Cloud Text-to-Speech (1M chars/month free)
+ * - azure: Microsoft Azure Cognitive Services TTS (500K chars/month free)
+ * - edge: Microsoft Edge TTS (completely free, no API key needed)
+ */
+export type TTSProvider = 'elevenlabs' | 'gemini' | 'google-cloud' | 'azure' | 'edge';
+
+/**
+ * TTS Provider metadata for UI display
+ */
+export interface TTSProviderInfo {
+  id: TTSProvider;
+  name: string;
+  description: string;
+  freeTier: string;
+  quality: 'premium' | 'high' | 'good' | 'standard';
+  requiresApiKey: boolean;
+  envVar?: string;
+}
+
+/**
  * Speaker identifiers from the debate system
  */
 export type Speaker = 'pro' | 'con' | 'moderator';
@@ -262,3 +286,82 @@ export interface AudioExportResult {
   /** Error message if failed */
   error?: string;
 }
+
+/**
+ * Generic TTS Service interface
+ *
+ * All TTS providers must implement this interface for compatibility
+ * with the audio export pipeline.
+ */
+export interface ITTSService {
+  /** Provider identifier */
+  readonly provider: TTSProvider;
+
+  /**
+   * Generate speech from text
+   * @param text - Text to convert to speech
+   * @param voiceType - Voice type to use (pro, con, moderator, narrator)
+   * @returns Audio buffer and metadata
+   */
+  generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult>;
+
+  /**
+   * Get voice configuration for a voice type
+   */
+  getVoiceConfig(voiceType: VoiceType): VoiceConfig;
+
+  /**
+   * Check if the service is available (API key configured, etc.)
+   */
+  isAvailable(): boolean;
+}
+
+/**
+ * TTS Provider registry with metadata
+ */
+export const TTS_PROVIDERS: Record<TTSProvider, TTSProviderInfo> = {
+  elevenlabs: {
+    id: 'elevenlabs',
+    name: 'ElevenLabs',
+    description: 'Premium AI voices with exceptional quality and emotion',
+    freeTier: '10,000 chars/month (non-commercial)',
+    quality: 'premium',
+    requiresApiKey: true,
+    envVar: 'ELEVENLABS_API_KEY',
+  },
+  gemini: {
+    id: 'gemini',
+    name: 'Google Gemini TTS',
+    description: 'Gemini 2.5 native TTS with multi-speaker support',
+    freeTier: 'Pay-as-you-go (low cost)',
+    quality: 'premium',
+    requiresApiKey: true,
+    envVar: 'GOOGLE_AI_API_KEY',
+  },
+  'google-cloud': {
+    id: 'google-cloud',
+    name: 'Google Cloud TTS',
+    description: 'Google WaveNet and Neural2 voices',
+    freeTier: '1M chars/month free',
+    quality: 'high',
+    requiresApiKey: true,
+    envVar: 'GOOGLE_CLOUD_API_KEY',
+  },
+  azure: {
+    id: 'azure',
+    name: 'Microsoft Azure TTS',
+    description: 'Azure Cognitive Services Neural TTS',
+    freeTier: '500K chars/month free',
+    quality: 'high',
+    requiresApiKey: true,
+    envVar: 'AZURE_SPEECH_KEY',
+  },
+  edge: {
+    id: 'edge',
+    name: 'Edge TTS (Free)',
+    description: 'Microsoft Edge browser TTS - completely free',
+    freeTier: 'Unlimited (no API key needed)',
+    quality: 'good',
+    requiresApiKey: false,
+  },
+};

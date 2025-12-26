@@ -10,7 +10,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import pino from 'pino';
 import Bottleneck from 'bottleneck';
-import type { VoiceConfig, VoiceType, VoiceProfiles, TTSResult } from './types.js';
+import type { VoiceConfig, VoiceType, VoiceProfiles, TTSResult, ITTSService, TTSProvider } from './types.js';
 
 /**
  * Logger instance
@@ -101,8 +101,11 @@ export interface ElevenLabsConfig {
  * ElevenLabs TTS Service
  *
  * Provides text-to-speech functionality using ElevenLabs API
+ * Implements ITTSService for compatibility with the TTS provider factory.
  */
-export class ElevenLabsService {
+export class ElevenLabsService implements ITTSService {
+  readonly provider: TTSProvider = 'elevenlabs';
+
   private readonly apiKey: string;
   private readonly modelId: string;
   private readonly baseUrl: string;
@@ -143,6 +146,13 @@ export class ElevenLabsService {
       { modelId: this.modelId, rateLimit: config.requestsPerMinute || 100 },
       'ElevenLabs service initialized'
     );
+  }
+
+  /**
+   * Check if the service is available (API key configured)
+   */
+  isAvailable(): boolean {
+    return !!this.apiKey;
   }
 
   /**

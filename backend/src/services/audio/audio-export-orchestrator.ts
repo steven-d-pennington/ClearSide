@@ -12,15 +12,17 @@ import path from 'path';
 import pino from 'pino';
 import { v4 as uuidv4 } from 'uuid';
 import type { DebateTranscript } from '../transcript/transcript-recorder.js';
-import { ElevenLabsService, createElevenLabsService } from './elevenlabs-service.js';
 import { ScriptGenerator, createScriptGenerator } from './script-generator.js';
 import { AudioProcessor, createAudioProcessor } from './audio-processor.js';
 import { ID3Manager, createID3Manager } from './id3-manager.js';
+import { getTTSService, getDefaultProvider } from './tts-provider-factory.js';
 import type {
   AudioExportJob,
   AudioExportOptions,
   AudioExportResult,
   AudioSegment,
+  ITTSService,
+  TTSProvider,
 } from './types.js';
 
 /**
@@ -45,8 +47,8 @@ const jobStore = new Map<string, AudioExportJob>();
  * Orchestrator Configuration
  */
 export interface AudioExportOrchestratorConfig {
-  /** ElevenLabs API key */
-  elevenLabsApiKey?: string;
+  /** TTS provider to use (defaults to auto-detect based on available API keys) */
+  provider?: TTSProvider;
   /** Working directory for audio processing */
   workDir?: string;
   /** Output directory for final files */
@@ -61,7 +63,8 @@ export interface AudioExportOrchestratorConfig {
  * Manages the complete audio export pipeline
  */
 export class AudioExportOrchestrator {
-  private readonly ttsService: ElevenLabsService;
+  private readonly ttsService: ITTSService;
+  private readonly provider: TTSProvider;
   private readonly scriptGenerator: ScriptGenerator;
   private readonly audioProcessor: AudioProcessor;
   private readonly id3Manager: ID3Manager;
@@ -70,10 +73,10 @@ export class AudioExportOrchestrator {
   private readonly baseUrl: string;
 
   constructor(config: AudioExportOrchestratorConfig = {}) {
-    // Initialize services
-    this.ttsService = createElevenLabsService({
-      apiKey: config.elevenLabsApiKey,
-    });
+    // Determine and initialize TTS provider
+    this.provider = config.provider || getDefaultProvider();
+    this.ttsService = getTTSService(this.provider);
+
     this.scriptGenerator = createScriptGenerator();
     this.audioProcessor = createAudioProcessor();
     this.id3Manager = createID3Manager();
@@ -83,7 +86,7 @@ export class AudioExportOrchestrator {
     this.baseUrl = config.baseUrl || '/api/exports/audio';
 
     logger.info(
-      { workDir: this.workDir, outputDir: this.outputDir },
+      { workDir: this.workDir, outputDir: this.outputDir, provider: this.provider },
       'Audio export orchestrator initialized'
     );
   }

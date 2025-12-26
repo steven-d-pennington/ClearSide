@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Badge } from '../components/ui';
 import { DebateStream } from '../components/DebateStream';
+import { ExportPanel } from '../components/ExportPanel';
 import { useDebateStore } from '../stores/debate-store';
 import { DebatePhase, Speaker } from '../types/debate';
 import type { Debate, DebateTurn } from '../types/debate';
@@ -330,6 +331,18 @@ export function DebateViewPage() {
         <div className={styles.transcript}>
           <DebateStream />
         </div>
+
+        {/* Export Panel - show for completed debates */}
+        {debate?.status === 'completed' && (
+          <aside className={styles.sidebar}>
+            <ExportPanel
+              debateId={debateId!}
+              onExportComplete={(format, url) => {
+                console.log(`Export complete: ${format} - ${url}`);
+              }}
+            />
+          </aside>
+        )}
       </main>
 
       <footer className={styles.footer}>

@@ -42,9 +42,23 @@ export type {
   AudioProcessingResult,
   ID3Tags,
   AudioExportResult,
+  TTSProvider,
+  TTSProviderInfo,
+  ITTSService,
 } from './types.js';
 
-export { DEFAULT_AUDIO_OPTIONS } from './types.js';
+export { DEFAULT_AUDIO_OPTIONS, TTS_PROVIDERS } from './types.js';
+
+// TTS Provider Factory (multi-provider support)
+export {
+  createTTSService,
+  getTTSService,
+  getAvailableProviders,
+  getDefaultProvider,
+  getProvidersWithStatus,
+  isProviderAvailable,
+  clearServiceCache,
+} from './tts-provider-factory.js';
 
 // ElevenLabs TTS Service
 export {
@@ -53,6 +67,41 @@ export {
   DEFAULT_VOICE_PROFILES,
   type ElevenLabsConfig,
 } from './elevenlabs-service.js';
+
+// Gemini TTS Service
+export {
+  GeminiTTSService,
+  createGeminiTTSService,
+  GEMINI_VOICE_PROFILES,
+  GEMINI_AVAILABLE_VOICES,
+  type GeminiTTSConfig,
+} from './gemini-tts-service.js';
+
+// Google Cloud TTS Service
+export {
+  GoogleCloudTTSService,
+  createGoogleCloudTTSService,
+  GOOGLE_CLOUD_VOICE_PROFILES,
+  GOOGLE_CLOUD_AVAILABLE_VOICES,
+  type GoogleCloudTTSConfig,
+} from './google-cloud-tts-service.js';
+
+// Azure TTS Service
+export {
+  AzureTTSService,
+  createAzureTTSService,
+  AZURE_VOICE_PROFILES,
+  type AzureTTSConfig,
+} from './azure-tts-service.js';
+
+// Edge TTS Service (free, no API key)
+export {
+  EdgeTTSService,
+  createEdgeTTSService,
+  EDGE_VOICE_PROFILES,
+  EDGE_AVAILABLE_VOICES,
+  type EdgeTTSConfig,
+} from './edge-tts-service.js';
 
 // Script Generator
 export {

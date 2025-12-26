@@ -4,7 +4,7 @@
 
 .container {
   width: 100%;
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: var(--spacing-2xl) var(--spacing-lg);
   display: flex;
@@ -93,12 +93,27 @@
 
 .main {
   flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+}
+
+/* When sidebar is present, use two-column layout */
+.main:has(.sidebar) {
+  grid-template-columns: 1fr 360px;
 }
 
 .transcript {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xl);
+  min-width: 0;
+}
+
+.sidebar {
+  position: sticky;
+  top: var(--spacing-xl);
+  height: fit-content;
 }
 
 .footer {
@@ -166,6 +181,18 @@
 }
 
 /* Responsive */
+@media (max-width: 900px) {
+  .main:has(.sidebar) {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: relative;
+    top: 0;
+    order: -1; /* Show export panel above transcript on mobile */
+  }
+}
+
 @media (max-width: 640px) {
   .header {
     flex-direction: column;
