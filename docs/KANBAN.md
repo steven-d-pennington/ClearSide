@@ -1,9 +1,19 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2025-12-26
-> Version: 3.8.0 - Configuration & Personas Feature Added
+> Version: 3.9.0 - Audio Export Pipeline Added
 
 ## 🔧 Recent Changes (2025-12-26)
+
+**NEW: Audio Export Pipeline (Phase 2):**
+- ElevenLabs TTS integration with multiple voice profiles (Pro, Con, Moderator, Narrator)
+- Script generator converts transcripts to audio-ready format with SSML
+- FFmpeg audio processor for concatenation, normalization, and MP3 encoding
+- ID3 tag manager with chapter markers for podcast navigation
+- Async export orchestrator with job tracking and progress updates
+- RESTful API endpoints for audio export workflow
+- 47 unit tests for audio pipeline
+- See `backend/src/services/audio/` for implementation
 
 **NEW: Configuration & Personas Feature:**
 - Debate configuration system with presets (Quick, Balanced, Deep Dive, Research)
@@ -71,17 +81,17 @@ Each task file includes:
 
 | Task | Description | Priority | Status |
 |------|-------------|----------|--------|
-| P2-003 | TTS voice integration (ElevenLabs/PlayHT) | P0 | 🟢 Ready |
-| P2-004 | Voice profile mapping (Pro/Con/Moderator) | P0 | Depends on P2-003 |
-| P2-005 | Audio podcast generator (MP3) | P0 | Depends on P2-003, P2-004 |
-| P2-002 | PDF export | P1 | 🟢 Ready (quick win) |
+| AUDIO-001-004 | Audio podcast export pipeline | P0 | ✅ DONE |
+| EXPORT-002 | PDF export | P1 | 🟢 Ready (quick win) |
+| VIDEO-001 | Remotion video framework setup | P1 | 🟢 Ready |
+| QUEUE-001 | BullMQ job queue | P1 | 🟢 Ready |
 
-**Start with:** P2-002 (quick win) or P2-003 (enables audio pipeline)
+**Audio pipeline complete!** Next: PDF export or video pipeline
 
 ### Recommendation
 
 For **user-facing features**: Start with PERSONA-001 (differentiated debates)
-For **content distribution**: Start with P2-003 (enables podcast export)
+For **content distribution**: Audio export is complete! Try EXPORT-002 (PDF) or VIDEO-001 (video)
 
 ---
 
@@ -267,10 +277,10 @@ For **content distribution**: Start with P2-003 (enables podcast export)
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AUDIO-001 | Integrate ElevenLabs TTS API | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-001) |
-| AUDIO-002 | Create Voice Profile Mapping | P0 | S | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-002) |
-| AUDIO-003 | Implement Audio Podcast Generator (MP3) | P0 | L | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-003) |
-| AUDIO-004 | Add Chapter Markers to Audio | P1 | S | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-004) |
+| AUDIO-001 | Integrate ElevenLabs TTS API | P0 | M | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-001) |
+| AUDIO-002 | Create Voice Profile Mapping | P0 | S | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-002) |
+| AUDIO-003 | Implement Audio Podcast Generator (MP3) | P0 | L | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-003) |
+| AUDIO-004 | Add Chapter Markers to Audio | P1 | S | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-004) |
 
 **Dependencies:**
 - AUDIO-001 can start immediately

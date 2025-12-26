@@ -20,12 +20,12 @@
 | Testing | 4 | 5 | ✅ Complete (Load testing remaining) |
 | Configuration | 7 | 7 | ✅ Complete |
 
-### Phase 2 Progress: 6% Complete (1/16 tasks)
+### Phase 2 Progress: 31% Complete (5/16 tasks)
 
 | Category | Tasks Done | Total | Status |
 |----------|------------|-------|--------|
 | Text Export | 1 | 2 | 🟡 In Progress |
-| Audio Export | 0 | 4 | 📋 Backlog |
+| Audio Export | 4 | 4 | ✅ Complete |
 | Video Export | 0 | 4 | 📋 Backlog |
 | Queue & Storage | 0 | 4 | 📋 Backlog |
 | Export UI | 0 | 2 | 📋 Backlog |
@@ -40,7 +40,8 @@
 | Accessibility Tests | 111 | 3 |
 | Agent Quality Tests | 101 | 4 |
 | Export Tests | 40 | 1 |
-| **Total** | **~480+** | **22** |
+| Audio Pipeline Tests | 47 | 4 |
+| **Total** | **~530+** | **26** |
 
 ---
 
@@ -113,6 +114,15 @@ backend/
 │   │   │
 │   │   ├── transcript/
 │   │   │   └── transcript-recorder.ts
+│   │   │
+│   │   ├── audio/                  # ⭐ AUDIO EXPORT PIPELINE
+│   │   │   ├── index.ts            # Module exports
+│   │   │   ├── types.ts            # Audio types (VoiceType, AudioSegment, etc.)
+│   │   │   ├── elevenlabs-service.ts  # TTS API integration
+│   │   │   ├── script-generator.ts    # Transcript → Audio script conversion
+│   │   │   ├── audio-processor.ts     # FFmpeg audio processing
+│   │   │   ├── id3-manager.ts         # MP3 metadata and chapters
+│   │   │   └── audio-export-orchestrator.ts  # Pipeline orchestration
 │   │   │
 │   │   └── validation/
 │   │       └── schema-validator.ts
@@ -255,6 +265,75 @@ type SSEEventType =
   | 'debate:completed'
   | 'error';
 ```
+
+---
+
+## Audio Export Pipeline (Added 2025-12-26)
+
+Complete audio export functionality for generating podcast-style MP3s from debates.
+
+### Components
+
+| File | Purpose |
+|------|---------|
+| `elevenlabs-service.ts` | ElevenLabs TTS API integration with rate limiting |
+| `script-generator.ts` | Converts transcripts to audio scripts with SSML |
+| `audio-processor.ts` | FFmpeg wrapper for audio processing |
+| `id3-manager.ts` | MP3 metadata and chapter markers |
+| `audio-export-orchestrator.ts` | Coordinates the full pipeline |
+
+### Voice Profiles
+
+```typescript
+const VOICE_PROFILES = {
+  pro: { voiceId: 'EXAVITQu4vr4xnSDxMaL', name: 'Pro Advocate' },
+  con: { voiceId: 'ErXwobaYiN019PkySvjV', name: 'Con Advocate' },
+  moderator: { voiceId: '21m00Tcm4TlvDq8ikWAM', name: 'Moderator' },
+  narrator: { voiceId: 'pNInz6obpgDQGcFmaJgB', name: 'Narrator' },
+};
+```
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/exports/:debateId/audio` | Start audio export job |
+| GET | `/api/exports/audio/:jobId/status` | Check job progress |
+| GET | `/api/exports/audio/:jobId/download` | Download completed MP3 |
+| DELETE | `/api/exports/audio/:jobId` | Delete job and file |
+| GET | `/api/exports/audio/jobs` | List all audio jobs |
+
+### Usage Example
+
+```typescript
+// Start export
+const response = await fetch(`/api/exports/${debateId}/audio`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    format: 'mp3',
+    includeIntroOutro: true,
+    normalizeAudio: true,
+  }),
+});
+const { jobId, statusUrl } = await response.json();
+
+// Poll for completion
+const status = await fetch(statusUrl).then(r => r.json());
+if (status.status === 'completed') {
+  window.location.href = status.downloadUrl;
+}
+```
+
+### Environment Variables
+
+```bash
+ELEVENLABS_API_KEY=your-api-key-here  # Required for audio export
+```
+
+### Cost Estimate
+
+~$4.50 per 27-minute debate (based on ElevenLabs character pricing)
 
 ---
 
