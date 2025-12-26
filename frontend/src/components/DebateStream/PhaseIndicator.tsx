@@ -20,7 +20,12 @@ export const PhaseIndicator: React.FC<PhaseIndicatorProps> = ({
   currentPhase,
   className = '',
 }) => {
-  const currentInfo = PHASE_INFO[currentPhase];
+  // Handle case where phase might not be in PHASE_INFO
+  const currentInfo = PHASE_INFO[currentPhase] || {
+    name: currentPhase?.replace('PHASE_', '').replace(/_/g, ' ') || 'Unknown',
+    shortName: currentPhase?.replace('PHASE_', '').replace(/_/g, ' ').slice(0, 10) || '?',
+    description: 'Debate in progress',
+  };
   const currentIndex = DEBATE_PHASES.indexOf(currentPhase);
 
   const getPhaseStatus = (_phase: DebatePhase, index: number) => {

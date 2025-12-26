@@ -15,11 +15,18 @@ export const SpeakerBadge: React.FC<SpeakerBadgeProps> = ({
   showName = true,
   className = '',
 }) => {
-  const info = SPEAKER_INFO[speaker];
+  // Handle case where speaker might not be in SPEAKER_INFO
+  const info = SPEAKER_INFO[speaker] || {
+    shortName: speaker || 'Unknown',
+    color: 'var(--color-text-secondary)',
+    bgColor: 'var(--color-bg-tertiary)',
+  };
+
+  const speakerClass = speaker ? styles[speaker.toLowerCase()] : '';
 
   return (
     <span
-      className={`${styles.badge} ${styles[speaker.toLowerCase()]} ${styles[size]} ${className}`}
+      className={`${styles.badge} ${speakerClass} ${styles[size]} ${className}`}
       style={{
         '--speaker-color': info.color,
         '--speaker-bg': info.bgColor,

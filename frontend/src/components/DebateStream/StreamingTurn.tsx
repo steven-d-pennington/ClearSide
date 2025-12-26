@@ -16,11 +16,15 @@ export const StreamingTurn: React.FC<StreamingTurnProps> = ({
   content,
   className = '',
 }) => {
-  const phaseInfo = PHASE_INFO[phase];
+  // Handle case where phase might not be in PHASE_INFO
+  const phaseInfo = PHASE_INFO[phase] || {
+    shortName: phase?.replace('PHASE_', '').replace(/_/g, ' ') || 'Unknown',
+  };
+  const speakerClass = speaker ? styles[speaker.toLowerCase()] : '';
 
   return (
     <article
-      className={`${styles.streamingTurn} ${styles[speaker.toLowerCase()]} ${className}`}
+      className={`${styles.streamingTurn} ${speakerClass} ${className}`}
       aria-live="polite"
       aria-atomic="false"
     >

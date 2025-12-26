@@ -17,7 +17,10 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   onSelect,
   className = '',
 }) => {
-  const phaseInfo = PHASE_INFO[turn.phase];
+  // Handle case where phase might not be in PHASE_INFO (e.g., from backend with different format)
+  const phaseInfo = PHASE_INFO[turn.phase] || {
+    shortName: turn.phase?.replace('PHASE_', '').replace(/_/g, ' ') || 'Unknown',
+  };
 
   const formatTime = (date: Date) => {
     return new Date(date).toLocaleTimeString([], {
