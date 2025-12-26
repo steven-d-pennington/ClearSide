@@ -1,11 +1,25 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2025-12-26
-> Version: 3.9.0 - Audio Export Pipeline Added
+> Version: 4.0.0 - Multi-Provider TTS & Export UI
 
 ## 🔧 Recent Changes (2025-12-26)
 
-**NEW: Audio Export Pipeline (Phase 2):**
+**NEW: Multi-Provider TTS System:**
+- 5 TTS providers: ElevenLabs, Gemini 2.5, Google Cloud, Azure, Edge (free!)
+- Provider factory with automatic fallback to free Edge TTS
+- `ITTSService` interface for consistent provider abstraction
+- API endpoint to list available providers: `GET /api/exports/audio/providers`
+- Provider selection in audio export: `POST /api/exports/:debateId/audio { provider: "edge" }`
+
+**NEW: Export Panel UI:**
+- ExportPanel component shows for completed debates
+- TTSProviderSelector displays quality, cost, and availability
+- Format selection (Markdown, Audio, PDF coming soon)
+- Job progress tracking with download button
+- Integrated into DebateViewPage as sidebar
+
+**Audio Export Pipeline (Phase 2):**
 - ElevenLabs TTS integration with multiple voice profiles (Pro, Con, Moderator, Narrator)
 - Script generator converts transcripts to audio-ready format with SSML
 - FFmpeg audio processor for concatenation, normalization, and MP3 encoding
@@ -88,10 +102,32 @@ Each task file includes:
 
 **Audio pipeline complete!** Next: PDF export or video pipeline
 
+### Option C: OpenRouter Multi-LLM Debates (Phase 3)
+
+**NEW FEATURE IDEA:** Let users choose which LLM powers each debate agent!
+
+| Task | Description | Estimate | Status |
+|------|-------------|----------|--------|
+| OPENROUTER-001 | OpenRouter API integration | M | 📋 Planned |
+| OPENROUTER-002 | LLM selection per agent role | L | 📋 Planned |
+| OPENROUTER-003 | Frontend LLM picker UI | M | 📋 Planned |
+| OPENROUTER-004 | Model cost/capability display | S | 📋 Planned |
+
+**Concept:** Users could configure debates like:
+- **Pro Advocate**: Claude Opus (nuanced reasoning)
+- **Con Advocate**: GPT-4o (structured arguments)
+- **Moderator**: Gemini 2.0 (synthesis & balance)
+- **Narrator**: Llama 3.3 (cost-effective TTS scripts)
+
+OpenRouter provides unified API to 100+ models. This builds on the Persona system and creates genuinely diverse debates with different "thinking styles" clashing.
+
+**Dependencies:** PERSONA-001-005 should be done first (agent identity system)
+
 ### Recommendation
 
 For **user-facing features**: Start with PERSONA-001 (differentiated debates)
 For **content distribution**: Audio export is complete! Try EXPORT-002 (PDF) or VIDEO-001 (video)
+For **advanced debates**: After personas, consider OPENROUTER-001 (multi-LLM debates)
 
 ---
 
