@@ -1,0 +1,222 @@
+/**
+ * ExportPanel Styles
+ */
+
+.exportPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.title svg {
+  color: var(--color-primary);
+}
+
+.errorAlert {
+  margin-bottom: var(--space-2);
+}
+
+/* Format Selection */
+.formatSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sectionLabel {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.formatButtons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.formatButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.formatButton:hover:not(.disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.formatButton.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-alpha-10);
+}
+
+.formatButton.active svg {
+  color: var(--color-primary);
+}
+
+.formatButton.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.formatButton svg {
+  color: var(--color-text-secondary);
+}
+
+.formatButton span {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.comingSoon {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  font-size: var(--font-size-xs);
+}
+
+/* Audio Options */
+.audioOptions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
+}
+
+.optionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.optionLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.optionLabel input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+}
+
+/* Job Progress */
+.jobProgress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.progressHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progressLabel {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.downloadSection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.completeMessage {
+  font-size: var(--font-size-sm);
+  color: var(--color-success);
+  margin: 0;
+}
+
+.completeMessage span {
+  color: var(--color-text-secondary);
+  margin-left: var(--space-2);
+}
+
+/* Export Button */
+.exportButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .formatButtons {
+    flex-direction: column;
+  }
+
+  .downloadSection {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .completeMessage {
+    text-align: center;
+  }
+}

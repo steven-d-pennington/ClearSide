@@ -20,15 +20,15 @@
 | Testing | 4 | 5 | ✅ Complete (Load testing remaining) |
 | Configuration | 7 | 7 | ✅ Complete |
 
-### Phase 2 Progress: 6% Complete (1/16 tasks)
+### Phase 2 Progress: 44% Complete (7/16 tasks)
 
 | Category | Tasks Done | Total | Status |
 |----------|------------|-------|--------|
 | Text Export | 1 | 2 | 🟡 In Progress |
-| Audio Export | 0 | 4 | 📋 Backlog |
+| Audio Export | 4 | 4 | ✅ Complete |
 | Video Export | 0 | 4 | 📋 Backlog |
 | Queue & Storage | 0 | 4 | 📋 Backlog |
-| Export UI | 0 | 2 | 📋 Backlog |
+| Export UI | 2 | 2 | ✅ Complete |
 
 ### Test Coverage Summary
 
@@ -40,7 +40,8 @@
 | Accessibility Tests | 111 | 3 |
 | Agent Quality Tests | 101 | 4 |
 | Export Tests | 40 | 1 |
-| **Total** | **~480+** | **22** |
+| Audio Pipeline Tests | 47 | 4 |
+| **Total** | **~530+** | **26** |
 
 ---
 
@@ -113,6 +114,15 @@ backend/
 │   │   │
 │   │   ├── transcript/
 │   │   │   └── transcript-recorder.ts
+│   │   │
+│   │   ├── audio/                  # ⭐ AUDIO EXPORT PIPELINE
+│   │   │   ├── index.ts            # Module exports
+│   │   │   ├── types.ts            # Audio types (VoiceType, AudioSegment, etc.)
+│   │   │   ├── elevenlabs-service.ts  # TTS API integration
+│   │   │   ├── script-generator.ts    # Transcript → Audio script conversion
+│   │   │   ├── audio-processor.ts     # FFmpeg audio processing
+│   │   │   ├── id3-manager.ts         # MP3 metadata and chapters
+│   │   │   └── audio-export-orchestrator.ts  # Pipeline orchestration
 │   │   │
 │   │   └── validation/
 │   │       └── schema-validator.ts
@@ -254,6 +264,206 @@ type SSEEventType =
   | 'intervention:processed'
   | 'debate:completed'
   | 'error';
+```
+
+---
+
+## Audio Export Pipeline (Added 2025-12-26)
+
+Complete audio export functionality for generating podcast-style MP3s from debates.
+
+### Components
+
+| File | Purpose |
+|------|---------|
+| `elevenlabs-service.ts` | ElevenLabs TTS API integration with rate limiting |
+| `script-generator.ts` | Converts transcripts to audio scripts with SSML |
+| `audio-processor.ts` | FFmpeg wrapper for audio processing |
+| `id3-manager.ts` | MP3 metadata and chapter markers |
+| `audio-export-orchestrator.ts` | Coordinates the full pipeline |
+
+### Voice Profiles
+
+```typescript
+const VOICE_PROFILES = {
+  pro: { voiceId: 'EXAVITQu4vr4xnSDxMaL', name: 'Pro Advocate' },
+  con: { voiceId: 'ErXwobaYiN019PkySvjV', name: 'Con Advocate' },
+  moderator: { voiceId: '21m00Tcm4TlvDq8ikWAM', name: 'Moderator' },
+  narrator: { voiceId: 'pNInz6obpgDQGcFmaJgB', name: 'Narrator' },
+};
+```
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/exports/:debateId/audio` | Start audio export job |
+| GET | `/api/exports/audio/:jobId/status` | Check job progress |
+| GET | `/api/exports/audio/:jobId/download` | Download completed MP3 |
+| DELETE | `/api/exports/audio/:jobId` | Delete job and file |
+| GET | `/api/exports/audio/jobs` | List all audio jobs |
+
+### Usage Example
+
+```typescript
+// Start export
+const response = await fetch(`/api/exports/${debateId}/audio`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    format: 'mp3',
+    includeIntroOutro: true,
+    normalizeAudio: true,
+  }),
+});
+const { jobId, statusUrl } = await response.json();
+
+// Poll for completion
+const status = await fetch(statusUrl).then(r => r.json());
+if (status.status === 'completed') {
+  window.location.href = status.downloadUrl;
+}
+```
+
+### Environment Variables
+
+```bash
+ELEVENLABS_API_KEY=your-api-key-here  # Required for audio export
+```
+
+### Cost Estimate
+
+~$4.50 per 27-minute debate (based on ElevenLabs character pricing)
+
+---
+
+## Multi-Provider TTS System (Added 2025-12-26)
+
+### Overview
+
+Added support for multiple TTS providers, allowing users to choose based on quality and cost needs.
+
+### Supported Providers
+
+| Provider | Quality | Free Tier | API Key Required |
+|----------|---------|-----------|------------------|
+| ElevenLabs | Premium | 10K chars/month | Yes (`ELEVENLABS_API_KEY`) |
+| Gemini TTS | Premium | Pay-as-you-go | Yes (`GOOGLE_AI_API_KEY`) |
+| Google Cloud | High | 1M chars/month | Yes (`GOOGLE_CLOUD_API_KEY`) |
+| Azure | High | 500K chars/month | Yes (`AZURE_SPEECH_KEY`) |
+| Edge TTS | Good | Unlimited | **No** |
+
+### Backend Services
+
+Location: `backend/src/services/audio/`
+
+| File | Purpose |
+|------|---------|
+| `types.ts` | `TTSProvider` type, `ITTSService` interface, `TTS_PROVIDERS` registry |
+| `tts-provider-factory.ts` | Creates TTS service based on provider selection |
+| `elevenlabs-service.ts` | ElevenLabs API integration |
+| `gemini-tts-service.ts` | Gemini 2.5 TTS integration |
+| `google-cloud-tts-service.ts` | Google Cloud TTS integration |
+| `azure-tts-service.ts` | Azure Cognitive Services TTS |
+| `edge-tts-service.ts` | Free Edge TTS (requires Python `edge-tts` package) |
+
+### TTS Provider Interface
+
+```typescript
+interface ITTSService {
+  readonly provider: TTSProvider;
+  generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult>;
+  getVoiceConfig(voiceType: VoiceType): VoiceConfig;
+  isAvailable(): boolean;
+}
+```
+
+### Factory Usage
+
+```typescript
+import {
+  createTTSService,
+  getAvailableProviders,
+  getDefaultProvider
+} from './services/audio/index.js';
+
+// Get available providers (based on configured API keys)
+const available = getAvailableProviders(); // ['edge'] or ['elevenlabs', 'edge', ...]
+
+// Get default provider (first available premium, falls back to edge)
+const defaultProvider = getDefaultProvider();
+
+// Create service for specific provider
+const service = createTTSService('azure');
+const result = await service.generateSpeech('Hello world', 'narrator');
+```
+
+### API Updates
+
+**New endpoint:**
+```
+GET /api/exports/audio/providers
+```
+
+Returns:
+```json
+{
+  "providers": [
+    { "id": "elevenlabs", "name": "ElevenLabs", "quality": "premium", "available": false },
+    { "id": "edge", "name": "Edge TTS", "quality": "good", "available": true }
+  ],
+  "defaultProvider": "edge",
+  "availableProviders": ["edge"]
+}
+```
+
+**Updated POST endpoint:**
+```
+POST /api/exports/:debateId/audio
+Body: { "provider": "edge", "format": "mp3", ... }
+```
+
+### Frontend Export Panel
+
+Location: `frontend/src/components/ExportPanel/`
+
+| File | Purpose |
+|------|---------|
+| `ExportPanel.tsx` | Main export panel with format selection |
+| `TTSProviderSelector.tsx` | TTS provider selection UI |
+| `*.module.css` | Component styles |
+
+**Usage:**
+```tsx
+import { ExportPanel } from '@/components/ExportPanel';
+
+<ExportPanel
+  debateId={debate.id}
+  onExportComplete={(format, url) => console.log(url)}
+/>
+```
+
+### Edge TTS Setup
+
+Edge TTS is the only completely free option. To use it:
+
+```bash
+pip install edge-tts
+```
+
+No API key required. The service automatically checks for Python availability.
+
+### Environment Variables
+
+```bash
+# Premium providers (choose one or more)
+ELEVENLABS_API_KEY=xxx          # ElevenLabs
+GOOGLE_AI_API_KEY=xxx           # Gemini TTS (Google AI Studio)
+GOOGLE_CLOUD_API_KEY=xxx        # Google Cloud TTS
+AZURE_SPEECH_KEY=xxx            # Azure TTS
+AZURE_SPEECH_REGION=eastus      # Azure region (optional, defaults to eastus)
+
+# Edge TTS: No environment variable needed
 ```
 
 ---

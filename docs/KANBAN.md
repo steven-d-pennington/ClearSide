@@ -1,9 +1,41 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2025-12-26
-> Version: 3.8.0 - Configuration & Personas Feature Added
+> Last Updated: 2025-12-27
+> Version: 4.1.0 - Lively Debate Arena Roadmap
 
-## 🔧 Recent Changes (2025-12-26)
+## 🔧 Recent Changes (2025-12-27)
+
+**NEW: Lively Debate Arena (Phase 3 Roadmap):**
+- Multi-panel UI with active speaker highlighting (ARENA-001)
+- Interruption system with natural turn-taking (ARENA-002)
+- Human participant "raise hand" system (ARENA-003)
+- Themed debate modes: lightning, formal, casual (ARENA-004)
+- Real-time voice input for humans (ARENA-005)
+- Target: Human+AI panel discussions for debate clubs, education, content creators
+
+**NEW: Multi-Provider TTS System:**
+- 5 TTS providers: ElevenLabs, Gemini 2.5, Google Cloud, Azure, Edge (free!)
+- Provider factory with automatic fallback to free Edge TTS
+- `ITTSService` interface for consistent provider abstraction
+- API endpoint to list available providers: `GET /api/exports/audio/providers`
+- Provider selection in audio export: `POST /api/exports/:debateId/audio { provider: "edge" }`
+
+**NEW: Export Panel UI:**
+- ExportPanel component shows for completed debates
+- TTSProviderSelector displays quality, cost, and availability
+- Format selection (Markdown, Audio, PDF coming soon)
+- Job progress tracking with download button
+- Integrated into DebateViewPage as sidebar
+
+**Audio Export Pipeline (Phase 2):**
+- ElevenLabs TTS integration with multiple voice profiles (Pro, Con, Moderator, Narrator)
+- Script generator converts transcripts to audio-ready format with SSML
+- FFmpeg audio processor for concatenation, normalization, and MP3 encoding
+- ID3 tag manager with chapter markers for podcast navigation
+- Async export orchestrator with job tracking and progress updates
+- RESTful API endpoints for audio export workflow
+- 47 unit tests for audio pipeline
+- See `backend/src/services/audio/` for implementation
 
 **NEW: Configuration & Personas Feature:**
 - Debate configuration system with presets (Quick, Balanced, Deep Dive, Research)
@@ -71,17 +103,65 @@ Each task file includes:
 
 | Task | Description | Priority | Status |
 |------|-------------|----------|--------|
-| P2-003 | TTS voice integration (ElevenLabs/PlayHT) | P0 | 🟢 Ready |
-| P2-004 | Voice profile mapping (Pro/Con/Moderator) | P0 | Depends on P2-003 |
-| P2-005 | Audio podcast generator (MP3) | P0 | Depends on P2-003, P2-004 |
-| P2-002 | PDF export | P1 | 🟢 Ready (quick win) |
+| AUDIO-001-004 | Audio podcast export pipeline | P0 | ✅ DONE |
+| EXPORT-002 | PDF export | P1 | 🟢 Ready (quick win) |
+| VIDEO-001 | Remotion video framework setup | P1 | 🟢 Ready |
+| QUEUE-001 | BullMQ job queue | P1 | 🟢 Ready |
 
-**Start with:** P2-002 (quick win) or P2-003 (enables audio pipeline)
+**Audio pipeline complete!** Next: PDF export or video pipeline
+
+### Option C: OpenRouter Multi-LLM Debates (Phase 3)
+
+**NEW FEATURE IDEA:** Let users choose which LLM powers each debate agent!
+
+| Task | Description | Estimate | Status |
+|------|-------------|----------|--------|
+| OPENROUTER-001 | OpenRouter API integration | M | 📋 Planned |
+| OPENROUTER-002 | LLM selection per agent role | L | 📋 Planned |
+| OPENROUTER-003 | Frontend LLM picker UI | M | 📋 Planned |
+| OPENROUTER-004 | Model cost/capability display | S | 📋 Planned |
+
+**Concept:** Users could configure debates like:
+- **Pro Advocate**: Claude Opus (nuanced reasoning)
+- **Con Advocate**: GPT-4o (structured arguments)
+- **Moderator**: Gemini 2.0 (synthesis & balance)
+- **Narrator**: Llama 3.3 (cost-effective TTS scripts)
+
+OpenRouter provides unified API to 100+ models. This builds on the Persona system and creates genuinely diverse debates with different "thinking styles" clashing.
+
+**Dependencies:** PERSONA-001-005 should be done first (agent identity system)
+
+### Option D: Lively Debate Arena - Human-AI Multi-Panel Debates (Phase 3)
+
+**NEW FEATURE CONCEPT:** Transform debates into a dynamic multi-panel show with human participants!
+
+| Task | Description | Estimate | Status |
+|------|-------------|----------|--------|
+| ARENA-001 | Multi-panel UI with speaker highlighting | L | 📋 Planned |
+| ARENA-002 | Interruption system & turn-taking orchestrator | XL | 📋 Planned |
+| ARENA-003 | Human participant "raise hand" system | M | 📋 Planned |
+| ARENA-004 | Themed debate modes (lightning, formal, casual) | M | 📋 Planned |
+| ARENA-005 | Real-time voice input for human participants | L | 📋 Planned |
+
+**Vision:** Create a live debate panel show experience where:
+- **Multi-Panel Interface**: Each participant (AI or human) has a dedicated panel
+- **Active Speaker Highlighting**: Current speaker's panel moves to center stage
+- **Natural Interruptions**: Backend orchestrator manages debate flow with interjections
+- **Human-AI Collaboration**: Humans join debates alongside AI agents with "raise hand" to speak
+- **Themed Modes**: Lightning rounds, formal Oxford-style, casual roundtable discussions
+
+**Dependencies:**
+- PERSONA-001-005 (agent identity system)
+- OPENROUTER-001-004 (multi-model diversity recommended)
+- Audio pipeline (for voice input/output)
+
+**Target Audience:** Debate clubs, educational institutions, content creators who want engaging human+AI panel discussions
 
 ### Recommendation
 
 For **user-facing features**: Start with PERSONA-001 (differentiated debates)
-For **content distribution**: Start with P2-003 (enables podcast export)
+For **content distribution**: Audio export is complete! Try EXPORT-002 (PDF) or VIDEO-001 (video)
+For **advanced debates**: After personas, consider OPENROUTER-001 (multi-LLM debates)
 
 ---
 
@@ -267,10 +347,10 @@ For **content distribution**: Start with P2-003 (enables podcast export)
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AUDIO-001 | Integrate ElevenLabs TTS API | P0 | M | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-001) |
-| AUDIO-002 | Create Voice Profile Mapping | P0 | S | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-002) |
-| AUDIO-003 | Implement Audio Podcast Generator (MP3) | P0 | L | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-003) |
-| AUDIO-004 | Add Chapter Markers to Audio | P1 | S | 📋 BACKLOG | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-004) |
+| AUDIO-001 | Integrate ElevenLabs TTS API | P0 | M | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-001) |
+| AUDIO-002 | Create Voice Profile Mapping | P0 | S | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-002) |
+| AUDIO-003 | Implement Audio Podcast Generator (MP3) | P0 | L | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-003) |
+| AUDIO-004 | Add Chapter Markers to Audio | P1 | S | ✅ DONE | [See Summary](../tasks/TASK_CREATION_SUMMARY.md#audio-004) |
 
 **Dependencies:**
 - AUDIO-001 can start immediately

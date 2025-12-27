@@ -9,9 +9,10 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Badge } from '../components/ui';
 import { DebateStream } from '../components/DebateStream';
+import { ExportPanel } from '../components/ExportPanel';
 import { useDebateStore } from '../stores/debate-store';
 import { DebatePhase, Speaker } from '../types/debate';
-import type { Debate, DebateTurn } from '../types/debate';
+import type { Debate, DebateTurn, FlowMode, PresetMode } from '../types/debate';
 import styles from './DebateViewPage.module.css';
 
 /**
@@ -151,6 +152,13 @@ export function DebateViewPage() {
               interventions: [],
               createdAt: new Date(debateData.createdAt),
               totalElapsedMs: debateData.totalDurationMs || 0,
+              // Configuration defaults (API doesn't return these yet)
+              flowMode: 'auto' as FlowMode,
+              presetMode: 'balanced' as PresetMode,
+              brevityLevel: 3,
+              llmTemperature: 0.7,
+              maxTokensPerResponse: 1024,
+              requireCitations: false,
             },
             isLoading: false,
           });
@@ -175,6 +183,13 @@ export function DebateViewPage() {
           createdAt: new Date(debateData.createdAt),
           completedAt: mappedStatus === 'completed' ? new Date(debateData.updatedAt) : undefined,
           totalElapsedMs: debateData.totalDurationMs || 0,
+          // Configuration defaults (API doesn't return these yet)
+          flowMode: 'auto' as FlowMode,
+          presetMode: 'balanced' as PresetMode,
+          brevityLevel: 3,
+          llmTemperature: 0.7,
+          maxTokensPerResponse: 1024,
+          requireCitations: false,
         };
 
         // Update store
@@ -330,6 +345,18 @@ export function DebateViewPage() {
         <div className={styles.transcript}>
           <DebateStream />
         </div>
+
+        {/* Export Panel - show for completed debates */}
+        {debate?.status === 'completed' && (
+          <aside className={styles.sidebar}>
+            <ExportPanel
+              debateId={debateId!}
+              onExportComplete={(format, url) => {
+                console.log(`Export complete: ${format} - ${url}`);
+              }}
+            />
+          </aside>
+        )}
       </main>
 
       <footer className={styles.footer}>
