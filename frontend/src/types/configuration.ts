@@ -196,3 +196,97 @@ export function isPresetMode(value: unknown): value is PresetMode {
 export function isBrevityLevel(value: unknown): value is BrevityLevel {
   return typeof value === 'number' && [1, 2, 3, 4, 5].includes(value);
 }
+
+// ============================================================================
+// Persona Types
+// ============================================================================
+
+/**
+ * Persona archetype categories
+ */
+export type PersonaArchetype =
+  | 'academic'
+  | 'pragmatic'
+  | 'empirical'
+  | 'legal'
+  | 'economic'
+  | 'moral';
+
+/**
+ * Persona summary for selection UI
+ */
+export interface PersonaSummary {
+  id: string;
+  name: string;
+  archetype: PersonaArchetype;
+  description: string | null;
+  avatarEmoji: string | null;
+  colorPrimary: string | null;
+}
+
+/**
+ * Full persona with all details
+ */
+export interface Persona extends PersonaSummary {
+  argumentationStyle: string;
+  vocabularyHints: string | null;
+  focusAreas: string[];
+  rhetoricalPreferences: string | null;
+  systemPromptAddition: string;
+  colorSecondary: string | null;
+  isSystemPersona: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Persona selection for a debate
+ */
+export interface PersonaSelection {
+  proPersonaId: string | null;
+  conPersonaId: string | null;
+}
+
+/**
+ * Default persona selection (no personas = standard behavior)
+ */
+export const DEFAULT_PERSONA_SELECTION: PersonaSelection = {
+  proPersonaId: null,
+  conPersonaId: null,
+};
+
+/**
+ * Archetype display information
+ */
+export const ARCHETYPE_INFO: Record<PersonaArchetype, { name: string; description: string; icon: string }> = {
+  academic: {
+    name: 'Academic',
+    description: 'Theoretical and philosophical',
+    icon: '🎓',
+  },
+  pragmatic: {
+    name: 'Pragmatic',
+    description: 'Practical and politically-aware',
+    icon: '🏛️',
+  },
+  empirical: {
+    name: 'Empirical',
+    description: 'Evidence-based and data-driven',
+    icon: '🔬',
+  },
+  legal: {
+    name: 'Legal',
+    description: 'Rights-focused and precedent-based',
+    icon: '⚖️',
+  },
+  economic: {
+    name: 'Economic',
+    description: 'Incentive and trade-off focused',
+    icon: '📊',
+  },
+  moral: {
+    name: 'Moral',
+    description: 'Ethics and values focused',
+    icon: '🧭',
+  },
+};

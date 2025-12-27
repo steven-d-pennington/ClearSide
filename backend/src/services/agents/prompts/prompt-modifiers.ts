@@ -6,7 +6,7 @@
  * and citation requirements.
  */
 
-import type { BrevityLevel, DebateConfiguration } from '../../../types/configuration.js';
+import type { BrevityLevel, DebateConfiguration, Persona } from '../../../types/configuration.js';
 import { BREVITY_WORD_TARGETS } from '../../../types/configuration.js';
 
 // ============================================================================
@@ -199,6 +199,102 @@ function getBrevityLabel(level: BrevityLevel): string {
 }
 
 // ============================================================================
+// Persona Injection
+// ============================================================================
+
+/**
+ * Build persona context to inject into prompts
+ * This adds the persona's unique argumentation style to the prompt
+ */
+export function buildPersonaContext(persona: Persona): string {
+  return `
+---
+**PERSONA: ${persona.name}** ${persona.avatarEmoji || ''}
+---
+
+${persona.systemPromptAddition}
+`;
+}
+
+/**
+ * Apply persona to a base prompt
+ *
+ * Inserts the persona's system_prompt_addition after the core identity section,
+ * before the PHASE description.
+ */
+export function applyPersonaToPrompt(
+  basePrompt: string,
+  persona: Persona | null | undefined
+): string {
+  if (!persona) {
+    return basePrompt;
+  }
+
+  const personaContext = buildPersonaContext(persona);
+
+  // Look for the PHASE section to insert before it
+  const phaseMarker = '**PHASE:';
+  const insertPoint = basePrompt.indexOf(phaseMarker);
+
+  if (insertPoint !== -1) {
+    // Insert persona context before PHASE section
+    return (
+      basePrompt.slice(0, insertPoint) +
+      personaContext +
+      '\n' +
+      basePrompt.slice(insertPoint)
+    );
+  }
+
+  // If no PHASE section, insert after the Core Principles section
+  const coreMarker = 'Treat opposition as intelligent';
+  const coreEndPoint = basePrompt.indexOf(coreMarker);
+
+  if (coreEndPoint !== -1) {
+    // Find the end of that line
+    const lineEnd = basePrompt.indexOf('\n', coreEndPoint);
+    if (lineEnd !== -1) {
+      return (
+        basePrompt.slice(0, lineEnd + 1) +
+        personaContext +
+        basePrompt.slice(lineEnd + 1)
+      );
+    }
+  }
+
+  // Fallback: append to end
+  return basePrompt + '\n' + personaContext;
+}
+
+/**
+ * Create a fully configured prompt with both configuration and persona applied
+ */
+export function createFullyConfiguredPrompt(
+  baseSystemPrompt: string,
+  config: DebateConfiguration,
+  persona?: Persona | null
+): string {
+  // First apply persona (modifies identity)
+  let modifiedPrompt = applyPersonaToPrompt(baseSystemPrompt, persona);
+
+  // Then apply configuration (modifies behavior)
+  modifiedPrompt = applyConfigurationToPrompt(modifiedPrompt, config);
+
+  // Add configuration header
+  const configHeader = `
+---
+**DEBATE CONFIGURATION**
+Mode: ${config.presetMode.replace('_', ' ').toUpperCase()}
+Brevity: Level ${config.brevityLevel} (${getBrevityLabel(config.brevityLevel)})
+Citations: ${config.requireCitations ? 'REQUIRED' : 'Optional'}
+${persona ? `Persona: ${persona.name} (${persona.archetype})` : 'Persona: Standard Advocate'}
+---
+`;
+
+  return configHeader + '\n' + modifiedPrompt;
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -209,6 +305,9 @@ export const promptModifiers = {
   applyConfigurationToPrompt,
   createConfiguredPrompt,
   getTemperatureGuidance,
+  buildPersonaContext,
+  applyPersonaToPrompt,
+  createFullyConfiguredPrompt,
 };
 
 export default promptModifiers;

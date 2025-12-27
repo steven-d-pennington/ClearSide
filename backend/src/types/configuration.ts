@@ -272,3 +272,118 @@ export function mergeWithDefaults(
     requireCitations: partial.requireCitations ?? DEFAULT_CONFIGURATION.requireCitations,
   };
 }
+
+// ============================================================================
+// Persona Types
+// ============================================================================
+
+/**
+ * Persona archetype categories
+ */
+export type PersonaArchetype =
+  | 'academic'
+  | 'pragmatic'
+  | 'empirical'
+  | 'legal'
+  | 'economic'
+  | 'moral';
+
+/**
+ * Persona definition
+ */
+export interface Persona {
+  /** Unique identifier */
+  id: string;
+
+  /** Display name */
+  name: string;
+
+  /** Category/archetype */
+  archetype: PersonaArchetype;
+
+  /** Brief description */
+  description: string | null;
+
+  /** How this persona argues */
+  argumentationStyle: string;
+
+  /** Suggested vocabulary */
+  vocabularyHints: string | null;
+
+  /** Topic areas of focus */
+  focusAreas: string[];
+
+  /** Rhetorical approach */
+  rhetoricalPreferences: string | null;
+
+  /** Text to inject into agent system prompt */
+  systemPromptAddition: string;
+
+  /** Emoji avatar */
+  avatarEmoji: string | null;
+
+  /** Primary color (hex) */
+  colorPrimary: string | null;
+
+  /** Secondary color (hex) */
+  colorSecondary: string | null;
+
+  /** Whether this is a system-defined persona */
+  isSystemPersona: boolean;
+
+  /** Creation timestamp */
+  createdAt: Date;
+
+  /** Last update timestamp */
+  updatedAt: Date;
+}
+
+/**
+ * Simplified persona for display/selection
+ */
+export interface PersonaSummary {
+  id: string;
+  name: string;
+  archetype: PersonaArchetype;
+  description: string | null;
+  avatarEmoji: string | null;
+  colorPrimary: string | null;
+}
+
+/**
+ * Persona selection for a debate
+ */
+export interface PersonaSelection {
+  proPersonaId: string | null;
+  conPersonaId: string | null;
+}
+
+/**
+ * Archetype display info
+ */
+export const ARCHETYPE_INFO: Record<PersonaArchetype, { name: string; description: string }> = {
+  academic: {
+    name: 'Academic',
+    description: 'Theoretical and philosophical approach',
+  },
+  pragmatic: {
+    name: 'Pragmatic',
+    description: 'Practical and politically-aware approach',
+  },
+  empirical: {
+    name: 'Empirical',
+    description: 'Evidence-based and data-driven approach',
+  },
+  legal: {
+    name: 'Legal',
+    description: 'Rights-focused and precedent-based approach',
+  },
+  economic: {
+    name: 'Economic',
+    description: 'Incentive and trade-off focused approach',
+  },
+  moral: {
+    name: 'Moral',
+    description: 'Ethics and values focused approach',
+  },
+};

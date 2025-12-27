@@ -120,6 +120,20 @@ export {
   type PromptTesterConfig,
 } from './prompt-tester.js';
 
+// Prompt Modifiers (Configuration & Persona)
+export {
+  promptModifiers,
+  BREVITY_INSTRUCTIONS,
+  CITATION_INSTRUCTIONS,
+  buildConfigurationContext,
+  applyConfigurationToPrompt,
+  createConfiguredPrompt,
+  getTemperatureGuidance,
+  buildPersonaContext,
+  applyPersonaToPrompt,
+  createFullyConfiguredPrompt,
+} from './prompt-modifiers.js';
+
 // ============================================================================
 // Combined Prompt Library Export
 // ============================================================================

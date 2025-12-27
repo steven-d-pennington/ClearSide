@@ -19,9 +19,9 @@ import {
   PRO_ADVOCATE_PROMPTS,
   PRO_PROMPT_BUILDERS,
 } from './prompts/pro-advocate-prompts.js';
-import { applyConfigurationToPrompt } from './prompts/prompt-modifiers.js';
+import { createFullyConfiguredPrompt } from './prompts/prompt-modifiers.js';
 import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
-import type { DebateConfiguration } from '../../types/configuration.js';
+import type { DebateConfiguration, Persona } from '../../types/configuration.js';
 import type { PromptBuilderContext, ConstructiveRound } from './prompts/types.js';
 
 /**
@@ -168,10 +168,11 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.opening(promptContext);
 
-      // Apply configuration modifiers to system prompt
-      const modifiedSystemPrompt = applyConfigurationToPrompt(
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
         PRO_ADVOCATE_PROMPTS.opening.template,
-        config
+        config,
+        context.persona
       );
 
       // Build LLM request with configuration settings
@@ -259,10 +260,11 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.constructive(promptContext);
 
-      // Apply configuration modifiers to system prompt
-      const modifiedSystemPrompt = applyConfigurationToPrompt(
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
         promptTemplate.template,
-        config
+        config,
+        context.persona
       );
 
       // Build LLM request with configuration settings

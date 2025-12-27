@@ -90,6 +90,12 @@ export interface Debate {
   /** Whether citations are required */
   requireCitations: boolean;
 
+  /** Optional persona for Pro advocate */
+  proPersonaId: string | null;
+
+  /** Optional persona for Con advocate */
+  conPersonaId: string | null;
+
   /** Timestamp when debate started (ISO 8601) */
   startedAt: Date | null;
 
@@ -195,6 +201,8 @@ export interface DebateRow {
   llm_temperature: number;
   max_tokens_per_response: number;
   require_citations: boolean;
+  pro_persona_id: string | null;
+  con_persona_id: string | null;
   started_at: Date | null;
   completed_at: Date | null;
   total_duration_ms: number | null;
@@ -242,6 +250,9 @@ export interface CreateDebateInput {
   llmTemperature?: number;
   maxTokensPerResponse?: number;
   requireCitations?: boolean;
+  /** Persona selections */
+  proPersonaId?: string | null;
+  conPersonaId?: string | null;
 }
 
 /**

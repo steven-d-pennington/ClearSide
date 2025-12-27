@@ -36,6 +36,9 @@ function rowToDebate(row: DebateRow): Debate {
     llmTemperature: parseFloat(row.llm_temperature?.toString() ?? '0.7'),
     maxTokensPerResponse: row.max_tokens_per_response ?? 1024,
     requireCitations: row.require_citations ?? false,
+    // Persona fields
+    proPersonaId: row.pro_persona_id ?? null,
+    conPersonaId: row.con_persona_id ?? null,
     // Timestamp fields
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -67,9 +70,11 @@ export async function create(input: CreateDebateInput): Promise<Debate> {
       brevity_level,
       llm_temperature,
       max_tokens_per_response,
-      require_citations
+      require_citations,
+      pro_persona_id,
+      con_persona_id
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *
   `;
 
@@ -82,6 +87,8 @@ export async function create(input: CreateDebateInput): Promise<Debate> {
     llmTemperature,
     maxTokensPerResponse,
     requireCitations,
+    input.proPersonaId ?? null,
+    input.conPersonaId ?? null,
   ];
 
   try {
