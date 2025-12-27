@@ -13,7 +13,6 @@ import type {
   BrevityLevel,
 } from '../../types/configuration';
 import {
-  DEFAULT_CONFIGURATION,
   PRESET_MODE_INFO,
   BREVITY_LABELS,
 } from '../../types/configuration';
