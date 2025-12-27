@@ -1,9 +1,17 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2025-12-26
-> Version: 4.0.0 - Multi-Provider TTS & Export UI
+> Last Updated: 2025-12-27
+> Version: 4.1.0 - Lively Debate Arena Roadmap
 
-## 🔧 Recent Changes (2025-12-26)
+## 🔧 Recent Changes (2025-12-27)
+
+**NEW: Lively Debate Arena (Phase 3 Roadmap):**
+- Multi-panel UI with active speaker highlighting (ARENA-001)
+- Interruption system with natural turn-taking (ARENA-002)
+- Human participant "raise hand" system (ARENA-003)
+- Themed debate modes: lightning, formal, casual (ARENA-004)
+- Real-time voice input for humans (ARENA-005)
+- Target: Human+AI panel discussions for debate clubs, education, content creators
 
 **NEW: Multi-Provider TTS System:**
 - 5 TTS providers: ElevenLabs, Gemini 2.5, Google Cloud, Azure, Edge (free!)
@@ -122,6 +130,32 @@ Each task file includes:
 OpenRouter provides unified API to 100+ models. This builds on the Persona system and creates genuinely diverse debates with different "thinking styles" clashing.
 
 **Dependencies:** PERSONA-001-005 should be done first (agent identity system)
+
+### Option D: Lively Debate Arena - Human-AI Multi-Panel Debates (Phase 3)
+
+**NEW FEATURE CONCEPT:** Transform debates into a dynamic multi-panel show with human participants!
+
+| Task | Description | Estimate | Status |
+|------|-------------|----------|--------|
+| ARENA-001 | Multi-panel UI with speaker highlighting | L | 📋 Planned |
+| ARENA-002 | Interruption system & turn-taking orchestrator | XL | 📋 Planned |
+| ARENA-003 | Human participant "raise hand" system | M | 📋 Planned |
+| ARENA-004 | Themed debate modes (lightning, formal, casual) | M | 📋 Planned |
+| ARENA-005 | Real-time voice input for human participants | L | 📋 Planned |
+
+**Vision:** Create a live debate panel show experience where:
+- **Multi-Panel Interface**: Each participant (AI or human) has a dedicated panel
+- **Active Speaker Highlighting**: Current speaker's panel moves to center stage
+- **Natural Interruptions**: Backend orchestrator manages debate flow with interjections
+- **Human-AI Collaboration**: Humans join debates alongside AI agents with "raise hand" to speak
+- **Themed Modes**: Lightning rounds, formal Oxford-style, casual roundtable discussions
+
+**Dependencies:**
+- PERSONA-001-005 (agent identity system)
+- OPENROUTER-001-004 (multi-model diversity recommended)
+- Audio pipeline (for voice input/output)
+
+**Target Audience:** Debate clubs, educational institutions, content creators who want engaging human+AI panel discussions
 
 ### Recommendation
 
