@@ -6,9 +6,10 @@ import { Textarea } from '../ui/Textarea';
 import { Alert } from '../ui/Alert';
 import { CharacterCount } from './CharacterCount';
 import { ConfigPanel } from '../ConfigPanel/ConfigPanel';
+import { PersonaSelector } from './PersonaSelector';
 import type { FlowMode } from '../../types/debate';
-import type { DebateConfiguration } from '../../types/configuration';
-import { DEFAULT_CONFIGURATION } from '../../types/configuration';
+import type { DebateConfiguration, PersonaSelection } from '../../types/configuration';
+import { DEFAULT_CONFIGURATION, DEFAULT_PERSONA_SELECTION } from '../../types/configuration';
 import styles from './InputForm.module.css';
 
 interface InputFormProps {
@@ -22,6 +23,7 @@ interface FormState {
   context: string;
   flowMode: FlowMode;
   configuration: DebateConfiguration;
+  personaSelection: PersonaSelection;
 }
 
 interface ValidationErrors {
@@ -40,6 +42,7 @@ export const InputForm: React.FC<InputFormProps> = ({
     context: '',
     flowMode: 'auto',
     configuration: DEFAULT_CONFIGURATION,
+    personaSelection: DEFAULT_PERSONA_SELECTION,
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -115,6 +118,13 @@ export const InputForm: React.FC<InputFormProps> = ({
   }, []);
 
   /**
+   * Handle persona selection change
+   */
+  const handlePersonaChange = useCallback((selection: PersonaSelection) => {
+    setFormState((prev) => ({ ...prev, personaSelection: selection }));
+  }, []);
+
+  /**
    * Handle paste event - suggest context field for long pastes
    */
   const handleQuestionPaste = useCallback(
@@ -176,8 +186,8 @@ export const InputForm: React.FC<InputFormProps> = ({
         console.log('🔵 Starting debate with proposition:', proposition, 'flowMode:', formState.flowMode);
         console.log('🔵 Configuration:', formState.configuration);
 
-        // Build start options including configuration
-        const { configuration } = formState;
+        // Build start options including configuration and personas
+        const { configuration, personaSelection } = formState;
         await startDebate(proposition, {
           flowMode: formState.flowMode,
           presetMode: configuration.presetMode,
@@ -185,6 +195,8 @@ export const InputForm: React.FC<InputFormProps> = ({
           llmTemperature: configuration.llmSettings.temperature,
           maxTokensPerResponse: configuration.llmSettings.maxTokensPerResponse,
           requireCitations: configuration.requireCitations,
+          proPersonaId: personaSelection.proPersonaId,
+          conPersonaId: personaSelection.conPersonaId,
         });
         console.log('🔵 startDebate returned');
 
@@ -328,6 +340,13 @@ export const InputForm: React.FC<InputFormProps> = ({
       <ConfigPanel
         configuration={formState.configuration}
         onChange={handleConfigChange}
+        disabled={isLoading}
+      />
+
+      {/* Persona Selector */}
+      <PersonaSelector
+        selection={formState.personaSelection}
+        onChange={handlePersonaChange}
         disabled={isLoading}
       />
 

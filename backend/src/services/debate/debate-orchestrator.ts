@@ -44,7 +44,9 @@ import type { DebatePhase as DbDebatePhase, Speaker as DbSpeaker } from '../../t
 import * as debateRepo from '../../db/repositories/debate-repository.js';
 import * as utteranceRepo from '../../db/repositories/utterance-repository.js';
 import * as interventionRepo from '../../db/repositories/intervention-repository.js';
+import * as personaRepo from '../../db/repositories/persona-repository.js';
 import { getNextPhase } from '../../config/debate-protocol.js';
+import type { Persona } from '../../types/configuration.js';
 
 /**
  * Logger instance
@@ -481,6 +483,16 @@ export class DebateOrchestrator {
       requireCitations: debate.requireCitations,
     } : DEFAULT_CONFIGURATION;
 
+    // Load persona for this speaker (if applicable)
+    let persona: Persona | null = null;
+    if (debate) {
+      if (speaker === Speaker.PRO && debate.proPersonaId) {
+        persona = await personaRepo.findById(debate.proPersonaId);
+      } else if (speaker === Speaker.CON && debate.conPersonaId) {
+        persona = await personaRepo.findById(debate.conPersonaId);
+      }
+    }
+
     return {
       debateId: this.debateId,
       currentPhase: this.stateMachine.getCurrentPhase(),
@@ -489,6 +501,7 @@ export class DebateOrchestrator {
       proposition,
       propositionContext: debate?.propositionContext,
       configuration,
+      persona,
     };
   }
 

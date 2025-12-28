@@ -19,6 +19,8 @@ import {
   CON_ADVOCATE_PROMPTS,
   CON_PROMPT_BUILDERS,
 } from './prompts/con-advocate-prompts.js';
+import { createFullyConfiguredPrompt } from './prompts/prompt-modifiers.js';
+import { DEFAULT_CONFIGURATION, type DebateConfiguration } from '../../types/configuration.js';
 import type { PromptBuilderContext, ConstructiveRound } from './prompts/types.js';
 import type { Utterance } from '../../types/database.js';
 
@@ -142,7 +144,12 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
     }, 'Generating opening statement');
 
     try {
-      const systemPrompt = CON_ADVOCATE_PROMPTS.opening.template;
+      const config = context.configuration ?? DEFAULT_CONFIGURATION;
+      const systemPrompt = createFullyConfiguredPrompt(
+        CON_ADVOCATE_PROMPTS.opening.template,
+        config,
+        context.persona
+      );
       const userPrompt = CON_PROMPT_BUILDERS.opening(this.buildPromptContext(context));
 
       const llmRequest: LLMRequest = {
@@ -207,7 +214,12 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         promptTemplate = CON_ADVOCATE_PROMPTS.constructive.practical;
       }
 
-      const systemPrompt = promptTemplate.template;
+      const config = context.configuration ?? DEFAULT_CONFIGURATION;
+      const systemPrompt = createFullyConfiguredPrompt(
+        promptTemplate.template,
+        config,
+        context.persona
+      );
       const userPrompt = CON_PROMPT_BUILDERS.constructive({
         ...this.buildPromptContext(context),
         constructiveRound,

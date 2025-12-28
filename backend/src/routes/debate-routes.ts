@@ -8,6 +8,7 @@ import { sseManager } from '../services/sse/index.js';
 import * as debateRepository from '../db/repositories/debate-repository.js';
 import * as utteranceRepository from '../db/repositories/utterance-repository.js';
 import * as presetRepository from '../db/repositories/preset-repository.js';
+import * as personaRepository from '../db/repositories/persona-repository.js';
 import { createLogger } from '../utils/logger.js';
 import type { CreateDebateInput, FlowMode } from '../types/database.js';
 import {
@@ -41,6 +42,8 @@ interface ConfigInput {
   llmTemperature?: unknown;
   maxTokensPerResponse?: unknown;
   requireCitations?: unknown;
+  proPersonaId?: unknown;
+  conPersonaId?: unknown;
 }
 
 function validateConfigInput(config: ConfigInput): string[] {
@@ -72,6 +75,39 @@ function validateConfigInput(config: ConfigInput): string[] {
 
   if (config.requireCitations !== undefined && typeof config.requireCitations !== 'boolean') {
     errors.push(`Invalid requireCitations: must be a boolean`);
+  }
+
+  // Persona validations - must be strings or null
+  if (config.proPersonaId !== undefined && config.proPersonaId !== null && typeof config.proPersonaId !== 'string') {
+    errors.push(`Invalid proPersonaId: must be a string or null`);
+  }
+
+  if (config.conPersonaId !== undefined && config.conPersonaId !== null && typeof config.conPersonaId !== 'string') {
+    errors.push(`Invalid conPersonaId: must be a string or null`);
+  }
+
+  return errors;
+}
+
+/**
+ * Validate that persona IDs exist in the database
+ * Returns validation errors array (empty if valid)
+ */
+async function validatePersonaIds(proPersonaId?: string | null, conPersonaId?: string | null): Promise<string[]> {
+  const errors: string[] = [];
+
+  if (proPersonaId) {
+    const exists = await personaRepository.exists(proPersonaId);
+    if (!exists) {
+      errors.push(`Invalid proPersonaId: persona '${proPersonaId}' not found`);
+    }
+  }
+
+  if (conPersonaId) {
+    const exists = await personaRepository.exists(conPersonaId);
+    if (!exists) {
+      errors.push(`Invalid conPersonaId: persona '${conPersonaId}' not found`);
+    }
   }
 
   return errors;
@@ -218,6 +254,8 @@ router.get('/debates/:debateId/stream', async (req: Request, res: Response) => {
  * - llmTemperature (optional): 0-1
  * - maxTokensPerResponse (optional): 128-4096
  * - requireCitations (optional): boolean
+ * - proPersonaId (optional): Persona ID for Pro advocate (e.g., 'theorist', 'economist')
+ * - conPersonaId (optional): Persona ID for Con advocate (e.g., 'lawyer', 'ethicist')
  */
 router.post('/debates', async (req: Request, res: Response) => {
   try {
@@ -231,6 +269,8 @@ router.post('/debates', async (req: Request, res: Response) => {
       llmTemperature: req.body.llmTemperature,
       maxTokensPerResponse: req.body.maxTokensPerResponse,
       requireCitations: req.body.requireCitations,
+      proPersonaId: req.body.proPersonaId,
+      conPersonaId: req.body.conPersonaId,
     };
 
     const configErrors = validateConfigInput(configInput);
@@ -238,6 +278,18 @@ router.post('/debates', async (req: Request, res: Response) => {
       res.status(400).json({
         error: 'Invalid configuration',
         messages: configErrors,
+      });
+      return;
+    }
+
+    // Validate persona IDs exist in database
+    const proPersonaId = configInput.proPersonaId as string | null | undefined;
+    const conPersonaId = configInput.conPersonaId as string | null | undefined;
+    const personaErrors = await validatePersonaIds(proPersonaId, conPersonaId);
+    if (personaErrors.length > 0) {
+      res.status(400).json({
+        error: 'Invalid persona configuration',
+        messages: personaErrors,
       });
       return;
     }
@@ -262,6 +314,13 @@ router.post('/debates', async (req: Request, res: Response) => {
       }),
       ...(configInput.requireCitations !== undefined && {
         requireCitations: configInput.requireCitations as boolean,
+      }),
+      // Persona selections
+      ...(proPersonaId !== undefined && {
+        proPersonaId: proPersonaId ?? null,
+      }),
+      ...(conPersonaId !== undefined && {
+        conPersonaId: conPersonaId ?? null,
       }),
     };
 

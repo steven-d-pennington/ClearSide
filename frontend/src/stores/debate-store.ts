@@ -35,6 +35,10 @@ export interface StartDebateOptions {
   maxTokensPerResponse?: number;
   /** Whether citations are required */
   requireCitations?: boolean;
+  /** Persona ID for Pro advocate */
+  proPersonaId?: string | null;
+  /** Persona ID for Con advocate */
+  conPersonaId?: string | null;
 }
 
 /**
@@ -159,6 +163,13 @@ export const useDebateStore = create<DebateState>()(
           }
           if (options.requireCitations !== undefined) {
             requestBody.requireCitations = options.requireCitations;
+          }
+          // Add persona fields if provided
+          if (options.proPersonaId !== undefined) {
+            requestBody.proPersonaId = options.proPersonaId;
+          }
+          if (options.conPersonaId !== undefined) {
+            requestBody.conPersonaId = options.conPersonaId;
           }
 
           console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);

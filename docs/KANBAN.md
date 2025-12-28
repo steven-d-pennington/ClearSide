@@ -1,7 +1,7 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2025-12-27
-> Version: 4.1.0 - Lively Debate Arena Roadmap
+> Version: 4.2.0 - Persona System Complete
 
 ## 🔧 Recent Changes (2025-12-27)
 
@@ -87,17 +87,17 @@ Each task file includes:
 
 **MVP is complete!** Here are the priority items for the next sprint:
 
-### Option A: Persona System (Extends Configuration)
+### Option A: Persona System (Extends Configuration) ✅ COMPLETE
 
 | Task | Description | Estimate | Status |
 |------|-------------|----------|--------|
-| PERSONA-001 | Database migration for personas | S | 🟢 Ready |
-| PERSONA-002 | Persona types and repository | M | 🟢 Ready (after PERSONA-001) |
-| PERSONA-003 | Parameterize agent identity prompts | L | Depends on PERSONA-002 |
-| PERSONA-004 | API endpoints for personas | S | Depends on PERSONA-002 |
-| PERSONA-005 | Frontend PersonaSelector | M | Depends on PERSONA-004 |
+| PERSONA-001 | Database migration for personas | S | ✅ DONE |
+| PERSONA-002 | Persona types and repository | M | ✅ DONE |
+| PERSONA-003 | Parameterize agent identity prompts | L | ✅ DONE |
+| PERSONA-004 | API endpoints for personas | S | ✅ DONE |
+| PERSONA-005 | Frontend PersonaSelector | M | ✅ DONE |
 
-**Start with:** PERSONA-001 → PERSONA-002 → PERSONA-003/004 in parallel → PERSONA-005
+**ALL PERSONA TASKS COMPLETE!** 6 debate archetypes available: Theorist, Politician, Scientist, Lawyer, Economist, Ethicist
 
 ### Option B: Media Export Pipeline (Phase 2)
 
