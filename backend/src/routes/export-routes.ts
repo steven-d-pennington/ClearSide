@@ -178,13 +178,17 @@ router.get('/exports/:debateId/markdown', async (req: Request, res: Response) =>
       (transcript.structured_analysis?.con?.arguments?.length ?? 0) > 0 ||
       (transcript.structured_analysis?.moderator?.areas_of_agreement?.length ?? 0) > 0;
 
+    // Auto-include interventions when they exist (unless explicitly disabled)
+    const hasInterventions = (transcript.user_interventions?.length ?? 0) > 0;
+
     const options: MarkdownExportOptions = {
       includeMetadata: req.query.includeMetadata !== 'false',
       includeProposition: req.query.includeProposition !== 'false',
       includePro: req.query.includePro !== 'false',
       includeCon: req.query.includeCon !== 'false',
       includeModerator: req.query.includeModerator !== 'false',
-      includeChallenges: req.query.includeChallenges === 'true',
+      // Auto-include interventions when they exist (user can still disable with includeChallenges=false)
+      includeChallenges: req.query.includeChallenges === 'false' ? false : (req.query.includeChallenges === 'true' || hasInterventions),
       // Include transcript by default when there's no structured analysis
       includeTranscript: req.query.includeTranscript === 'true' || !hasStructuredAnalysis,
       format: (req.query.format as 'standard' | 'compact') || 'standard',

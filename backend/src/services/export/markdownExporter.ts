@@ -33,7 +33,38 @@ const logger = pino({
 /**
  * Current version of the Markdown exporter
  */
-const EXPORTER_VERSION = '1.0.0';
+const EXPORTER_VERSION = '1.1.0';
+
+/**
+ * Patterns to strip from LLM-generated content for cleaner exports
+ */
+const CONTENT_CLEANUP_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
+  // Word count notes: "(Word count: 348)", "(word count: 500 words)", etc.
+  { pattern: /\s*\((?:Word|word)\s*count:?\s*\d+(?:\s*words?)?\)/gi, replacement: '' },
+
+  // Numbered citations: [1], [2][3], [1, 2, 3], etc.
+  { pattern: /\s*\[\d+(?:,?\s*\d+)*\]/g, replacement: '' },
+
+  // Page references: [page:1 from arXiv:2503.14499], etc.
+  { pattern: /\s*\[page:\d+\s+from\s+[^\]]+\]/gi, replacement: '' },
+
+  // Web references: [web:3 from debate], etc.
+  { pattern: /\s*\[web:\d+\s+from\s+[^\]]+\]/gi, replacement: '' },
+
+  // Generic source references: [source: ...], [ref: ...], etc.
+  { pattern: /\s*\[(?:source|ref|cite):\s*[^\]]+\]/gi, replacement: '' },
+];
+
+/**
+ * Patterns to extract structured analysis from moderator synthesis text
+ */
+const SYNTHESIS_SECTION_MARKERS = [
+  'Areas of Agreement',
+  'Core Disagreements',
+  'Evidence Gaps',
+  'Decision Hinges',
+  'Closing',
+];
 
 /**
  * Markdown Exporter Class
@@ -84,11 +115,23 @@ export class MarkdownExporter {
         sections.push(this.formatConSection(transcript.structured_analysis.con));
       }
 
-      // Moderator synthesis
-      if (opts.includeModerator && transcript.structured_analysis?.moderator) {
-        sections.push(
-          this.formatModeratorSection(transcript.structured_analysis.moderator)
-        );
+      // Moderator synthesis - use structured_analysis if available, otherwise extract from transcript
+      if (opts.includeModerator) {
+        const moderatorSection = transcript.structured_analysis?.moderator;
+        const hasModeratorContent =
+          (moderatorSection?.areas_of_agreement?.length ?? 0) > 0 ||
+          (moderatorSection?.core_disagreements?.length ?? 0) > 0 ||
+          (moderatorSection?.decision_hinges?.length ?? 0) > 0;
+
+        if (hasModeratorContent && moderatorSection) {
+          sections.push(this.formatModeratorSection(moderatorSection));
+        } else if (transcript.transcript?.length) {
+          // Try to extract structured analysis from the final moderator synthesis in transcript
+          const extractedSynthesis = this.extractModeratorSynthesisFromTranscript(transcript.transcript);
+          if (extractedSynthesis) {
+            sections.push(extractedSynthesis);
+          }
+        }
       }
 
       // User interventions
@@ -178,8 +221,13 @@ export class MarkdownExporter {
 
 **Question:** ${prop.normalized_question}`;
 
+    // Only show context if it's meaningful (not empty JSON or identical to raw_input)
     if (prop.context && prop.context !== prop.raw_input) {
-      section += `\n\n**Context:** ${prop.context}`;
+      const contextStr = typeof prop.context === 'string' ? prop.context : JSON.stringify(prop.context);
+      // Skip if context is empty object/string
+      if (contextStr && contextStr !== '{}' && contextStr !== '""' && contextStr.trim() !== '') {
+        section += `\n\n**Context:** ${contextStr}`;
+      }
     }
 
     if (prop.raw_input !== prop.normalized_question) {
@@ -368,8 +416,8 @@ ${arg.content}`;
         header += ' *[Interjection]*';
       }
 
-      // Format content - add em-dash for interrupted speech
-      let content = utterance.content;
+      // Format and sanitize content - remove LLM artifacts like word counts and citations
+      let content = this.sanitizeContent(utterance.content);
       if (metadata.wasInterrupted) {
         content = content.trimEnd() + '—';
       }
@@ -491,6 +539,204 @@ ${content}
     };
 
     return confidenceMap[level] || level;
+  }
+
+  /**
+   * Sanitize LLM-generated content by removing artifacts
+   * like word counts, citation brackets, and source references
+   */
+  private sanitizeContent(content: string): string {
+    let sanitized = content;
+
+    for (const { pattern, replacement } of CONTENT_CLEANUP_PATTERNS) {
+      sanitized = sanitized.replace(pattern, replacement);
+    }
+
+    // Clean up any double spaces created by removals
+    sanitized = sanitized.replace(/  +/g, ' ');
+
+    // Clean up any trailing whitespace on lines
+    sanitized = sanitized.replace(/[ \t]+$/gm, '');
+
+    return sanitized.trim();
+  }
+
+  /**
+   * Extract structured synthesis from the final moderator utterance in the transcript
+   * This is used when structured_analysis is not populated (e.g., in lively mode debates)
+   */
+  private extractModeratorSynthesisFromTranscript(utterances: TranscriptUtterance[]): string | null {
+    // Find the last moderator utterance in the synthesis phase
+    const moderatorUtterances = utterances.filter(
+      (u) => u.speaker === 'moderator' && (u.phase.includes('synthesis') || u.phase.includes('closing'))
+    );
+
+    if (moderatorUtterances.length === 0) {
+      return null;
+    }
+
+    // Get the last (and typically most complete) synthesis
+    const synthesis = moderatorUtterances[moderatorUtterances.length - 1]!;
+    const content = this.sanitizeContent(synthesis.content);
+
+    // Check if it has structured sections
+    const hasStructuredSections = SYNTHESIS_SECTION_MARKERS.some(
+      (marker) => content.includes(marker)
+    );
+
+    if (!hasStructuredSections) {
+      return null;
+    }
+
+    // Format as a summary section
+    const parts: string[] = ['## Debate Summary'];
+
+    // Extract the introductory paragraph (before the first ### header)
+    const firstHeaderIndex = content.indexOf('###');
+    if (firstHeaderIndex > 0) {
+      const intro = content.substring(0, firstHeaderIndex).trim();
+      if (intro.length > 50) {
+        parts.push(`*${intro.substring(0, 500)}${intro.length > 500 ? '...' : ''}*`);
+      }
+    }
+
+    // Parse out the structured sections
+    const sections = this.parseModeratorSections(content);
+
+    // Areas of Agreement
+    if (sections.areasOfAgreement.length > 0) {
+      parts.push('### Areas of Agreement\n');
+      parts.push(sections.areasOfAgreement.map((a) => `- ${a}`).join('\n'));
+    }
+
+    // Core Disagreements
+    if (sections.coreDisagreements.length > 0) {
+      parts.push('### Core Disagreements\n');
+      parts.push(sections.coreDisagreements.map((d) => `- ${d}`).join('\n'));
+    }
+
+    // Evidence Gaps
+    if (sections.evidenceGaps.length > 0) {
+      parts.push('### Evidence Gaps\n');
+      parts.push(sections.evidenceGaps.map((g) => `- ${g}`).join('\n'));
+    }
+
+    // Decision Hinges
+    if (sections.decisionHinges.length > 0) {
+      parts.push('### Key Decision Points\n');
+      parts.push(sections.decisionHinges.map((h) => `- ${h}`).join('\n'));
+    }
+
+    return parts.length > 1 ? parts.join('\n\n') : null;
+  }
+
+  /**
+   * Parse the moderator synthesis content into structured sections
+   */
+  private parseModeratorSections(content: string): {
+    areasOfAgreement: string[];
+    coreDisagreements: string[];
+    evidenceGaps: string[];
+    decisionHinges: string[];
+  } {
+    const result = {
+      areasOfAgreement: [] as string[],
+      coreDisagreements: [] as string[],
+      evidenceGaps: [] as string[],
+      decisionHinges: [] as string[],
+    };
+
+    // Split by markdown headers
+    const headerPattern = /###?\s*(.+?)[\r\n]+/g;
+    const sections: Array<{ title: string; content: string }> = [];
+
+    let lastIndex = 0;
+    let lastTitle = '';
+    let match;
+
+    while ((match = headerPattern.exec(content)) !== null) {
+      if (lastTitle) {
+        sections.push({
+          title: lastTitle,
+          content: content.substring(lastIndex, match.index).trim(),
+        });
+      }
+      lastTitle = (match[1] ?? '').toLowerCase();
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add the last section
+    if (lastTitle) {
+      sections.push({
+        title: lastTitle,
+        content: content.substring(lastIndex).trim(),
+      });
+    }
+
+    // Extract items from each section
+    for (const section of sections) {
+      const items = this.extractListItems(section.content);
+
+      if (section.title.includes('agreement')) {
+        result.areasOfAgreement.push(...items);
+      } else if (section.title.includes('disagreement')) {
+        result.coreDisagreements.push(...items);
+      } else if (section.title.includes('evidence') || section.title.includes('gap')) {
+        result.evidenceGaps.push(...items);
+      } else if (section.title.includes('decision') || section.title.includes('hinge')) {
+        result.decisionHinges.push(...items);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Extract list items from markdown content (numbered or bulleted)
+   */
+  private extractListItems(content: string): string[] {
+    const items: string[] = [];
+
+    // Match numbered items: "1. ", "2. ", etc.
+    const numberedPattern = /^\s*\d+\.\s*\*?\*?(.+?)(?:\*?\*?)$/gm;
+    let match: RegExpExecArray | null;
+    while ((match = numberedPattern.exec(content)) !== null) {
+      const captured = match[1];
+      if (captured) {
+        const item = captured.trim().replace(/^\*\*|\*\*$/g, '');
+        if (item.length > 10) {
+          items.push(item);
+        }
+      }
+    }
+
+    // Match bullet items: "- ", "* ", etc.
+    const bulletPattern = /^\s*[-*]\s+(.+?)$/gm;
+    while ((match = bulletPattern.exec(content)) !== null) {
+      const captured = match[1];
+      if (captured) {
+        const item = captured.trim();
+        if (item.length > 10) {
+          items.push(item);
+        }
+      }
+    }
+
+    // If no list items found, try to extract topic/description pairs
+    if (items.length === 0) {
+      const boldPattern = /\*\*([^*]+)\*\*/g;
+      while ((match = boldPattern.exec(content)) !== null) {
+        const captured = match[1];
+        if (captured) {
+          const item = captured.trim();
+          if (item.length > 10 && item.length < 200) {
+            items.push(item);
+          }
+        }
+      }
+    }
+
+    return items;
   }
 }
 
