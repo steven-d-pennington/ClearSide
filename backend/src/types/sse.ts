@@ -25,6 +25,7 @@ export type SSEEventType =
   | 'continuing'             // Step mode: user clicked continue, resuming
   | 'complete'               // Debate completed
   | 'debate_complete'        // Debate completed (alternative)
+  | 'debate_stopped'         // Debate stopped by user
   | 'error'                  // Error occurred during debate
   // Lively mode events
   | 'speaker_started'        // Speaker takes the floor in lively mode
@@ -144,6 +145,14 @@ export interface ErrorEventData {
   error: string;
   code?: string;
   timestamp: string;
+}
+
+/** Debate stopped event payload */
+export interface DebateStoppedEventData {
+  debateId: string;
+  stoppedAt: string;
+  reason: string;
+  totalDurationMs?: number;
 }
 
 // ============================================================================

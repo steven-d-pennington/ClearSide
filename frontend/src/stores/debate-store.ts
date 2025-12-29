@@ -57,6 +57,8 @@ export interface StartDebateOptions {
   proModelId?: string | null;
   /** Model ID for Con advocate (manual mode) */
   conModelId?: string | null;
+  /** Model ID for Moderator (manual mode) */
+  moderatorModelId?: string | null;
   /** Debate mode - turn_based or lively */
   debateMode?: DebateMode;
   /** Lively mode settings (only used if debateMode is 'lively') */
@@ -107,6 +109,7 @@ interface DebateState {
   resumeDebate: () => Promise<void>;
   continueDebate: () => Promise<void>;
   closeDebate: (status?: 'completed' | 'failed', reason?: string) => Promise<void>;
+  stopDebate: (reason?: string) => Promise<void>;
   submitIntervention: (intervention: Omit<Intervention, 'id' | 'debateId' | 'status' | 'timestamp'>) => Promise<void>;
 
   // SSE actions
@@ -226,6 +229,9 @@ export const useDebateStore = create<DebateState>()(
           if (options.conModelId !== undefined) {
             requestBody.conModelId = options.conModelId;
           }
+          if (options.moderatorModelId !== undefined) {
+            requestBody.moderatorModelId = options.moderatorModelId;
+          }
 
           console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);
           const response = await fetch(`${API_BASE_URL}/api/debates`, {
@@ -265,9 +271,11 @@ export const useDebateStore = create<DebateState>()(
               // Include model info if available
               proModelId: options.proModelId || undefined,
               conModelId: options.conModelId || undefined,
+              moderatorModelId: options.moderatorModelId || undefined,
               // Extract model names from IDs (format: "provider/model-name")
               proModelName: options.proModelId?.split('/').pop() || undefined,
               conModelName: options.conModelId?.split('/').pop() || undefined,
+              moderatorModelName: options.moderatorModelId?.split('/').pop() || undefined,
             },
             isLoading: false,
             // Set lively mode immediately if selected (don't wait for SSE event)
@@ -398,6 +406,48 @@ export const useDebateStore = create<DebateState>()(
         } catch (error) {
           set({
             error: error instanceof Error ? error.message : 'Failed to close debate',
+          });
+        }
+      },
+
+      /**
+       * Stop a running debate immediately
+       * This actually stops the orchestrator execution on the backend
+       */
+      stopDebate: async (reason) => {
+        const { debate, disconnectFromDebate } = get();
+        if (!debate) return;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/debates/${debate.id}/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to stop debate: ${response.statusText}`);
+          }
+
+          // The SSE 'debate_stopped' event will update the state
+          // But we also update immediately for responsiveness
+          set((state) => ({
+            debate: state.debate
+              ? {
+                  ...state.debate,
+                  status: 'completed',
+                  currentPhase: DebatePhase.COMPLETED,
+                  completedAt: new Date(),
+                }
+              : null,
+            streamingTurn: null,
+          }));
+
+          // Disconnect from SSE
+          disconnectFromDebate();
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to stop debate',
           });
         }
       },
@@ -1147,6 +1197,25 @@ export const useDebateStore = create<DebateState>()(
             }));
             get().disconnectFromDebate();
             break;
+
+          // Backend sends 'debate_stopped' when user stops the debate
+          case 'debate_stopped': {
+            const data = message.data as { debateId: string; stoppedAt: string; reason: string };
+            console.log('🛑 Debate stopped:', data);
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'completed',
+                    currentPhase: DebatePhase.COMPLETED,
+                    completedAt: new Date(data.stoppedAt),
+                  }
+                : null,
+              streamingTurn: null,
+            }));
+            get().disconnectFromDebate();
+            break;
+          }
 
           // Backend sends 'error' for failures
           case 'error': {

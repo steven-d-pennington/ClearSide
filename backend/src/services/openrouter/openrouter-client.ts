@@ -30,6 +30,25 @@ const TIER_THRESHOLDS = {
 };
 
 /**
+ * Known-good providers for debate
+ * These are major, reliable providers with well-tested models
+ */
+const TRUSTED_PROVIDERS = new Set([
+  'openai',
+  'anthropic',
+  'google',
+  'meta-llama',
+  'mistralai',
+  'cohere',
+  'deepseek',
+  'qwen',
+  'microsoft',
+  'nvidia',
+  'perplexity',
+  'x-ai',
+]);
+
+/**
  * Mapping from cost threshold to allowed tiers
  */
 const COST_THRESHOLD_TO_TIERS_MAP: Record<CostThreshold, ModelTier[]> = {
@@ -104,8 +123,9 @@ export class OpenRouterClient {
       const data = (await response.json()) as OpenRouterModelsResponse;
 
       // Process and classify models
+      // Filter to text models from trusted providers only
       const tieredModels = data.data
-        .filter(this.isTextModel)
+        .filter(this.isDebateSuitableModel.bind(this))
         .map(this.classifyModel.bind(this))
         .sort((a, b) => b.costPer1MTokens - a.costPer1MTokens); // Sort by cost desc
 
@@ -188,12 +208,46 @@ export class OpenRouterClient {
   }
 
   /**
-   * Filter for text-to-text models only
+   * Filter for models suitable for debate
+   * - Must be text-to-text (not image/audio)
+   * - Must be from a trusted provider
+   * - Must not be a specialized model (embedding, code-only, etc.)
    */
-  private isTextModel(model: OpenRouterModel): boolean {
+  private isDebateSuitableModel(model: OpenRouterModel): boolean {
     // Filter out image/audio models
     const modality = model.architecture?.modality || '';
-    return modality.includes('text') || modality === '';
+    const isTextModel = modality.includes('text') || modality === '';
+
+    if (!isTextModel) {
+      return false;
+    }
+
+    // Check for trusted provider
+    const provider = this.extractProvider(model.id);
+    if (!TRUSTED_PROVIDERS.has(provider)) {
+      return false;
+    }
+
+    // Filter out specialized models that aren't suitable for debate
+    const lowerName = model.name.toLowerCase();
+    const lowerId = model.id.toLowerCase();
+
+    // Exclude embedding, vision-only, and code-only models
+    const excludePatterns = [
+      'embed',
+      'vision-only',
+      'code-only',
+      'instruct-only',
+      'base-only',
+    ];
+
+    for (const pattern of excludePatterns) {
+      if (lowerName.includes(pattern) || lowerId.includes(pattern)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**

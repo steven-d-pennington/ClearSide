@@ -296,6 +296,7 @@ export type SSEEventType =
   | 'continuing'         // Step mode: user clicked Continue, resuming
   | 'debate_completed'
   | 'debate_complete'    // Backend sends this (without 'd')
+  | 'debate_stopped'     // Backend sends this when user stops debate
   | 'debate_error'
   | 'error'              // Backend sends this
   | 'heartbeat'

@@ -117,6 +117,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         // Clear manual selections when switching to auto
         proModelId: mode === 'auto' ? null : selection.proModelId,
         conModelId: mode === 'auto' ? null : selection.conModelId,
+        moderatorModelId: mode === 'auto' ? null : selection.moderatorModelId,
       });
     },
     [selection, onChange]
@@ -135,10 +136,15 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   // Handle model selection
   const handleModelChange = useCallback(
-    (role: 'pro' | 'con', modelId: string) => {
+    (role: 'pro' | 'con' | 'moderator', modelId: string) => {
+      const fieldMap = {
+        pro: 'proModelId',
+        con: 'conModelId',
+        moderator: 'moderatorModelId',
+      };
       onChange({
         ...selection,
-        [role === 'pro' ? 'proModelId' : 'conModelId']: modelId || null,
+        [fieldMap[role]]: modelId || null,
       });
     },
     [selection, onChange]
@@ -301,6 +307,26 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             <select
               value={selection.conModelId || ''}
               onChange={(e) => handleModelChange('con', e.target.value)}
+              disabled={disabled}
+              className={styles.select}
+            >
+              <option value="">Select a model...</option>
+              {models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name} - ${model.costPer1MTokens.toFixed(2)}/1M
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.modelSelect}>
+            <label className={styles.selectLabel}>
+              <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-moderator, #8b5cf6)' }} />
+              Moderator
+            </label>
+            <select
+              value={selection.moderatorModelId || ''}
+              onChange={(e) => handleModelChange('moderator', e.target.value)}
               disabled={disabled}
               className={styles.select}
             >

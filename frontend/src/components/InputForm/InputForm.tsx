@@ -233,6 +233,7 @@ export const InputForm: React.FC<InputFormProps> = ({
           costThreshold: modelSelection.costThreshold,
           proModelId: modelSelection.proModelId,
           conModelId: modelSelection.conModelId,
+          moderatorModelId: modelSelection.moderatorModelId,
           debateMode,
           livelySettings: debateMode === 'lively' ? livelySettings : undefined,
         });

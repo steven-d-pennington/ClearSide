@@ -35,6 +35,14 @@ export interface PropositionContext {
 }
 
 /**
+ * Optional configuration for OrchestratorAgent
+ */
+interface OrchestratorAgentOptions {
+  /** Override the model ID (for OpenRouter model selection) */
+  model?: string;
+}
+
+/**
  * Orchestrator Agent - Normalizes propositions
  *
  * Responsibilities:
@@ -54,14 +62,16 @@ export class OrchestratorAgent implements BaseAgent, IOrchestratorAgent {
   private modelName: string;
   private provider: 'openai' | 'anthropic';
 
-  constructor(llmClient: LLMClient) {
+  constructor(llmClient: LLMClient, options?: OrchestratorAgentOptions) {
     this.llmClient = llmClient;
     this.provider = llmConfig.defaultProvider;
-    this.modelName = llmConfig.defaultModels[this.provider];
+    // Use provided model override or fall back to default
+    this.modelName = options?.model || llmConfig.defaultModels[this.provider];
 
     logger.info({
       provider: this.provider,
       model: this.modelName,
+      hasModelOverride: !!options?.model,
     }, 'OrchestratorAgent initialized');
   }
 

@@ -196,7 +196,7 @@ export function createOpenRouterClient(modelId: string): OpenRouterLLMClient {
 }
 
 /**
- * Create a pair of LLM clients for Pro and Con advocates
+ * Create LLM clients for Pro, Con, and Moderator roles
  *
  * If model config specifies OpenRouter models, creates OpenRouter clients.
  * Otherwise falls back to default LLM client.
@@ -207,6 +207,7 @@ export async function createDebateClients(config?: DebateModelConfig): Promise<{
   moderatorClient: LLMClient;
   proModelId?: string;
   conModelId?: string;
+  moderatorModelId?: string;
 }> {
   // Import default client lazily to avoid circular dependencies
   const { defaultLLMClient } = await import('./index.js');
@@ -242,13 +243,16 @@ export async function createDebateClients(config?: DebateModelConfig): Promise<{
     ? createOpenRouterClient(config.conModelId)
     : defaultLLMClient;
 
-  // Moderator always uses default
-  const moderatorClient = defaultLLMClient;
+  // Moderator uses specified model or default
+  const moderatorClient = config.moderatorModelId
+    ? createOpenRouterClient(config.moderatorModelId)
+    : defaultLLMClient;
 
   logger.info(
     {
       proModel: config.proModelId || 'default',
       conModel: config.conModelId || 'default',
+      moderatorModel: config.moderatorModelId || 'default',
     },
     'Created debate clients with model config'
   );
@@ -259,6 +263,7 @@ export async function createDebateClients(config?: DebateModelConfig): Promise<{
     moderatorClient,
     proModelId: config.proModelId,
     conModelId: config.conModelId,
+    moderatorModelId: config.moderatorModelId,
   };
 }
 

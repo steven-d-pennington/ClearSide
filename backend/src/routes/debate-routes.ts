@@ -24,7 +24,7 @@ import { createDebateClients } from '../services/llm/openrouter-adapter.js';
 import { getOpenRouterClient, createModelPairingService } from '../services/openrouter/index.js';
 
 // Orchestrator and dependencies
-import { DebateOrchestrator, DebateStateMachine, turnManager } from '../services/debate/index.js';
+import { DebateOrchestrator, DebateStateMachine, turnManager, orchestratorRegistry } from '../services/debate/index.js';
 import { createLivelyOrchestrator } from '../services/debate/lively-orchestrator.js';
 import {
   ProAdvocateAgent,
@@ -55,6 +55,7 @@ interface ConfigInput {
   modelSelectionMode?: unknown;
   proModelId?: unknown;
   conModelId?: unknown;
+  moderatorModelId?: unknown;
   costThreshold?: unknown;
 }
 
@@ -178,6 +179,7 @@ async function buildModelConfig(configInput: ConfigInput): Promise<DebateModelCo
       selectionMode: 'manual',
       proModelId: configInput.proModelId as string | undefined,
       conModelId: configInput.conModelId as string | undefined,
+      moderatorModelId: configInput.moderatorModelId as string | undefined,
       costThreshold: configInput.costThreshold as CostThreshold | undefined,
     };
   }
@@ -255,8 +257,14 @@ async function startDebateOrchestrator(
         clients.conClient,
         clients.conModelId ? { model: clients.conModelId } : undefined
       ),
-      moderator: new ModeratorAgent(clients.moderatorClient),
-      orchestrator: new OrchestratorAgent(clients.moderatorClient),
+      moderator: new ModeratorAgent(
+        clients.moderatorClient,
+        clients.moderatorModelId ? { model: clients.moderatorModelId } : undefined
+      ),
+      orchestrator: new OrchestratorAgent(
+        clients.moderatorClient,
+        clients.moderatorModelId ? { model: clients.moderatorModelId } : undefined
+      ),
     };
 
     // Check if lively mode is requested
@@ -280,10 +288,17 @@ async function startDebateOrchestrator(
         livelySettings
       );
 
-      // Start lively debate
-      await livelyOrchestrator.start();
+      // Register lively orchestrator so it can be accessed for stop/pause
+      orchestratorRegistry.register(debateId, livelyOrchestrator);
 
-      logger.info({ debateId }, 'Lively debate completed successfully');
+      try {
+        // Start lively debate
+        await livelyOrchestrator.start();
+        logger.info({ debateId }, 'Lively debate completed successfully');
+      } finally {
+        // Always unregister when done (success or failure)
+        orchestratorRegistry.unregister(debateId);
+      }
       return;
     }
 
@@ -303,13 +318,21 @@ async function startDebateOrchestrator(
       }
     );
 
-    // Start the debate - this runs all 6 phases
-    const transcript = await orchestrator.startDebate(propositionText, propositionContext);
+    // Register orchestrator so it can be accessed for stop/pause
+    orchestratorRegistry.register(debateId, orchestrator);
 
-    logger.info(
-      { debateId, phases: transcript.utterances.length },
-      'Debate completed successfully'
-    );
+    try {
+      // Start the debate - this runs all 6 phases
+      const transcript = await orchestrator.startDebate(propositionText, propositionContext);
+
+      logger.info(
+        { debateId, phases: transcript.utterances.length },
+        'Debate completed successfully'
+      );
+    } finally {
+      // Always unregister when done (success or failure)
+      orchestratorRegistry.unregister(debateId);
+    }
   } catch (error) {
     // Properly serialize the error for logging
     const errorDetails = error instanceof Error
@@ -433,6 +456,7 @@ router.post('/debates', async (req: Request, res: Response) => {
       modelSelectionMode: req.body.modelSelectionMode,
       proModelId: req.body.proModelId,
       conModelId: req.body.conModelId,
+      moderatorModelId: req.body.moderatorModelId,
       costThreshold: req.body.costThreshold,
     };
 
@@ -881,6 +905,75 @@ router.post('/debates/:debateId/close', async (req: Request, res: Response) => {
     logger.error({ debateId, error }, 'Error closing debate');
     res.status(500).json({
       error: 'Failed to close debate',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * POST /debates/:debateId/stop
+ * Stop a running debate immediately
+ * Unlike close, this actually stops the orchestrator execution
+ */
+router.post('/debates/:debateId/stop', async (req: Request, res: Response) => {
+  const { debateId } = req.params;
+  const { reason } = req.body as { reason?: string };
+
+  logger.info({ debateId, reason }, 'Stop debate request received');
+
+  try {
+    const debate = await debateRepository.findById(debateId!);
+
+    if (!debate) {
+      res.status(404).json({
+        error: 'Debate not found',
+        debateId,
+      });
+      return;
+    }
+
+    // Only allow stopping live or paused debates
+    if (debate.status !== 'live' && debate.status !== 'paused' && debate.status !== 'initializing') {
+      res.status(400).json({
+        error: 'Invalid debate status',
+        message: `Cannot stop debate with status: ${debate.status}. Only 'live', 'paused', or 'initializing' debates can be stopped.`,
+        currentStatus: debate.status,
+      });
+      return;
+    }
+
+    // Get the running orchestrator
+    const orchestrator = orchestratorRegistry.get(debateId!);
+
+    if (orchestrator) {
+      // Stop the orchestrator - this sets the flag and broadcasts the event
+      await orchestrator.stop(reason || 'User stopped debate');
+      logger.info({ debateId }, 'Orchestrator stopped');
+    } else {
+      // No orchestrator found - debate might be stalled or running in lively mode
+      // Still update the status and broadcast
+      logger.warn({ debateId }, 'No orchestrator found in registry, updating status directly');
+
+      await debateRepository.updateStatus(debateId!, { status: 'completed' });
+
+      sseManager.broadcastToDebate(debateId!, 'debate_stopped', {
+        debateId,
+        stoppedAt: new Date().toISOString(),
+        reason: reason || 'User stopped debate (no active orchestrator)',
+      });
+    }
+
+    res.json({
+      success: true,
+      debateId,
+      stoppedAt: new Date().toISOString(),
+      reason: reason || 'User stopped debate',
+      hadActiveOrchestrator: !!orchestrator,
+    });
+  } catch (error) {
+    logger.error({ debateId, error }, 'Error stopping debate');
+    res.status(500).json({
+      error: 'Failed to stop debate',
       message: error instanceof Error ? error.message : String(error),
     });
   }

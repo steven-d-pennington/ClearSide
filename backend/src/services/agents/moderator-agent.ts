@@ -40,6 +40,14 @@ interface NeutralityValidation {
 }
 
 /**
+ * Optional configuration for ModeratorAgent
+ */
+interface ModeratorAgentOptions {
+  /** Override the model ID (for OpenRouter model selection) */
+  model?: string;
+}
+
+/**
  * Moderator Agent - Neutral facilitator and synthesizer
  *
  * Responsibilities:
@@ -59,15 +67,17 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
   private modelName: string;
   private provider: 'openai' | 'anthropic';
 
-  constructor(llmClient: LLMClient) {
+  constructor(llmClient: LLMClient, options?: ModeratorAgentOptions) {
     this.llmClient = llmClient;
     this.provider = llmConfig.defaultProvider;
-    this.modelName = llmConfig.defaultModels[this.provider];
+    // Use provided model override or fall back to default
+    this.modelName = options?.model || llmConfig.defaultModels[this.provider];
 
     logger.info(
       {
         provider: this.provider,
         model: this.modelName,
+        hasModelOverride: !!options?.model,
       },
       'ModeratorAgent initialized'
     );

@@ -85,6 +85,8 @@ export interface DebateModelConfig {
   proModelId?: string;
   /** OpenRouter model ID for Con advocate (manual mode) */
   conModelId?: string;
+  /** OpenRouter model ID for Moderator (manual mode) */
+  moderatorModelId?: string;
   /** Maximum cost tier allowed (auto mode) */
   costThreshold?: CostThreshold;
 }

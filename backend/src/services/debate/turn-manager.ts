@@ -213,18 +213,24 @@ export class TurnManager {
 
   /**
    * Phase 1: Opening Statements
-   * Pro opens first, then Con
+   * Moderator introduces first, then Pro opens, then Con
    */
   private generateOpeningTurns(): Turn[] {
     return [
       {
         turnNumber: 1,
+        speaker: Speaker.MODERATOR,
+        promptType: 'introduction',
+        metadata: { expectedDurationMs: 60000 }, // 1 minute for introduction
+      },
+      {
+        turnNumber: 2,
         speaker: Speaker.PRO,
         promptType: 'opening_statement',
         metadata: { expectedDurationMs: 120000 }, // 2 minutes
       },
       {
-        turnNumber: 2,
+        turnNumber: 3,
         speaker: Speaker.CON,
         promptType: 'opening_statement',
         metadata: { expectedDurationMs: 120000 }, // 2 minutes

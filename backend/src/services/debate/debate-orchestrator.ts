@@ -116,6 +116,7 @@ export class DebateOrchestrator {
   private config: OrchestratorConfig;
   private startTime: Date | null = null;
   private isPausedFlag: boolean = false;
+  private isStoppedFlag: boolean = false;
 
   constructor(
     debateId: string,
@@ -229,14 +230,31 @@ export class DebateOrchestrator {
     ];
 
     for (const phase of phases) {
+      // Check if stopped before each phase
+      if (this.isStoppedFlag) {
+        logger.info({ debateId: this.debateId, phase }, 'Debate stopped, exiting');
+        return;
+      }
+
       // Check if paused before each phase
       if (this.isPausedFlag) {
         logger.info({ debateId: this.debateId, phase }, 'Debate paused, waiting...');
         await this.waitForResume();
+        // Check again after resume in case we were stopped while paused
+        if (this.isStoppedFlag) {
+          logger.info({ debateId: this.debateId, phase }, 'Debate stopped after pause, exiting');
+          return;
+        }
       }
 
       logger.info({ debateId: this.debateId, phase }, 'Executing phase');
       await this.executePhase(phase, proposition);
+
+      // Check if stopped after phase execution
+      if (this.isStoppedFlag) {
+        logger.info({ debateId: this.debateId, phase }, 'Debate stopped after phase, exiting');
+        return;
+      }
 
       // Transition to next phase (except after last phase)
       if (phase !== DebatePhase.PHASE_6_SYNTHESIS) {
@@ -268,22 +286,35 @@ export class DebateOrchestrator {
     }
 
     // Execute each turn in sequence
+    let turnsExecuted = 0;
     for (const turn of plan.turns) {
+      // Check if stopped
+      if (this.isStoppedFlag) {
+        logger.info({ debateId: this.debateId, turn }, 'Debate stopped during phase');
+        return;
+      }
+
       // Check if paused
       if (this.isPausedFlag) {
         logger.info({ debateId: this.debateId, turn }, 'Debate paused during turn');
         await this.waitForResume();
+        // Check again after resume
+        if (this.isStoppedFlag) {
+          logger.info({ debateId: this.debateId, turn }, 'Debate stopped after pause');
+          return;
+        }
       }
 
       await this.executeTurn(turn, proposition);
+      turnsExecuted++;
     }
 
-    // Broadcast phase complete event
-    if (this.config.broadcastEvents) {
+    // Only broadcast phase complete if we weren't stopped
+    if (!this.isStoppedFlag && this.config.broadcastEvents) {
       this.sseManager.broadcastToDebate(this.debateId, 'phase_complete', {
         phase,
         phaseName: plan.metadata.name,
-        turnsExecuted: plan.turns.length,
+        turnsExecuted,
       });
     }
 
@@ -585,6 +616,12 @@ export class DebateOrchestrator {
 
     // Poll until continue signal received (flag cleared by /continue endpoint)
     while (true) {
+      // Check if stopped locally
+      if (this.isStoppedFlag) {
+        logger.info({ debateId: this.debateId }, 'Step mode: Debate stopped, exiting wait');
+        break;
+      }
+
       // Check if debate is still awaiting continue
       const debate = await debateRepo.findById(this.debateId);
 
@@ -637,10 +674,40 @@ export class DebateOrchestrator {
   }
 
   /**
+   * Stop the debate immediately
+   * This will cause the debate to exit cleanly at the next check point
+   */
+  async stop(reason?: string): Promise<void> {
+    logger.info({ debateId: this.debateId, reason }, 'Stopping debate');
+    this.isStoppedFlag = true;
+
+    // Update database status
+    await debateRepo.updateStatus(this.debateId, { status: 'completed' });
+
+    // Broadcast stop event
+    if (this.config.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'debate_stopped', {
+        debateId: this.debateId,
+        stoppedAt: new Date().toISOString(),
+        reason: reason || 'User stopped debate',
+        totalDurationMs: this.getElapsedMs(),
+      });
+    }
+  }
+
+  /**
+   * Check if the debate has been stopped
+   */
+  isStopped(): boolean {
+    return this.isStoppedFlag;
+  }
+
+  /**
    * Wait for resume (used when paused during execution)
+   * Also exits early if debate is stopped
    */
   private async waitForResume(): Promise<void> {
-    while (this.isPausedFlag) {
+    while (this.isPausedFlag && !this.isStoppedFlag) {
       await this.sleep(1000);
     }
   }

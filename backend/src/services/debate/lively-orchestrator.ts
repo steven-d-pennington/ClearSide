@@ -38,6 +38,10 @@ import * as interventionRepo from '../../db/repositories/intervention-repository
 import { LLMClient } from '../llm/client.js';
 import type { CreateUtteranceInput } from '../../types/database.js';
 import type { DebatePhase as DbDebatePhase, Speaker as DbSpeaker } from '../../types/database.js';
+import { PRO_ADVOCATE_PROMPTS, PRO_PROMPT_BUILDERS } from '../agents/prompts/pro-advocate-prompts.js';
+import { CON_ADVOCATE_PROMPTS, CON_PROMPT_BUILDERS } from '../agents/prompts/con-advocate-prompts.js';
+import { MODERATOR_PROMPTS, MODERATOR_PROMPT_BUILDERS } from '../agents/prompts/moderator-prompts.js';
+import type { PromptBuilderContext } from '../agents/prompts/types.js';
 
 const logger = pino({
   name: 'lively-orchestrator',
@@ -159,7 +163,9 @@ export class LivelyDebateOrchestrator {
     this.stateMachine = stateMachine;
     this.turnManager = turnManager;
     this.agents = agents;
-    this.llmClient = llmClient ?? new LLMClient();
+    // Use the moderator's LLM client for interruption evaluation (neutral task)
+    // This ensures we use the same provider/model the user selected for moderator
+    this.llmClient = llmClient ?? agents.moderator.getLLMClient();
 
     this.broadcastEvents = config.broadcastEvents ?? true;
     this.evaluationIntervalMs = config.evaluationIntervalMs ?? 1000;
@@ -251,12 +257,34 @@ export class LivelyDebateOrchestrator {
   }
 
   /**
-   * Stop the debate
+   * Stop the debate immediately
+   * This will cause the debate to exit cleanly at the next check point
    */
-  stop(): void {
+  async stop(reason?: string): Promise<void> {
+    logger.info({ debateId: this.debateId, reason }, 'Stopping lively debate');
     this.isRunning = false;
     this.scheduler.stop();
-    logger.info({ debateId: this.debateId }, 'Lively debate stopped');
+
+    // Update database status
+    await debateRepo.updateStatus(this.debateId, { status: 'completed' });
+
+    // Broadcast stop event
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'debate_stopped', {
+        debateId: this.debateId,
+        stoppedAt: new Date().toISOString(),
+        reason: reason || 'User stopped debate',
+        totalDurationMs: this.getElapsedMs(),
+        debateMode: 'lively',
+      });
+    }
+  }
+
+  /**
+   * Check if the debate has been stopped
+   */
+  isStopped(): boolean {
+    return !this.isRunning;
   }
 
   // ===========================================================================
@@ -857,32 +885,177 @@ export class LivelyDebateOrchestrator {
   }
 
   /**
-   * Get system prompt for speaker and phase
+   * Get system prompt for speaker and phase using proper prompt templates
    */
-  private getSystemPrompt(speaker: Speaker, _promptType: string, context: AgentContext): string {
-    // Extract system prompt from agent (this is simplified - agents have more complex prompting)
-    return `You are a ${speaker} in a formal debate on: "${context.proposition}". Provide a clear, well-reasoned response.`;
+  private getSystemPrompt(speaker: Speaker, promptType: string, _context: AgentContext): string {
+    switch (speaker) {
+      case Speaker.PRO:
+        return this.getProSystemPrompt(promptType);
+      case Speaker.CON:
+        return this.getConSystemPrompt(promptType);
+      case Speaker.MODERATOR:
+        return this.getModeratorSystemPrompt(promptType);
+      default:
+        return `You are a ${speaker} in a formal debate. Provide a clear, well-reasoned response.`;
+    }
   }
 
   /**
-   * Get user prompt for speaker and phase
+   * Get Pro advocate system prompt for the given phase
    */
-  private getUserPrompt(_speaker: Speaker, promptType: string, _context: AgentContext): string {
+  private getProSystemPrompt(promptType: string): string {
     switch (promptType) {
       case 'opening':
       case 'opening_statement':
-        return `Provide your opening statement on this proposition.`;
+        return PRO_ADVOCATE_PROMPTS.opening.template;
       case 'constructive':
       case 'constructive_argument':
-        return `Provide a constructive argument with evidence.`;
+        return PRO_ADVOCATE_PROMPTS.constructive.economic.template;
       case 'rebuttal':
-        return `Provide a rebuttal to the opposing arguments.`;
+        return PRO_ADVOCATE_PROMPTS.rebuttal.template;
       case 'closing':
       case 'closing_statement':
-        return `Provide your closing statement.`;
+        return PRO_ADVOCATE_PROMPTS.closing.template;
       default:
-        return `Provide your response.`;
+        return PRO_ADVOCATE_PROMPTS.opening.template;
     }
+  }
+
+  /**
+   * Get Con advocate system prompt for the given phase
+   */
+  private getConSystemPrompt(promptType: string): string {
+    switch (promptType) {
+      case 'opening':
+      case 'opening_statement':
+        return CON_ADVOCATE_PROMPTS.opening.template;
+      case 'constructive':
+      case 'constructive_argument':
+        return CON_ADVOCATE_PROMPTS.constructive.economic.template;
+      case 'rebuttal':
+        return CON_ADVOCATE_PROMPTS.rebuttal.template;
+      case 'closing':
+      case 'closing_statement':
+        return CON_ADVOCATE_PROMPTS.closing.template;
+      default:
+        return CON_ADVOCATE_PROMPTS.opening.template;
+    }
+  }
+
+  /**
+   * Get Moderator system prompt for the given phase
+   */
+  private getModeratorSystemPrompt(promptType: string): string {
+    switch (promptType) {
+      case 'introduction':
+      case 'opening':
+      case 'opening_statement':
+        return MODERATOR_PROMPTS.introduction.template;
+      case 'synthesis':
+        return MODERATOR_PROMPTS.synthesis.template;
+      case 'closing':
+      case 'closing_statement':
+        return MODERATOR_PROMPTS.synthesis.template;
+      default:
+        return MODERATOR_PROMPTS.introduction.template;
+    }
+  }
+
+  /**
+   * Get user prompt for speaker and phase using proper prompt builders
+   */
+  private getUserPrompt(speaker: Speaker, promptType: string, context: AgentContext): string {
+    // Build the prompt context with proper typing
+    const promptContext: PromptBuilderContext = {
+      proposition: context.proposition,
+      propositionContext: context.propositionContext as PromptBuilderContext['propositionContext'],
+      previousUtterances: this.formatPreviousUtterances(context.previousUtterances),
+      phase: context.currentPhase,
+    };
+
+    switch (speaker) {
+      case Speaker.PRO:
+        return this.getProUserPrompt(promptType, promptContext);
+      case Speaker.CON:
+        return this.getConUserPrompt(promptType, promptContext);
+      case Speaker.MODERATOR:
+        return this.getModeratorUserPrompt(promptType, promptContext);
+      default:
+        return `Provide your response to the proposition: "${context.proposition}"`;
+    }
+  }
+
+  /**
+   * Get Pro advocate user prompt
+   */
+  private getProUserPrompt(promptType: string, context: PromptBuilderContext): string {
+    switch (promptType) {
+      case 'opening':
+      case 'opening_statement':
+        return PRO_PROMPT_BUILDERS.opening(context);
+      case 'constructive':
+      case 'constructive_argument':
+        return PRO_PROMPT_BUILDERS.constructive(context);
+      case 'rebuttal':
+        return PRO_PROMPT_BUILDERS.rebuttal(context);
+      case 'closing':
+      case 'closing_statement':
+        return PRO_PROMPT_BUILDERS.closing(context);
+      default:
+        return PRO_PROMPT_BUILDERS.opening(context);
+    }
+  }
+
+  /**
+   * Get Con advocate user prompt
+   */
+  private getConUserPrompt(promptType: string, context: PromptBuilderContext): string {
+    switch (promptType) {
+      case 'opening':
+      case 'opening_statement':
+        return CON_PROMPT_BUILDERS.opening(context);
+      case 'constructive':
+      case 'constructive_argument':
+        return CON_PROMPT_BUILDERS.constructive(context);
+      case 'rebuttal':
+        return CON_PROMPT_BUILDERS.rebuttal(context);
+      case 'closing':
+      case 'closing_statement':
+        return CON_PROMPT_BUILDERS.closing(context);
+      default:
+        return CON_PROMPT_BUILDERS.opening(context);
+    }
+  }
+
+  /**
+   * Get Moderator user prompt
+   */
+  private getModeratorUserPrompt(promptType: string, context: PromptBuilderContext): string {
+    switch (promptType) {
+      case 'introduction':
+      case 'opening':
+      case 'opening_statement':
+        return MODERATOR_PROMPT_BUILDERS.introduction(context);
+      case 'synthesis':
+        return MODERATOR_PROMPT_BUILDERS.synthesis({ ...context, fullTranscript: context.previousUtterances });
+      case 'closing':
+      case 'closing_statement':
+        return MODERATOR_PROMPT_BUILDERS.synthesis({ ...context, fullTranscript: context.previousUtterances });
+      default:
+        return MODERATOR_PROMPT_BUILDERS.introduction(context);
+    }
+  }
+
+  /**
+   * Format previous utterances for context
+   */
+  private formatPreviousUtterances(utterances?: Array<{ speaker: string; content: string; phase?: string }>): string {
+    if (!utterances || utterances.length === 0) {
+      return '';
+    }
+    return utterances
+      .map((u) => `[${u.speaker}]: ${u.content}`)
+      .join('\n\n');
   }
 
   /**
@@ -955,6 +1128,7 @@ export class LivelyDebateOrchestrator {
    */
   private async callModeratorAgent(promptType: string, context: AgentContext): Promise<string> {
     switch (promptType) {
+      case 'introduction':
       case 'opening':
       case 'opening_statement':
         return await this.agents.moderator.generateIntroduction(context.proposition, context);

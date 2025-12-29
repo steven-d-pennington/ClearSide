@@ -340,6 +340,7 @@ export interface ModelSelection {
   costThreshold: CostThreshold;
   proModelId: string | null;
   conModelId: string | null;
+  moderatorModelId: string | null;
 }
 
 /**
@@ -350,6 +351,7 @@ export const DEFAULT_MODEL_SELECTION: ModelSelection = {
   costThreshold: 'medium',
   proModelId: null,
   conModelId: null,
+  moderatorModelId: null,
 };
 
 /**

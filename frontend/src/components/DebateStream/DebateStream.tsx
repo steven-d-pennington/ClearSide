@@ -26,6 +26,7 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
     error,
     pauseDebate,
     resumeDebate,
+    stopDebate,
     toggleAutoScroll,
     selectTurn,
     continueDebate,
@@ -141,6 +142,15 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
           {isPaused && (
             <Button variant="primary" size="sm" onClick={resumeDebate}>
               Resume Debate
+            </Button>
+          )}
+          {(isLive || isPaused) && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => stopDebate('User stopped debate')}
+            >
+              Stop Debate
             </Button>
           )}
           <Button
