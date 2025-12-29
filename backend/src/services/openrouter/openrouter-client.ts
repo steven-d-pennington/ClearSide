@@ -63,6 +63,8 @@ export class OpenRouterClient {
 
     if (!this.apiKey) {
       logger.warn('OpenRouter API key not configured');
+    } else {
+      logger.info('OpenRouter client initialized');
     }
   }
 

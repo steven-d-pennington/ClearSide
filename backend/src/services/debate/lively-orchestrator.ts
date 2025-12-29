@@ -679,25 +679,30 @@ export class LivelyDebateOrchestrator {
   private async callProAgent(promptType: string, context: AgentContext): Promise<string> {
     switch (promptType) {
       case 'opening':
+      case 'opening_statement':
         return await this.agents.pro.generateOpeningStatement(context);
       case 'constructive':
+      case 'constructive_argument':
         return await this.agents.pro.generateConstructiveArgument(context);
       case 'crossExamQuestion':
+      case 'cross_exam_question':
         return await this.agents.pro.generateCrossExamQuestion(context);
       case 'crossExamResponse':
+      case 'cross_exam_response': {
         // For cross-exam responses, we need the question from the last utterance
         const lastQuestion = this.getLastOpponentUtterance(context);
         return await this.agents.pro.respondToCrossExam(lastQuestion, context);
+      }
       case 'rebuttal':
         return await this.agents.pro.generateRebuttal(context);
       case 'closing':
+      case 'closing_statement':
         return await this.agents.pro.generateClosingStatement(context);
       default:
-        // Fallback to generic response with proposition in prompt
-        return await this.agents.pro.generateResponse(
-          `Proposition: ${context.proposition}\n\nRespond as the Pro advocate for the above proposition.`,
-          context
-        );
+        // Fallback: use opening statement logic for unknown prompt types
+        // This ensures the agent debates properly instead of using intervention prompts
+        logger.warn({ promptType }, 'Unknown promptType, falling back to opening statement');
+        return await this.agents.pro.generateOpeningStatement(context);
     }
   }
 
@@ -707,23 +712,29 @@ export class LivelyDebateOrchestrator {
   private async callConAgent(promptType: string, context: AgentContext): Promise<string> {
     switch (promptType) {
       case 'opening':
+      case 'opening_statement':
         return await this.agents.con.generateOpeningStatement(context);
       case 'constructive':
+      case 'constructive_argument':
         return await this.agents.con.generateConstructiveArgument(context);
       case 'crossExamQuestion':
+      case 'cross_exam_question':
         return await this.agents.con.generateCrossExamQuestion(context);
       case 'crossExamResponse':
+      case 'cross_exam_response': {
         const lastQuestion = this.getLastOpponentUtterance(context);
         return await this.agents.con.respondToCrossExam(lastQuestion, context);
+      }
       case 'rebuttal':
         return await this.agents.con.generateRebuttal(context);
       case 'closing':
+      case 'closing_statement':
         return await this.agents.con.generateClosingStatement(context);
       default:
-        return await this.agents.con.generateResponse(
-          `Proposition: ${context.proposition}\n\nRespond as the Con advocate against the above proposition.`,
-          context
-        );
+        // Fallback: use opening statement logic for unknown prompt types
+        // This ensures the agent debates properly instead of using intervention prompts
+        logger.warn({ promptType }, 'Unknown promptType, falling back to opening statement');
+        return await this.agents.con.generateOpeningStatement(context);
     }
   }
 
@@ -733,18 +744,18 @@ export class LivelyDebateOrchestrator {
   private async callModeratorAgent(promptType: string, context: AgentContext): Promise<string> {
     switch (promptType) {
       case 'opening':
-        return await this.agents.moderator.generateIntroduction(context);
-      case 'transition':
-        return await this.agents.moderator.generateTransition(context.currentPhase, context);
+      case 'opening_statement':
+        return await this.agents.moderator.generateIntroduction(context.proposition, context);
       case 'synthesis':
         return await this.agents.moderator.generateSynthesis(context);
       case 'closing':
-        return await this.agents.moderator.generateClosingRemarks(context);
+      case 'closing_statement':
+        // Moderator doesn't have a closing method, use synthesis for final remarks
+        return await this.agents.moderator.generateSynthesis(context);
       default:
-        return await this.agents.moderator.generateResponse(
-          `Proposition: ${context.proposition}\n\nProvide moderator commentary for the above debate.`,
-          context
-        );
+        // Fallback: use synthesis for general moderator commentary
+        logger.warn({ promptType }, 'Unknown moderator promptType, falling back to synthesis');
+        return await this.agents.moderator.generateSynthesis(context);
     }
   }
 
@@ -756,11 +767,13 @@ export class LivelyDebateOrchestrator {
       return '';
     }
 
+    // Convert current speaker (enum) to database format (string) for comparison
+    const currentSpeakerDb = mapSpeakerToDb(context.speaker);
+
     // Find the last utterance from a different speaker
-    const currentSpeaker = context.speaker;
     for (let i = context.previousUtterances.length - 1; i >= 0; i--) {
       const utterance = context.previousUtterances[i];
-      if (utterance.speaker !== currentSpeaker) {
+      if (utterance && utterance.speaker !== currentSpeakerDb) {
         return utterance.content;
       }
     }

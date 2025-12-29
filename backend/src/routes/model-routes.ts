@@ -13,9 +13,18 @@ import type { CostThreshold, ModelTier } from '../types/openrouter.js';
 const router = express.Router();
 const logger = createLogger({ module: 'ModelRoutes' });
 
-// Initialize services
-const openRouterClient = getOpenRouterClient();
-const pairingService = createModelPairingService(openRouterClient);
+// Lazy initialization - services created on first request
+// This ensures dotenv has loaded environment variables before client creation
+let _openRouterClient: ReturnType<typeof getOpenRouterClient> | null = null;
+let _pairingService: ReturnType<typeof createModelPairingService> | null = null;
+
+function getServices() {
+  if (!_openRouterClient) {
+    _openRouterClient = getOpenRouterClient();
+    _pairingService = createModelPairingService(_openRouterClient);
+  }
+  return { openRouterClient: _openRouterClient, pairingService: _pairingService! };
+}
 
 /**
  * Validate cost threshold parameter
@@ -43,6 +52,7 @@ function isValidTier(value: unknown): value is ModelTier {
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const { openRouterClient } = getServices();
     const { threshold, tier, provider } = req.query;
 
     // Check if OpenRouter is configured
@@ -115,6 +125,7 @@ router.get('/', async (req: Request, res: Response) => {
  */
 router.get('/pairings', async (req: Request, res: Response) => {
   try {
+    const { openRouterClient, pairingService } = getServices();
     const { threshold } = req.query;
 
     // Check if OpenRouter is configured
@@ -178,6 +189,8 @@ router.get('/pairings', async (req: Request, res: Response) => {
  */
 router.get('/pairings/suggestions', async (_req: Request, res: Response) => {
   try {
+    const { openRouterClient, pairingService } = getServices();
+
     // Check if OpenRouter is configured
     if (!openRouterClient.isConfigured()) {
       res.status(503).json({
@@ -229,6 +242,7 @@ router.get('/pairings/suggestions', async (_req: Request, res: Response) => {
  */
 router.post('/validate', async (req: Request, res: Response) => {
   try {
+    const { openRouterClient, pairingService } = getServices();
     const { proModelId, conModelId } = req.body;
 
     // Check if OpenRouter is configured
@@ -302,6 +316,7 @@ router.post('/validate', async (req: Request, res: Response) => {
  * Check OpenRouter configuration status
  */
 router.get('/status', (_req: Request, res: Response) => {
+  const { openRouterClient } = getServices();
   res.json({
     configured: openRouterClient.isConfigured(),
     message: openRouterClient.isConfigured()

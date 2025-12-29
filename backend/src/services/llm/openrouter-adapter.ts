@@ -68,6 +68,68 @@ export class OpenRouterLLMClient extends LLMClient {
   }
 
   /**
+   * Override complete method to use OpenRouter
+   * This is the main method used by agents
+   */
+  async complete(request: import('../../types/llm.js').LLMRequest): Promise<import('../../types/llm.js').LLMResponse> {
+    const startTime = Date.now();
+
+    logger.info({
+      provider: 'openrouter',
+      model: this.modelId,
+      messageCount: request.messages.length,
+      temperature: request.temperature,
+      maxTokens: request.maxTokens,
+    }, 'Starting OpenRouter completion request');
+
+    try {
+      const completion = await this.openRouterClient.chat.completions.create({
+        model: this.modelId,
+        messages: request.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        temperature: request.temperature ?? 0.7,
+        max_tokens: request.maxTokens ?? 4096,
+        stream: false,
+      });
+
+      const choice = completion.choices[0];
+      const content = choice?.message?.content ?? '';
+
+      const duration = Date.now() - startTime;
+      const usage = {
+        promptTokens: completion.usage?.prompt_tokens ?? 0,
+        completionTokens: completion.usage?.completion_tokens ?? 0,
+        totalTokens: completion.usage?.total_tokens ?? 0,
+      };
+
+      logger.info({
+        provider: 'openrouter',
+        model: this.modelId,
+        duration,
+        usage,
+      }, 'OpenRouter completion successful');
+
+      return {
+        content,
+        model: completion.model || this.modelId,
+        usage,
+        finishReason: choice?.finish_reason === 'length' ? 'length' : 'stop',
+        provider: 'openrouter',
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error({
+        error: error instanceof Error ? error.message : String(error),
+        modelId: this.modelId,
+        duration,
+      }, 'OpenRouter completion error');
+      throw error;
+    }
+  }
+
+  /**
    * Override chat method to use OpenRouter
    */
   async chat(
@@ -139,15 +201,15 @@ export function createOpenRouterClient(modelId: string): OpenRouterLLMClient {
  * If model config specifies OpenRouter models, creates OpenRouter clients.
  * Otherwise falls back to default LLM client.
  */
-export function createDebateClients(config?: DebateModelConfig): {
+export async function createDebateClients(config?: DebateModelConfig): Promise<{
   proClient: LLMClient;
   conClient: LLMClient;
   moderatorClient: LLMClient;
   proModelId?: string;
   conModelId?: string;
-} {
+}> {
   // Import default client lazily to avoid circular dependencies
-  const { defaultLLMClient } = require('./index.js');
+  const { defaultLLMClient } = await import('./index.js');
 
   // If no config or auto mode without models set, use defaults
   if (!config || (config.selectionMode === 'auto' && !config.proModelId)) {

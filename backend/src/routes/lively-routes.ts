@@ -238,53 +238,59 @@ router.get('/debates/:debateId/interruptions', async (req, res) => {
  * Get available lively mode presets
  */
 router.get('/lively/presets', (_req, res) => {
+  // Presets tuned for natural debate flow
+  // minSpeakingTimeMs ensures speakers can make complete points before interrupts
   const presets = [
     {
       id: 'calm',
       name: 'Calm Discussion',
-      description: 'Minimal interruptions, slow pacing',
+      description: 'Minimal interruptions, speakers complete their thoughts',
       settings: {
         aggressionLevel: 1,
         maxInterruptsPerMinute: 1,
         pacingMode: 'slow',
-        interruptCooldownMs: 30000,
-        minSpeakingTimeMs: 10000,
+        interruptCooldownMs: 45000,
+        minSpeakingTimeMs: 30000,
+        relevanceThreshold: 0.9,
       },
     },
     {
       id: 'balanced',
       name: 'Balanced Debate',
-      description: 'Moderate interruptions, natural flow',
+      description: 'Natural flow with occasional interjections',
       settings: {
-        aggressionLevel: 3,
+        aggressionLevel: 2,
         maxInterruptsPerMinute: 2,
         pacingMode: 'medium',
-        interruptCooldownMs: 15000,
-        minSpeakingTimeMs: 5000,
+        interruptCooldownMs: 20000,
+        minSpeakingTimeMs: 15000,
+        relevanceThreshold: 0.8,
       },
     },
     {
       id: 'heated',
       name: 'Heated Discussion',
-      description: 'Frequent interruptions, fast-paced',
+      description: 'More frequent interruptions, energetic exchange',
       settings: {
-        aggressionLevel: 4,
-        maxInterruptsPerMinute: 4,
+        aggressionLevel: 3,
+        maxInterruptsPerMinute: 3,
         pacingMode: 'fast',
-        interruptCooldownMs: 10000,
-        minSpeakingTimeMs: 3000,
+        interruptCooldownMs: 15000,
+        minSpeakingTimeMs: 10000,
+        relevanceThreshold: 0.7,
       },
     },
     {
       id: 'chaotic',
       name: 'Chaotic Panel',
-      description: 'Maximum interruptions, frantic pace',
+      description: 'Frequent interruptions, rapid-fire debate',
       settings: {
         aggressionLevel: 5,
-        maxInterruptsPerMinute: 6,
+        maxInterruptsPerMinute: 5,
         pacingMode: 'frantic',
-        interruptCooldownMs: 5000,
-        minSpeakingTimeMs: 2000,
+        interruptCooldownMs: 8000,
+        minSpeakingTimeMs: 5000,
+        relevanceThreshold: 0.6,
       },
     },
   ];

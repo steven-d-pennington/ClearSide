@@ -6,11 +6,10 @@
 import express, { type Request, type Response } from 'express';
 import { promises as fs } from 'fs';
 import { createMarkdownExporter } from '../services/export/markdownExporter.js';
-import { createTranscriptRecorder } from '../services/transcript/transcript-recorder.js';
+import { createTranscriptRecorder, type DebateTranscript } from '../services/transcript/transcript-recorder.js';
 import { schemaValidator } from '../services/validation/schema-validator.js';
 import { createLogger } from '../utils/logger.js';
 import type { MarkdownExportOptions } from '../services/export/types.js';
-import type { DebateTranscript } from '../types/orchestrator.js';
 import * as debateRepo from '../db/repositories/debate-repository.js';
 import * as utteranceRepo from '../db/repositories/utterance-repository.js';
 import * as interventionRepo from '../db/repositories/intervention-repository.js';
@@ -83,7 +82,7 @@ async function buildTranscriptFromUtterances(debateId: string): Promise<DebateTr
       context: debate.propositionContext ? JSON.stringify(debate.propositionContext) : undefined,
     },
     transcript: utterances.map((u) => ({
-      id: u.id,
+      id: String(u.id),
       timestamp_ms: u.timestampMs,
       phase: mapPhase(u.phase),
       speaker: mapSpeaker(u.speaker),
@@ -91,13 +90,14 @@ async function buildTranscriptFromUtterances(debateId: string): Promise<DebateTr
       metadata: u.metadata || {},
     })),
     structured_analysis: {
-      pro: null,
-      con: null,
-      moderator: null,
+      pro: { executive_summary: 'Analysis not yet generated', arguments: [], assumptions: [], uncertainties: [] },
+      con: { executive_summary: 'Analysis not yet generated', arguments: [], assumptions: [], uncertainties: [] },
+      moderator: { areas_of_agreement: [], core_disagreements: [], assumption_conflicts: [], evidence_gaps: [], decision_hinges: [] },
     },
     user_interventions: interventions.map((i) => ({
-      id: i.id,
+      id: String(i.id),
       timestamp_ms: i.timestampMs,
+      phase: 'unknown', // Phase not stored in intervention records
       type: i.interventionType,
       content: i.content,
       metadata: {
@@ -172,9 +172,11 @@ router.get('/exports/:debateId/markdown', async (req: Request, res: Response) =>
 
     // Parse export options from query parameters
     // Force includeTranscript=true when there's no structured analysis (e.g., lively mode debates)
-    const hasStructuredAnalysis = transcript.structured_analysis?.pro ||
-                                   transcript.structured_analysis?.con ||
-                                   transcript.structured_analysis?.moderator;
+    // Check for actual content, not just placeholder objects
+    const hasStructuredAnalysis =
+      (transcript.structured_analysis?.pro?.arguments?.length ?? 0) > 0 ||
+      (transcript.structured_analysis?.con?.arguments?.length ?? 0) > 0 ||
+      (transcript.structured_analysis?.moderator?.areas_of_agreement?.length ?? 0) > 0;
 
     const options: MarkdownExportOptions = {
       includeMetadata: req.query.includeMetadata !== 'false',

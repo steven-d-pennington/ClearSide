@@ -236,13 +236,19 @@ export const PACING_CONFIG: Record<PacingMode, {
 
 /**
  * Default lively settings
+ *
+ * Tuned for natural debate flow:
+ * - minSpeakingTimeMs: 15s lets speakers make complete points before interrupts
+ * - aggressionLevel: 2 (moderate) for balanced interruptions
+ * - relevanceThreshold: 0.8 ensures only high-quality interrupts fire
+ * - interruptCooldownMs: 20s prevents rapid-fire interruptions
  */
 export const DEFAULT_LIVELY_SETTINGS: Omit<LivelySettingsInput, 'debateId'> = {
-  aggressionLevel: 3,
+  aggressionLevel: 2,
   maxInterruptsPerMinute: 2,
-  interruptCooldownMs: 15000,
-  minSpeakingTimeMs: 5000,
-  relevanceThreshold: 0.7,
+  interruptCooldownMs: 20000,
+  minSpeakingTimeMs: 15000,
+  relevanceThreshold: 0.8,
   contradictionBoost: 0.3,
   pacingMode: 'medium',
   interjectionMaxTokens: 60,

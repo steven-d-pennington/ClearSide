@@ -104,7 +104,7 @@ export const DEFAULT_MARKDOWN_OPTIONS: MarkdownExportOptions = {
   includeCon: true,
   includeModerator: true,
   includeChallenges: false,
-  includeTranscript: false,
+  includeTranscript: true, // Include full transcript since structured_analysis isn't populated yet
   format: 'standard',
   maxSummaryLength: 500,
 };

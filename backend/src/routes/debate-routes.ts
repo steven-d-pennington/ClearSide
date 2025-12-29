@@ -243,7 +243,7 @@ async function startDebateOrchestrator(
     const stateMachine = new DebateStateMachine(debateId);
 
     // Create model-specific LLM clients if model config provided
-    const clients = createDebateClients(modelConfig);
+    const clients = await createDebateClients(modelConfig);
 
     // Create per-debate agent instances with model overrides
     const agents = {
@@ -311,7 +311,11 @@ async function startDebateOrchestrator(
       'Debate completed successfully'
     );
   } catch (error) {
-    logger.error({ debateId, error }, 'Debate orchestrator failed');
+    // Properly serialize the error for logging
+    const errorDetails = error instanceof Error
+      ? { message: error.message, stack: error.stack, name: error.name }
+      : { message: String(error) };
+    logger.error({ debateId, error: errorDetails }, 'Debate orchestrator failed');
 
     // Broadcast error to connected SSE clients
     sseManager.broadcastToDebate(debateId, 'error', {

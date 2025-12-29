@@ -42,11 +42,11 @@ export async function createLivelySettings(
     RETURNING *`,
     [
       input.debateId,
-      input.aggressionLevel ?? 3,
+      input.aggressionLevel ?? 2,        // Moderate aggression for balanced flow
       input.maxInterruptsPerMinute ?? 2,
-      input.interruptCooldownMs ?? 15000,
-      input.minSpeakingTimeMs ?? 5000,
-      input.relevanceThreshold ?? 0.7,
+      input.interruptCooldownMs ?? 20000, // 20s cooldown between interrupts
+      input.minSpeakingTimeMs ?? 15000,   // 15s before interrupts allowed
+      input.relevanceThreshold ?? 0.8,    // Higher bar for interrupts
       input.contradictionBoost ?? 0.3,
       input.pacingMode ?? 'medium',
       input.interjectionMaxTokens ?? 60,

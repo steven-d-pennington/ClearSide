@@ -3,8 +3,12 @@
  * Main entry point for the Express application
  */
 
-import express, { type Request, type Response } from 'express';
+// Load environment variables FIRST - before any other imports
+// This ensures process.env is populated when modules initialize
 import { config } from 'dotenv';
+config();
+
+import express, { type Request, type Response } from 'express';
 import { sseManager } from './services/sse/index.js';
 import debateRoutes from './routes/debate-routes.js';
 import interventionRoutes from './routes/intervention-routes.js';
@@ -15,9 +19,6 @@ import modelRoutes from './routes/model-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 import { runMigrationsOnStartup } from './db/runMigrations.js';
-
-// Load environment variables
-config();
 
 const PORT = process.env.PORT || 3000;
 const app = express();
