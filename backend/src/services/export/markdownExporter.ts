@@ -337,6 +337,7 @@ ${arg.content}`;
 
   /**
    * Format full chronological transcript
+   * Includes markers for interruptions and interjections (for TTS and readability)
    */
   private formatTranscript(utterances: TranscriptUtterance[]): string {
     const parts: string[] = ['## Full Transcript'];
@@ -352,10 +353,30 @@ ${arg.content}`;
 
       const timestamp = this.formatTimestamp(utterance.timestamp_ms);
       const speaker = this.formatSpeaker(utterance.speaker);
+      const metadata = utterance.metadata || {};
 
-      parts.push(`**[${timestamp}] ${speaker}:**
+      // Build header with interruption markers
+      let header = `**[${timestamp}] ${speaker}:**`;
 
-${utterance.content}
+      // Add [INTERRUPTED] marker if this speaker was cut off
+      if (metadata.wasInterrupted) {
+        header += ' [INTERRUPTED]';
+      }
+
+      // Add *[Interjection]* marker if this is an interjection
+      if (metadata.isInterjection) {
+        header += ' *[Interjection]*';
+      }
+
+      // Format content - add em-dash for interrupted speech
+      let content = utterance.content;
+      if (metadata.wasInterrupted) {
+        content = content.trimEnd() + '—';
+      }
+
+      parts.push(`${header}
+
+${content}
 `);
     });
 

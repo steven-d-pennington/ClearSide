@@ -1,10 +1,11 @@
-import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeAll, afterAll, vi, expect } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+import * as axeMatchers from 'vitest-axe/matchers';
 import './test-utils/customMatchers';
-import * as axeMatchers from 'vitest-axe';
 
-// Extend Vitest matchers with axe-core accessibility matchers
+// Manually extend Vitest matchers with jest-dom and axe matchers
+expect.extend(matchers);
 expect.extend(axeMatchers);
 
 // Cleanup after each test

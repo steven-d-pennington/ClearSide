@@ -99,7 +99,14 @@ router.get('/system', async (_req: Request, res: Response, next: NextFunction) =
  */
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id;
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Persona ID is required',
+      });
+    }
+
     logger.info({ personaId: id }, 'Fetching persona by ID');
 
     const persona = await personaRepo.findById(id);
@@ -114,7 +121,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     logger.info({ personaId: id }, 'Persona retrieved');
 
-    res.json({
+    return res.json({
       success: true,
       data: persona,
     });
@@ -123,7 +130,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       error: error instanceof Error ? error.message : String(error),
       personaId: req.params.id,
     }, 'Failed to fetch persona');
-    next(error);
+    return next(error);
   }
 });
 
@@ -134,7 +141,14 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.get('/archetype/:archetype', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { archetype } = req.params;
+    const archetype = req.params.archetype;
+    if (!archetype) {
+      return res.status(400).json({
+        success: false,
+        error: 'Archetype is required',
+      });
+    }
+
     logger.info({ archetype }, 'Fetching personas by archetype');
 
     // Validate archetype
@@ -150,7 +164,7 @@ router.get('/archetype/:archetype', async (req: Request, res: Response, next: Ne
 
     logger.info({ archetype, count: personas.length }, 'Personas by archetype retrieved');
 
-    res.json({
+    return res.json({
       success: true,
       data: personas,
     });
@@ -159,7 +173,7 @@ router.get('/archetype/:archetype', async (req: Request, res: Response, next: Ne
       error: error instanceof Error ? error.message : String(error),
       archetype: req.params.archetype,
     }, 'Failed to fetch personas by archetype');
-    next(error);
+    return next(error);
   }
 });
 

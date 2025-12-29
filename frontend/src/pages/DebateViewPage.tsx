@@ -8,12 +8,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Badge } from '../components/ui';
-import { DebateStream } from '../components/DebateStream';
+import { DebateStream, ReplayViewer } from '../components/DebateStream';
 import { ExportPanel } from '../components/ExportPanel';
 import { useDebateStore } from '../stores/debate-store';
 import { DebatePhase, Speaker } from '../types/debate';
 import type { Debate, DebateTurn, FlowMode, PresetMode } from '../types/debate';
 import styles from './DebateViewPage.module.css';
+
+/**
+ * View mode for completed debates
+ * - 'stream': Standard scrolling transcript view
+ * - 'replay': Step-through view one turn at a time
+ */
+type ViewMode = 'stream' | 'replay';
 
 /**
  * API response for a single debate
@@ -68,6 +75,8 @@ export function DebateViewPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLivelyDebate, setIsLivelyDebate] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('stream');
 
   // Get store state and actions
   const debate = useDebateStore((state) => state.debate);
@@ -110,6 +119,16 @@ export function DebateViewPage() {
         }
 
         const debateData: DebateResponse = await debateRes.json();
+
+        // Check if this was a lively debate
+        try {
+          const livelyRes = await fetch(`${API_BASE_URL}/api/debates/${debateId}/lively-settings`);
+          if (livelyRes.ok) {
+            setIsLivelyDebate(true);
+          }
+        } catch {
+          // Not a lively debate or settings don't exist
+        }
 
         // Fetch existing utterances for ALL debates (live, paused, or completed)
         const utterancesRes = await fetch(
@@ -292,6 +311,34 @@ export function DebateViewPage() {
                 : 'Paused'}
             </Badge>
 
+            {isLivelyDebate && (
+              <Badge variant="secondary">
+                Lively Mode
+              </Badge>
+            )}
+
+            {/* View mode toggle for completed lively debates */}
+            {isLivelyDebate && debate.status === 'completed' && (
+              <div className={styles.viewModeToggle}>
+                <Button
+                  variant={viewMode === 'stream' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('stream')}
+                  aria-pressed={viewMode === 'stream'}
+                >
+                  Stream View
+                </Button>
+                <Button
+                  variant={viewMode === 'replay' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('replay')}
+                  aria-pressed={viewMode === 'replay'}
+                >
+                  Step-Through
+                </Button>
+              </div>
+            )}
+
             {debate.totalElapsedMs > 0 && (
               <span className={styles.metaItem}>
                 <span className={styles.duration}>
@@ -343,7 +390,14 @@ export function DebateViewPage() {
 
       <main className={styles.main}>
         <div className={styles.transcript}>
-          <DebateStream />
+          {viewMode === 'stream' ? (
+            <DebateStream />
+          ) : (
+            <ReplayViewer
+              turns={debate?.turns || []}
+              onExit={() => setViewMode('stream')}
+            />
+          )}
         </div>
 
         {/* Export Panel - show for completed debates */}

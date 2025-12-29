@@ -9,6 +9,7 @@ import * as debateRepository from '../db/repositories/debate-repository.js';
 import * as utteranceRepository from '../db/repositories/utterance-repository.js';
 import * as presetRepository from '../db/repositories/preset-repository.js';
 import * as personaRepository from '../db/repositories/persona-repository.js';
+import * as livelyRepository from '../db/repositories/lively-repository.js';
 import { createLogger } from '../utils/logger.js';
 import type { CreateDebateInput, FlowMode } from '../types/database.js';
 import {
@@ -17,9 +18,11 @@ import {
   type PresetMode,
   type BrevityLevel,
 } from '../types/configuration.js';
+import type { DebateMode, LivelySettingsInput } from '../types/lively.js';
 
 // Orchestrator and dependencies
 import { DebateOrchestrator, DebateStateMachine, turnManager } from '../services/debate/index.js';
+import { createLivelyOrchestrator } from '../services/debate/lively-orchestrator.js';
 import { defaultLLMClient } from '../services/llm/index.js';
 import {
   ProAdvocateAgent,
@@ -44,6 +47,8 @@ interface ConfigInput {
   requireCitations?: unknown;
   proPersonaId?: unknown;
   conPersonaId?: unknown;
+  debateMode?: unknown;
+  livelySettings?: unknown;
 }
 
 function validateConfigInput(config: ConfigInput): string[] {
@@ -86,6 +91,41 @@ function validateConfigInput(config: ConfigInput): string[] {
     errors.push(`Invalid conPersonaId: must be a string or null`);
   }
 
+  // Debate mode validation
+  if (config.debateMode !== undefined && config.debateMode !== 'turn_based' && config.debateMode !== 'lively') {
+    errors.push(`Invalid debateMode: must be 'turn_based' or 'lively'`);
+  }
+
+  // Lively settings validation (only validate structure if provided)
+  if (config.livelySettings !== undefined) {
+    if (typeof config.livelySettings !== 'object' || config.livelySettings === null) {
+      errors.push(`Invalid livelySettings: must be an object`);
+    } else {
+      const settings = config.livelySettings as Record<string, unknown>;
+
+      if (settings.aggressionLevel !== undefined) {
+        const level = Number(settings.aggressionLevel);
+        if (isNaN(level) || !Number.isInteger(level) || level < 1 || level > 5) {
+          errors.push(`Invalid livelySettings.aggressionLevel: must be an integer between 1 and 5`);
+        }
+      }
+
+      if (settings.maxInterruptsPerMinute !== undefined) {
+        const max = Number(settings.maxInterruptsPerMinute);
+        if (isNaN(max) || !Number.isInteger(max) || max < 0 || max > 10) {
+          errors.push(`Invalid livelySettings.maxInterruptsPerMinute: must be an integer between 0 and 10`);
+        }
+      }
+
+      if (settings.pacingMode !== undefined) {
+        const validModes = ['slow', 'medium', 'fast', 'frantic'];
+        if (!validModes.includes(settings.pacingMode as string)) {
+          errors.push(`Invalid livelySettings.pacingMode: must be one of ${validModes.join(', ')}`);
+        }
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -121,9 +161,11 @@ async function startDebateOrchestrator(
   debateId: string,
   propositionText: string,
   propositionContext?: Record<string, unknown>,
-  flowMode: FlowMode = 'auto'
+  flowMode: FlowMode = 'auto',
+  debateMode: DebateMode = 'turn_based',
+  livelySettings?: LivelySettingsInput
 ): Promise<void> {
-  logger.info({ debateId, propositionText, flowMode }, 'Starting debate orchestrator');
+  logger.info({ debateId, propositionText, flowMode, debateMode }, 'Starting debate orchestrator');
 
   try {
     // Create per-debate state machine
@@ -137,7 +179,35 @@ async function startDebateOrchestrator(
       orchestrator: new OrchestratorAgent(defaultLLMClient),
     };
 
-    // Create orchestrator with all dependencies
+    // Check if lively mode is requested
+    if (debateMode === 'lively') {
+      logger.info({ debateId }, 'Starting lively debate mode');
+
+      // Create lively settings in the database
+      await livelyRepository.createLivelySettings({
+        debateId,
+        ...livelySettings,
+      });
+
+      // Create lively orchestrator
+      const livelyOrchestrator = await createLivelyOrchestrator(
+        debateId,
+        propositionText,
+        sseManager,
+        stateMachine,
+        turnManager,
+        agents,
+        livelySettings
+      );
+
+      // Start lively debate
+      await livelyOrchestrator.start();
+
+      logger.info({ debateId }, 'Lively debate completed successfully');
+      return;
+    }
+
+    // Standard turn-based mode
     const orchestrator = new DebateOrchestrator(
       debateId,
       stateMachine,
@@ -256,6 +326,8 @@ router.get('/debates/:debateId/stream', async (req: Request, res: Response) => {
  * - requireCitations (optional): boolean
  * - proPersonaId (optional): Persona ID for Pro advocate (e.g., 'theorist', 'economist')
  * - conPersonaId (optional): Persona ID for Con advocate (e.g., 'lawyer', 'ethicist')
+ * - debateMode (optional): 'turn_based' | 'lively' (default: 'turn_based')
+ * - livelySettings (optional): Lively mode configuration (only used if debateMode is 'lively')
  */
 router.post('/debates', async (req: Request, res: Response) => {
   try {
@@ -271,6 +343,8 @@ router.post('/debates', async (req: Request, res: Response) => {
       requireCitations: req.body.requireCitations,
       proPersonaId: req.body.proPersonaId,
       conPersonaId: req.body.conPersonaId,
+      debateMode: req.body.debateMode,
+      livelySettings: req.body.livelySettings,
     };
 
     const configErrors = validateConfigInput(configInput);
@@ -350,13 +424,21 @@ router.post('/debates', async (req: Request, res: Response) => {
     // Return 201 immediately - don't wait for orchestrator
     res.status(201).json(debate);
 
+    // Extract debate mode settings
+    const debateMode: DebateMode = configInput.debateMode === 'lively' ? 'lively' : 'turn_based';
+    const livelySettings = debateMode === 'lively'
+      ? (configInput.livelySettings as LivelySettingsInput | undefined)
+      : undefined;
+
     // Start orchestrator in background (fire and forget)
     // The .catch() ensures errors don't crash the server
     startDebateOrchestrator(
       debate.id,
       input.propositionText,
       input.propositionContext as Record<string, unknown> | undefined,
-      flowMode
+      flowMode,
+      debateMode,
+      livelySettings
     ).catch((error) => {
       // This catch is a safety net - startDebateOrchestrator has its own error handling
       logger.error({ debateId: debate.id, error }, 'Unhandled orchestrator error');

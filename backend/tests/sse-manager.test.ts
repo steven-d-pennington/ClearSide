@@ -39,29 +39,36 @@ function createMockResponse(): Response {
 
 /**
  * Parse SSE data from written output
+ * Note: The SSE manager uses a simplified format without named events
+ * Event type is embedded in the JSON data payload
  */
 function parseSSEData(data: string[]): Array<{ type: string; data: any; id?: string }> {
   const events: Array<{ type: string; data: any; id?: string }> = [];
 
   for (const chunk of data) {
     const lines = chunk.split('\n');
-    let currentEvent: { type?: string; data?: string; id?: string } = {};
+    let currentId: string | undefined;
+    let currentData: string | undefined;
 
     for (const line of lines) {
       if (line.startsWith('id: ')) {
-        currentEvent.id = line.substring(4);
-      } else if (line.startsWith('event: ')) {
-        currentEvent.type = line.substring(7);
+        currentId = line.substring(4);
       } else if (line.startsWith('data: ')) {
-        currentEvent.data = line.substring(6);
-      } else if (line === '' && currentEvent.type) {
-        // End of event
-        events.push({
-          type: currentEvent.type,
-          data: JSON.parse(currentEvent.data || '{}'),
-          id: currentEvent.id,
-        });
-        currentEvent = {};
+        currentData = line.substring(6);
+      } else if (line === '' && currentData) {
+        // End of event - parse the data
+        try {
+          const parsed = JSON.parse(currentData);
+          events.push({
+            type: parsed.event || 'message',
+            data: parsed,
+            id: currentId,
+          });
+        } catch {
+          // Skip malformed events
+        }
+        currentId = undefined;
+        currentData = undefined;
       }
     }
   }
@@ -316,7 +323,8 @@ describe('SSEManager', () => {
       const rawMessage = writtenData.join('');
 
       expect(rawMessage).toMatch(/^id: /m);
-      expect(rawMessage).toMatch(/^event: utterance$/m);
+      // Event type is embedded in JSON data, not as separate SSE event line
+      expect(rawMessage).toMatch(/"event":"utterance"/);
       expect(rawMessage).toMatch(/^data: /m);
     });
   });

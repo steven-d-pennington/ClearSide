@@ -10,6 +10,7 @@ import debateRoutes from './routes/debate-routes.js';
 import interventionRoutes from './routes/intervention-routes.js';
 import exportRoutes from './routes/export-routes.js';
 import personaRoutes from './routes/persona-routes.js';
+import livelyRoutes from './routes/lively-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 import { runMigrationsOnStartup } from './db/runMigrations.js';
@@ -79,6 +80,7 @@ app.use('/api', debateRoutes);
 app.use('/api', interventionRoutes);
 app.use('/api', exportRoutes);
 app.use('/api/personas', personaRoutes);
+app.use('/api', livelyRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

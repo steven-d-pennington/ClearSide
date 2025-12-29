@@ -29,9 +29,12 @@ export const TurnCard: React.FC<TurnCardProps> = ({
     });
   };
 
+  // Check if this is an interjection from lively mode
+  const isInterjection = turn.metadata?.isInterjection === true;
+
   return (
     <article
-      className={`${styles.turnCard} ${styles[turn.speaker.toLowerCase()]} ${isSelected ? styles.selected : ''} ${className}`}
+      className={`${styles.turnCard} ${styles[turn.speaker.toLowerCase()]} ${isSelected ? styles.selected : ''} ${isInterjection ? styles.interjection : ''} ${className}`}
       onClick={onSelect}
       tabIndex={onSelect ? 0 : undefined}
       onKeyDown={(e) => {
@@ -44,6 +47,11 @@ export const TurnCard: React.FC<TurnCardProps> = ({
     >
       <header className={styles.header}>
         <SpeakerBadge speaker={turn.speaker} size="sm" />
+        {isInterjection && (
+          <span className={styles.interjectionBadge} title="Lively mode interjection">
+            ⚡ Interjection
+          </span>
+        )}
         <span className={styles.phase}>{phaseInfo.shortName}</span>
         <span className={styles.time}>{formatTime(turn.timestamp)}</span>
       </header>

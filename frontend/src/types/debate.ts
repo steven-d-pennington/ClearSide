@@ -283,7 +283,18 @@ export type SSEEventType =
   | 'debate_complete'    // Backend sends this (without 'd')
   | 'debate_error'
   | 'error'              // Backend sends this
-  | 'heartbeat';
+  | 'heartbeat'
+  // Lively mode events
+  | 'speaker_started'      // Speaker takes the floor
+  | 'speaker_cutoff'       // Speaker was interrupted mid-turn
+  | 'token_chunk'          // Streaming token for live display
+  | 'interrupt_scheduled'  // Interrupt queued (UI shows anticipation)
+  | 'interrupt_fired'      // Interrupt happens
+  | 'interrupt_cancelled'  // Scheduled interrupt was cancelled
+  | 'interjection'         // Short 1-2 sentence interrupt content
+  | 'speaking_resumed'     // Original speaker continues
+  | 'lively_mode_started'  // Lively mode activated for debate
+  | 'pacing_change';       // Pacing mode changed
 
 /**
  * SSE message structure

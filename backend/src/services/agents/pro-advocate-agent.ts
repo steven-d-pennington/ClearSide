@@ -21,7 +21,7 @@ import {
 } from './prompts/pro-advocate-prompts.js';
 import { createFullyConfiguredPrompt } from './prompts/prompt-modifiers.js';
 import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
-import type { DebateConfiguration, Persona } from '../../types/configuration.js';
+import type { DebateConfiguration } from '../../types/configuration.js';
 import type { PromptBuilderContext, ConstructiveRound } from './prompts/types.js';
 
 /**

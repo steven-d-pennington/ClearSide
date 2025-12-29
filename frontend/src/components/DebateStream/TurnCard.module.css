@@ -140,3 +140,31 @@
 .uncertainty.high {
   color: var(--color-error);
 }
+
+/* Interjection styles for lively mode */
+.interjection {
+  border-style: dashed;
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-secondary) 0%,
+    rgba(var(--color-warning-rgb, 255, 193, 7), 0.05) 100%
+  );
+}
+
+.interjection .header {
+  background: rgba(var(--color-warning-rgb, 255, 193, 7), 0.1);
+}
+
+.interjectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-warning-dark, #856404);
+  background: rgba(var(--color-warning-rgb, 255, 193, 7), 0.2);
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}

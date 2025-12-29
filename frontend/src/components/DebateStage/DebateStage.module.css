@@ -1,0 +1,168 @@
+/**
+ * DebateStage Styles
+ *
+ * Multi-panel layout for lively debate mode
+ */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  min-height: 600px;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border-radius: 1rem;
+}
+
+/* Empty state */
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 1.125rem;
+}
+
+/* Turn-based mode (simple view) */
+.turnBased {
+  min-height: 400px;
+}
+
+.turnBasedContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main grid layout */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+/* Side panels */
+.sidePanel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Center panel */
+.centerPanel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bottom panel (Moderator) */
+.bottomPanel {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Status bar */
+.statusBar {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-bg-primary, #ffffff);
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.statusItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusLabel {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statusValue {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+  text-transform: capitalize;
+}
+
+/* Responsive: Tablet */
+@media (max-width: 1024px) {
+  .stage {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1.5fr 1fr;
+    gap: 1rem;
+  }
+
+  .statusBar {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+}
+
+/* Responsive: Mobile */
+@media (max-width: 768px) {
+  .stage {
+    min-height: 500px;
+    padding: 0.75rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap: 0.75rem;
+  }
+
+  .sidePanel {
+    order: 2;
+  }
+
+  .sidePanel:first-child {
+    order: 1;
+  }
+
+  .sidePanel:last-child {
+    order: 3;
+  }
+
+  .centerPanel {
+    order: 0;
+    min-height: 250px;
+  }
+
+  .bottomPanel {
+    max-width: 100%;
+  }
+
+  .statusBar {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .statusItem {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Animation for layout transitions */
+.grid > * {
+  transition: all 0.3s ease;
+}
+
+/* Active state enhancements */
+.grid > *:has(.active) {
+  z-index: 1;
+}

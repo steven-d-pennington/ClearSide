@@ -103,6 +103,12 @@ export interface AudioSegment {
     speakerName: string;
     /** Estimated duration in seconds */
     estimatedDuration: number;
+    /** Whether this utterance was interrupted (for TTS prosody) */
+    wasInterrupted?: boolean;
+    /** Whether this is an interjection (for TTS prosody) */
+    isInterjection?: boolean;
+    /** Interruption energy level 1-5 (for TTS prosody) */
+    interruptionEnergy?: number;
   };
 }
 

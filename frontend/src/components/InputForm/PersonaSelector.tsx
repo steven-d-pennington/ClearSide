@@ -9,7 +9,8 @@
 import React, { useState, useEffect } from 'react';
 import type { PersonaSummary, PersonaSelection } from '../../types/configuration';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Use relative URLs so Vite proxy can forward to backend
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface PersonaSelectorProps {
   selection: PersonaSelection;

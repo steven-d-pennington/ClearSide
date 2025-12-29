@@ -123,11 +123,12 @@ export async function findById(id: string): Promise<Persona | null> {
   const query = `SELECT * FROM personas WHERE id = $1`;
   const result = await pool.query<PersonaRow>(query, [id]);
 
-  if (result.rows.length === 0) {
+  const row = result.rows[0];
+  if (!row) {
     return null;
   }
 
-  return mapRowToPersona(result.rows[0]);
+  return mapRowToPersona(row);
 }
 
 /**
@@ -161,11 +162,12 @@ export async function getSystemPromptAddition(id: string): Promise<string | null
   const query = `SELECT system_prompt_addition FROM personas WHERE id = $1`;
   const result = await pool.query<{ system_prompt_addition: string }>(query, [id]);
 
-  if (result.rows.length === 0) {
+  const row = result.rows[0];
+  if (!row) {
     return null;
   }
 
-  return result.rows[0].system_prompt_addition;
+  return row.system_prompt_addition;
 }
 
 /**

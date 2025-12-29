@@ -20,7 +20,7 @@ import {
   CON_PROMPT_BUILDERS,
 } from './prompts/con-advocate-prompts.js';
 import { createFullyConfiguredPrompt } from './prompts/prompt-modifiers.js';
-import { DEFAULT_CONFIGURATION, type DebateConfiguration } from '../../types/configuration.js';
+import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
 import type { PromptBuilderContext, ConstructiveRound } from './prompts/types.js';
 import type { Utterance } from '../../types/database.js';
 

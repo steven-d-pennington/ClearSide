@@ -1,0 +1,483 @@
+/**
+ * SpeakerPanel Styles
+ *
+ * Individual speaker cards for the multi-panel debate stage
+ */
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--color-bg-secondary, #f9fafb);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Size variants */
+.sm {
+  padding: 0.75rem;
+}
+
+.sm .header {
+  gap: 0.5rem;
+}
+
+.sm .avatar {
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.875rem;
+}
+
+.sm .name {
+  font-size: 0.875rem;
+}
+
+.sm .content {
+  font-size: 0.75rem;
+  max-height: 60px;
+}
+
+.md {
+  padding: 1rem;
+}
+
+.lg {
+  padding: 1.5rem;
+}
+
+.lg .header {
+  gap: 1rem;
+}
+
+.lg .avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: 1.25rem;
+}
+
+.lg .name {
+  font-size: 1.125rem;
+}
+
+.lg .content {
+  max-height: 200px;
+}
+
+/* Header section */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.name {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Content area */
+.content {
+  flex: 1;
+  min-height: 40px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #4b5563);
+}
+
+.text {
+  margin: 0;
+  word-wrap: break-word;
+}
+
+.cursor {
+  animation: blink 1s ease-in-out infinite;
+  color: var(--color-primary, #3b82f6);
+  font-weight: bold;
+}
+
+/* Speaker-specific colors */
+.pro {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.05), rgba(34, 197, 94, 0.1));
+}
+
+.pro .avatar {
+  background-color: rgb(34, 197, 94);
+}
+
+.pro.active {
+  border-color: rgb(34, 197, 94);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+}
+
+.con {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(239, 68, 68, 0.1));
+}
+
+.con .avatar {
+  background-color: rgb(239, 68, 68);
+}
+
+.con.active {
+  border-color: rgb(239, 68, 68);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+.moderator {
+  border-color: rgba(99, 102, 241, 0.3);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.1));
+}
+
+.moderator .avatar {
+  background-color: rgb(99, 102, 241);
+}
+
+.moderator.active {
+  border-color: rgb(99, 102, 241);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.system {
+  border-color: rgba(156, 163, 175, 0.3);
+  background-color: rgba(156, 163, 175, 0.1);
+}
+
+.system .avatar {
+  background-color: rgb(156, 163, 175);
+}
+
+/* Active indicator */
+.active {
+  transform: scale(1.02);
+}
+
+.activeRing {
+  position: absolute;
+  inset: -4px;
+  border-radius: 1rem;
+  border: 2px solid currentColor;
+  opacity: 0.5;
+  animation: ringPulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.pro .activeRing {
+  border-color: rgb(34, 197, 94);
+}
+
+.con .activeRing {
+  border-color: rgb(239, 68, 68);
+}
+
+.moderator .activeRing {
+  border-color: rgb(99, 102, 241);
+}
+
+/* Animations */
+@keyframes blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes ringPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.8;
+  }
+}
+
+/* =====================================
+   LIVELY MODE STATES
+   ===================================== */
+
+/* Queued state - speaker about to interrupt */
+.queued {
+  animation: queuedPulse 0.8s ease-in-out infinite;
+}
+
+.queued::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%
+  );
+  animation: queuedShimmer 1.5s ease-in-out infinite;
+}
+
+.pro.queued {
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+  border-color: rgb(34, 197, 94);
+}
+
+.con.queued {
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+  border-color: rgb(239, 68, 68);
+}
+
+.moderator.queued {
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+  border-color: rgb(99, 102, 241);
+}
+
+/* Cooldown state - speaker can't interrupt yet */
+.cooldown {
+  opacity: 0.6;
+  filter: grayscale(30%);
+}
+
+.cooldown .avatar {
+  position: relative;
+}
+
+.cooldown .avatar::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px dashed currentColor;
+  opacity: 0.5;
+  animation: cooldownSpin 4s linear infinite;
+}
+
+.pro.cooldown .avatar::after {
+  border-color: rgb(34, 197, 94);
+}
+
+.con.cooldown .avatar::after {
+  border-color: rgb(239, 68, 68);
+}
+
+.moderator.cooldown .avatar::after {
+  border-color: rgb(99, 102, 241);
+}
+
+/* Interjecting state - speaker delivering interjection */
+.interjecting {
+  animation: interjectBurst 0.3s ease-out;
+  z-index: 10;
+}
+
+.pro.interjecting {
+  border-color: rgb(34, 197, 94);
+  box-shadow:
+    0 0 20px rgba(34, 197, 94, 0.5),
+    inset 0 0 30px rgba(34, 197, 94, 0.1);
+}
+
+.con.interjecting {
+  border-color: rgb(239, 68, 68);
+  box-shadow:
+    0 0 20px rgba(239, 68, 68, 0.5),
+    inset 0 0 30px rgba(239, 68, 68, 0.1);
+}
+
+.moderator.interjecting {
+  border-color: rgb(99, 102, 241);
+  box-shadow:
+    0 0 20px rgba(99, 102, 241, 0.5),
+    inset 0 0 30px rgba(99, 102, 241, 0.1);
+}
+
+/* Cutoff state - speaker was interrupted */
+.cutoff {
+  animation: cutoffShake 0.3s ease-out;
+}
+
+.cutoff::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.8) 50%,
+    transparent 100%
+  );
+  animation: cutoffFlash 0.3s ease-out forwards;
+  pointer-events: none;
+}
+
+/* Ready state - speaker can interrupt */
+.ready {
+  position: relative;
+}
+
+.ready::after {
+  content: '';
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgb(34, 197, 94);
+  animation: readyPulse 2s ease-in-out infinite;
+}
+
+/* =====================================
+   ADDITIONAL ANIMATIONS
+   ===================================== */
+
+@keyframes queuedPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes queuedShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes cooldownSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes interjectBurst {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes cutoffShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes cutoffFlash {
+  0% {
+    opacity: 0;
+    left: -100%;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    left: 100%;
+  }
+}
+
+@keyframes readyPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+}
+
+/* =====================================
+   SCROLLBAR STYLING
+   ===================================== */
+
+.content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+/* =====================================
+   RESPONSIVE
+   ===================================== */
+
+@media (max-width: 768px) {
+  .queued::before {
+    display: none;
+  }
+
+  .ready::after {
+    width: 6px;
+    height: 6px;
+    bottom: 6px;
+    right: 6px;
+  }
+}

@@ -18,6 +18,16 @@ import type {
 } from '../types/debate';
 import { DebatePhase, Speaker } from '../types/debate';
 import type { BrevityLevel } from '../types/configuration';
+import type {
+  DebateMode,
+  LivelySettings,
+  LivelySettingsInput,
+  LivelyState,
+  InterruptCandidate,
+  LivelyPreset,
+  PacingMode,
+} from '../types/lively';
+import { initialLivelyState } from '../types/lively';
 
 /**
  * Options for starting a new debate
@@ -39,6 +49,10 @@ export interface StartDebateOptions {
   proPersonaId?: string | null;
   /** Persona ID for Con advocate */
   conPersonaId?: string | null;
+  /** Debate mode - turn_based or lively */
+  debateMode?: DebateMode;
+  /** Lively mode settings (only used if debateMode is 'lively') */
+  livelySettings?: LivelySettingsInput;
 }
 
 /**
@@ -76,6 +90,9 @@ interface DebateState {
   isAutoScrollEnabled: boolean;
   selectedTurnId: string | null;
 
+  // Lively mode state
+  lively: LivelyState;
+
   // Actions
   startDebate: (proposition: string, options?: StartDebateOptions) => Promise<void>;
   pauseDebate: () => Promise<void>;
@@ -92,6 +109,11 @@ interface DebateState {
   toggleAutoScroll: () => void;
   selectTurn: (turnId: string | null) => void;
 
+  // Lively mode actions
+  fetchLivelySettings: (debateId: string) => Promise<void>;
+  updateLivelySettings: (debateId: string, settings: LivelySettingsInput) => Promise<void>;
+  fetchLivelyPresets: () => Promise<LivelyPreset[]>;
+
   // Internal actions (used by SSE handlers)
   _handleSSEMessage: (message: SSEMessage) => void;
   _setConnectionStatus: (status: ConnectionStatus) => void;
@@ -99,6 +121,8 @@ interface DebateState {
   _completeTurn: (turn: DebateTurn) => void;
   _setError: (error: string | null) => void;
   _reset: () => void;
+  _handleLivelySSEMessage: (message: SSEMessage) => void;
+  _parseSpeaker: (value: string | undefined) => Speaker | null;
 }
 
 /**
@@ -115,6 +139,7 @@ const initialState = {
   isAwaitingContinue: false,
   isAutoScrollEnabled: true,
   selectedTurnId: null,
+  lively: initialLivelyState,
 };
 
 /**
@@ -172,6 +197,14 @@ export const useDebateStore = create<DebateState>()(
             requestBody.conPersonaId = options.conPersonaId;
           }
 
+          // Add debate mode and lively settings
+          if (options.debateMode !== undefined) {
+            requestBody.debateMode = options.debateMode;
+          }
+          if (options.debateMode === 'lively' && options.livelySettings) {
+            requestBody.livelySettings = options.livelySettings;
+          }
+
           console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);
           const response = await fetch(`${API_BASE_URL}/api/debates`, {
             method: 'POST',
@@ -187,6 +220,9 @@ export const useDebateStore = create<DebateState>()(
           }
 
           const debate = await response.json();
+
+          // Check if this is a lively mode debate
+          const isLively = options.debateMode === 'lively';
 
           set({
             debate: {
@@ -206,7 +242,18 @@ export const useDebateStore = create<DebateState>()(
               requireCitations: debate.requireCitations || false,
             },
             isLoading: false,
+            // Set lively mode immediately if selected (don't wait for SSE event)
+            // Settings will be fully populated when lively_mode_started SSE event arrives
+            lively: isLively
+              ? {
+                  ...get().lively,
+                  isLivelyMode: true,
+                  // Keep settings null for now - will be set by SSE event
+                }
+              : get().lively,
           });
+
+          console.log('🎭 Lively mode set:', isLively);
 
           // Connect to SSE stream
           get().connectToDebate(debate.id);
@@ -435,6 +482,372 @@ export const useDebateStore = create<DebateState>()(
        */
       selectTurn: (turnId: string | null) => {
         set({ selectedTurnId: turnId });
+      },
+
+      /**
+       * Fetch lively settings for a debate
+       */
+      fetchLivelySettings: async (debateId: string) => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/debates/${debateId}/lively-settings`);
+          if (response.status === 404) {
+            // No lively settings - turn-based mode
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                isLivelyMode: false,
+                settings: null,
+              },
+            }));
+            return;
+          }
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch lively settings: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          set((state) => ({
+            lively: {
+              ...state.lively,
+              isLivelyMode: true,
+              settings: result.data,
+            },
+          }));
+        } catch (error) {
+          console.error('Failed to fetch lively settings:', error);
+        }
+      },
+
+      /**
+       * Update lively settings for a debate
+       */
+      updateLivelySettings: async (debateId: string, settings: LivelySettingsInput) => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/debates/${debateId}/lively-settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to update lively settings: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          set((state) => ({
+            lively: {
+              ...state.lively,
+              settings: result.data,
+            },
+          }));
+        } catch (error) {
+          console.error('Failed to update lively settings:', error);
+          set({
+            error: error instanceof Error ? error.message : 'Failed to update lively settings',
+          });
+        }
+      },
+
+      /**
+       * Fetch available lively presets
+       */
+      fetchLivelyPresets: async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/lively/presets`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch lively presets: ${response.statusText}`);
+          }
+          const result = await response.json();
+          return result.data as LivelyPreset[];
+        } catch (error) {
+          console.error('Failed to fetch lively presets:', error);
+          return [];
+        }
+      },
+
+      /**
+       * Convert backend speaker format to frontend Speaker enum
+       * Backend sends: 'pro_advocate', 'con_advocate', 'moderator'
+       * Frontend uses: Speaker.PRO, Speaker.CON, Speaker.MODERATOR
+       */
+      _parseSpeaker: (value: string | undefined): Speaker | null => {
+        if (!value) return null;
+        const normalized = value.toLowerCase().trim();
+        switch (normalized) {
+          case 'pro_advocate':
+          case 'pro':
+            return Speaker.PRO;
+          case 'con_advocate':
+          case 'con':
+            return Speaker.CON;
+          case 'moderator':
+            return Speaker.MODERATOR;
+          default:
+            return null;
+        }
+      },
+
+      /**
+       * Handle lively mode SSE messages
+       */
+      _handleLivelySSEMessage: (message: SSEMessage) => {
+        const parseSpeaker = get()._parseSpeaker;
+
+        switch (message.event) {
+          case 'lively_mode_started': {
+            const data = message.data as { debateId: string; settings: LivelySettings };
+            console.log('🎭 Lively mode started:', data);
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                isLivelyMode: true,
+                settings: data.settings,
+              },
+            }));
+            break;
+          }
+
+          case 'speaker_started': {
+            const data = message.data as {
+              speaker: string;
+              timestampMs: number;
+              phase: string;
+            };
+            const speaker = parseSpeaker(data.speaker);
+            if (!speaker) {
+              console.warn('Unknown speaker in speaker_started:', data.speaker);
+              break;
+            }
+            console.log('🎤 Speaker started:', data);
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                activeSpeaker: {
+                  speaker,
+                  startedAtMs: data.timestampMs,
+                  tokenPosition: 0,
+                  partialContent: '',
+                  interruptWindowOpen: false,
+                  lastSafeBoundary: 0,
+                },
+                speakerStates: new Map(state.lively.speakerStates).set(speaker, 'speaking'),
+              },
+            }));
+            break;
+          }
+
+          case 'token_chunk': {
+            const data = message.data as {
+              speaker: string;
+              chunk: string;
+              tokenPosition: number;
+              timestampMs: number;
+            };
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                activeSpeaker: state.lively.activeSpeaker
+                  ? {
+                      ...state.lively.activeSpeaker,
+                      partialContent: state.lively.activeSpeaker.partialContent + data.chunk,
+                      tokenPosition: data.tokenPosition,
+                    }
+                  : null,
+              },
+            }));
+            break;
+          }
+
+          case 'interrupt_scheduled': {
+            // Backend sends: { interrupter, currentSpeaker, scheduledForMs, relevanceScore, triggerPhrase }
+            const data = message.data as {
+              interrupter: string;
+              currentSpeaker: string;
+              scheduledForMs: number;
+              relevanceScore: number;
+              triggerPhrase: string;
+            };
+            const interrupter = parseSpeaker(data.interrupter);
+            if (!interrupter) {
+              console.warn('Unknown interrupter in interrupt_scheduled:', data.interrupter);
+              break;
+            }
+            console.log('⏱️ Interrupt scheduled:', data);
+            // Create a candidate object from the flat data
+            const candidate: InterruptCandidate = {
+              speaker: interrupter,
+              relevanceScore: data.relevanceScore,
+              contradictionScore: 0,
+              combinedScore: data.relevanceScore,
+              triggerPhrase: data.triggerPhrase,
+            };
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                pendingInterrupt: candidate,
+                speakerStates: new Map(state.lively.speakerStates).set(interrupter, 'queued'),
+              },
+            }));
+            break;
+          }
+
+          case 'interrupt_cancelled': {
+            const data = message.data as {
+              interruptId: number;
+              reason: string;
+            };
+            console.log('❌ Interrupt cancelled:', data);
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                pendingInterrupt: null,
+              },
+            }));
+            break;
+          }
+
+          case 'interrupt_fired': {
+            // Backend sends: { interrupter, interruptedSpeaker, timestampMs }
+            const data = message.data as {
+              interrupter: string;
+              interruptedSpeaker: string;
+              timestampMs: number;
+            };
+            const interrupter = parseSpeaker(data.interrupter);
+            const interruptedSpeaker = parseSpeaker(data.interruptedSpeaker);
+            if (!interrupter || !interruptedSpeaker) {
+              console.warn('Unknown speaker in interrupt_fired:', data);
+              break;
+            }
+            console.log('🔥 Interrupt fired:', data);
+            const newSpeakerStates = new Map(get().lively.speakerStates);
+            newSpeakerStates.set(interrupter, 'speaking');
+            newSpeakerStates.set(interruptedSpeaker, 'interrupted');
+
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                pendingInterrupt: null,
+                speakerStates: newSpeakerStates,
+                lastInterruptTime: new Map(state.lively.lastInterruptTime).set(
+                  interrupter,
+                  data.timestampMs
+                ),
+                interruptsThisMinute: state.lively.interruptsThisMinute + 1,
+              },
+            }));
+            break;
+          }
+
+          case 'speaker_cutoff': {
+            // Backend sends: { cutoffSpeaker, interruptedBy, atTokenPosition, partialContent, timestampMs }
+            const data = message.data as {
+              cutoffSpeaker: string;
+              interruptedBy: string;
+              atTokenPosition: number;
+              partialContent: string;
+              timestampMs: number;
+            };
+            const cutoffSpeaker = parseSpeaker(data.cutoffSpeaker);
+            if (!cutoffSpeaker) {
+              console.warn('Unknown speaker in speaker_cutoff:', data.cutoffSpeaker);
+              break;
+            }
+            console.log('✂️ Speaker cutoff:', data);
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                speakerStates: new Map(state.lively.speakerStates).set(cutoffSpeaker, 'interrupted'),
+                activeSpeaker: null,
+              },
+            }));
+            break;
+          }
+
+          case 'interjection': {
+            const data = message.data as {
+              speaker: string;
+              content: string;
+              isComplete?: boolean;
+              isInterjection?: boolean;
+            };
+            const speaker = parseSpeaker(data.speaker);
+            console.log('💬 Interjection:', data);
+            if (data.isComplete) {
+              set((state) => ({
+                lively: {
+                  ...state.lively,
+                  streamingInterjection: null,
+                },
+              }));
+            } else if (speaker) {
+              set((state) => ({
+                lively: {
+                  ...state.lively,
+                  streamingInterjection: {
+                    speaker,
+                    content: data.content,
+                    isStreaming: !data.isComplete,
+                  },
+                },
+              }));
+            }
+            break;
+          }
+
+          case 'speaking_resumed': {
+            const data = message.data as {
+              speaker: string;
+              resumedAtMs: number;
+              phase: string;
+            };
+            const speaker = parseSpeaker(data.speaker);
+            if (!speaker) {
+              console.warn('Unknown speaker in speaking_resumed:', data.speaker);
+              break;
+            }
+            console.log('▶️ Speaking resumed:', data);
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                activeSpeaker: state.lively.activeSpeaker
+                  ? { ...state.lively.activeSpeaker, speaker }
+                  : {
+                      speaker,
+                      startedAtMs: data.resumedAtMs,
+                      tokenPosition: 0,
+                      partialContent: '',
+                      interruptWindowOpen: false,
+                      lastSafeBoundary: 0,
+                    },
+                speakerStates: new Map(state.lively.speakerStates).set(speaker, 'speaking'),
+              },
+            }));
+            break;
+          }
+
+          case 'pacing_change': {
+            const data = message.data as {
+              pacingMode: PacingMode;
+              reason?: string;
+            };
+            console.log('⚡ Pacing change:', data);
+            set((state) => ({
+              lively: {
+                ...state.lively,
+                settings: state.lively.settings
+                  ? { ...state.lively.settings, pacingMode: data.pacingMode }
+                  : null,
+              },
+            }));
+            break;
+          }
+
+          default:
+            // Not a lively mode event - ignore
+            break;
+        }
       },
 
       /**
@@ -756,7 +1169,24 @@ export const useDebateStore = create<DebateState>()(
             break;
 
           default:
-            console.warn('Unknown SSE event:', message.event);
+            // Check if it's a lively mode event
+            const livelyEvents = [
+              'speaker_started',
+              'speaker_cutoff',
+              'token_chunk',
+              'interrupt_scheduled',
+              'interrupt_fired',
+              'interrupt_cancelled',
+              'interjection',
+              'speaking_resumed',
+              'lively_mode_started',
+              'pacing_change',
+            ];
+            if (livelyEvents.includes(message.event)) {
+              get()._handleLivelySSEMessage(message);
+            } else {
+              console.warn('Unknown SSE event:', message.event);
+            }
         }
       },
 
@@ -841,5 +1271,39 @@ export const selectFlowMode = (state: DebateState) =>
 
 export const selectIsStepMode = (state: DebateState) =>
   state.debate?.flowMode === 'step';
+
+/**
+ * Lively mode selectors
+ */
+export const selectIsLivelyMode = (state: DebateState) => state.lively.isLivelyMode;
+
+export const selectLivelySettings = (state: DebateState) => state.lively.settings;
+
+export const selectActiveSpeaker = (state: DebateState) => state.lively.activeSpeaker;
+
+export const selectPendingInterrupt = (state: DebateState) => state.lively.pendingInterrupt;
+
+export const selectSpeakerState = (state: DebateState, speaker: Speaker) =>
+  state.lively.speakerStates.get(speaker) ?? 'ready';
+
+export const selectInterruptsThisMinute = (state: DebateState) =>
+  state.lively.interruptsThisMinute;
+
+export const selectStreamingInterjection = (state: DebateState) =>
+  state.lively.streamingInterjection;
+
+export const selectCanInterrupt = (state: DebateState) => {
+  const { lively } = state;
+  if (!lively.isLivelyMode || !lively.settings || !lively.activeSpeaker) {
+    return false;
+  }
+  return (
+    lively.activeSpeaker.interruptWindowOpen &&
+    lively.interruptsThisMinute < lively.settings.maxInterruptsPerMinute
+  );
+};
+
+export const selectLivelyPacingMode = (state: DebateState) =>
+  state.lively.settings?.pacingMode ?? 'medium';
 
 export default useDebateStore;

@@ -332,27 +332,60 @@ export class AudioProcessor {
   /**
    * Generate a silence audio file
    *
+   * Uses raw PCM generation instead of lavfi filter for Alpine Linux compatibility.
+   *
    * @param durationMs - Duration of silence in milliseconds
    * @param outputPath - Path for the output file
    * @returns Path to the silence file
    */
   async generateSilence(durationMs: number, outputPath: string): Promise<string> {
-    const durationSec = durationMs / 1000;
+    const sampleRate = 44100;
+    const channels = 2;
+    const bytesPerSample = 2; // 16-bit
+    const totalSamples = Math.ceil((durationMs / 1000) * sampleRate);
+    const totalBytes = totalSamples * channels * bytesPerSample;
 
-    logger.debug({ durationMs, outputPath }, 'Generating silence');
+    logger.debug({ durationMs, outputPath, totalBytes }, 'Generating silence');
 
+    // Ensure output directory exists
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+    // Generate raw PCM silence data (all zeros = silence)
+    // For large files, generate in chunks to avoid memory issues
+    const rawPath = outputPath + '.raw';
+    const chunkSize = 1024 * 1024; // 1MB chunks
+    let remaining = totalBytes;
+
+    // Create/truncate the file
+    await fs.writeFile(rawPath, Buffer.alloc(0));
+
+    // Write silence in chunks
+    while (remaining > 0) {
+      const size = Math.min(remaining, chunkSize);
+      const chunk = Buffer.alloc(size, 0); // All zeros = silence
+      await fs.appendFile(rawPath, chunk);
+      remaining -= size;
+    }
+
+    // Convert raw PCM to MP3 using FFmpeg
     return new Promise((resolve, reject) => {
-      ffmpeg()
-        .input('anullsrc=r=44100:cl=stereo')
-        .inputFormat('lavfi')
-        .duration(durationSec)
+      ffmpeg(rawPath)
+        .inputOptions([
+          '-f', 's16le',           // 16-bit signed little-endian PCM
+          '-ar', String(sampleRate),
+          '-ac', String(channels),
+        ])
         .audioCodec('libmp3lame')
         .outputOptions(['-b:a', '192k'])
         .output(outputPath)
-        .on('end', () => {
+        .on('end', async () => {
+          // Clean up raw file
+          await fs.unlink(rawPath).catch(() => {});
           resolve(outputPath);
         })
-        .on('error', (err) => {
+        .on('error', async (err) => {
+          // Clean up raw file on error too
+          await fs.unlink(rawPath).catch(() => {});
           reject(new Error(`Silence generation failed: ${err.message}`));
         })
         .run();

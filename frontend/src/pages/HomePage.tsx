@@ -8,17 +8,19 @@ import { Link } from 'react-router-dom';
 import { Card, CardFooter, Button } from '../components/ui';
 import { InputForm } from '../components/InputForm';
 import { DebateStream } from '../components/DebateStream';
-import { useDebateStore } from '../stores/debate-store';
+import { DebateStage } from '../components/DebateStage/DebateStage';
+import { useDebateStore, selectIsLivelyMode } from '../stores/debate-store';
 import styles from './HomePage.module.css';
 
 export function HomePage() {
   const debate = useDebateStore((state) => state.debate);
+  const isLivelyMode = useDebateStore(selectIsLivelyMode);
 
-  // If a debate is active, show the DebateStream
+  // If a debate is active, show the appropriate view
   if (debate) {
     return (
       <div className={styles.container}>
-        <DebateStream />
+        {isLivelyMode ? <DebateStage /> : <DebateStream />}
       </div>
     );
   }

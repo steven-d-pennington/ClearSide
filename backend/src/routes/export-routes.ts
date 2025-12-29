@@ -10,6 +10,10 @@ import { createTranscriptRecorder } from '../services/transcript/transcript-reco
 import { schemaValidator } from '../services/validation/schema-validator.js';
 import { createLogger } from '../utils/logger.js';
 import type { MarkdownExportOptions } from '../services/export/types.js';
+import type { DebateTranscript } from '../types/orchestrator.js';
+import * as debateRepo from '../db/repositories/debate-repository.js';
+import * as utteranceRepo from '../db/repositories/utterance-repository.js';
+import * as interventionRepo from '../db/repositories/intervention-repository.js';
 import {
   createAudioExportOrchestrator,
   getAvailableProviders,
@@ -22,6 +26,88 @@ import {
 
 const router = express.Router();
 const logger = createLogger({ module: 'ExportRoutes' });
+
+/**
+ * Build a transcript on-the-fly from utterances for debates that don't have a saved transcript
+ * Uses the format expected by the markdown exporter (transcript-recorder schema)
+ */
+async function buildTranscriptFromUtterances(debateId: string): Promise<DebateTranscript | null> {
+  const debate = await debateRepo.findById(debateId);
+  if (!debate) return null;
+
+  const utterances = await utteranceRepo.findByDebateId(debateId);
+  if (utterances.length === 0) return null;
+
+  const interventions = await interventionRepo.findByDebateId(debateId);
+
+  // Convert speaker from database format to schema format
+  const mapSpeaker = (s: string) => {
+    const map: Record<string, string> = {
+      'pro_advocate': 'pro',
+      'con_advocate': 'con',
+      'moderator': 'moderator',
+    };
+    return map[s] || s;
+  };
+
+  // Convert phase from database format to schema format
+  const mapPhase = (p: string) => {
+    const map: Record<string, string> = {
+      'opening_statements': 'phase_1_opening',
+      'evidence_presentation': 'phase_2_constructive',
+      'clarifying_questions': 'phase_3_crossexam',
+      'rebuttals': 'phase_4_rebuttal',
+      'closing_statements': 'phase_5_closing',
+      'synthesis': 'phase_6_synthesis',
+    };
+    return map[p] || p;
+  };
+
+  // Calculate duration in seconds
+  const durationMs = debate.totalDurationMs || 0;
+  const durationSeconds = Math.round(durationMs / 1000);
+
+  // Build transcript in the format expected by markdown exporter
+  return {
+    meta: {
+      schema_version: '2.0.0',
+      debate_id: debateId,
+      generated_at: new Date().toISOString(),
+      debate_format: 'standard',
+      total_duration_seconds: durationSeconds,
+      status: debate.status,
+    },
+    proposition: {
+      raw_input: debate.propositionText,
+      normalized_question: debate.propositionText,
+      context: debate.propositionContext ? JSON.stringify(debate.propositionContext) : undefined,
+    },
+    transcript: utterances.map((u) => ({
+      id: u.id,
+      timestamp_ms: u.timestampMs,
+      phase: mapPhase(u.phase),
+      speaker: mapSpeaker(u.speaker),
+      content: u.content,
+      metadata: u.metadata || {},
+    })),
+    structured_analysis: {
+      pro: null,
+      con: null,
+      moderator: null,
+    },
+    user_interventions: interventions.map((i) => ({
+      id: i.id,
+      timestamp_ms: i.timestampMs,
+      type: i.interventionType,
+      content: i.content,
+      metadata: {
+        directed_to: i.directedTo,
+        response: i.response,
+        response_timestamp_ms: i.responseTimestampMs,
+      },
+    })),
+  } as DebateTranscript;
+}
 
 // Initialize services
 const transcriptRecorder = createTranscriptRecorder(schemaValidator);
@@ -66,8 +152,13 @@ router.get('/exports/:debateId/markdown', async (req: Request, res: Response) =>
   logger.info({ debateId }, 'Markdown export requested');
 
   try {
-    // Load transcript from database
-    const transcript = await transcriptRecorder.loadTranscript(debateId!);
+    // Load transcript from database, or build on-the-fly if not saved
+    let transcript = await transcriptRecorder.loadTranscript(debateId!);
+
+    if (!transcript) {
+      logger.info({ debateId }, 'No saved transcript, building from utterances');
+      transcript = await buildTranscriptFromUtterances(debateId!);
+    }
 
     if (!transcript) {
       logger.warn({ debateId }, 'Transcript not found for export');
@@ -80,6 +171,11 @@ router.get('/exports/:debateId/markdown', async (req: Request, res: Response) =>
     }
 
     // Parse export options from query parameters
+    // Force includeTranscript=true when there's no structured analysis (e.g., lively mode debates)
+    const hasStructuredAnalysis = transcript.structured_analysis?.pro ||
+                                   transcript.structured_analysis?.con ||
+                                   transcript.structured_analysis?.moderator;
+
     const options: MarkdownExportOptions = {
       includeMetadata: req.query.includeMetadata !== 'false',
       includeProposition: req.query.includeProposition !== 'false',
@@ -87,7 +183,8 @@ router.get('/exports/:debateId/markdown', async (req: Request, res: Response) =>
       includeCon: req.query.includeCon !== 'false',
       includeModerator: req.query.includeModerator !== 'false',
       includeChallenges: req.query.includeChallenges === 'true',
-      includeTranscript: req.query.includeTranscript === 'true',
+      // Include transcript by default when there's no structured analysis
+      includeTranscript: req.query.includeTranscript === 'true' || !hasStructuredAnalysis,
       format: (req.query.format as 'standard' | 'compact') || 'standard',
     };
 
@@ -147,8 +244,13 @@ router.get('/exports/:debateId/preview', async (req: Request, res: Response) => 
   logger.info({ debateId }, 'Export preview requested');
 
   try {
-    // Load transcript from database
-    const transcript = await transcriptRecorder.loadTranscript(debateId!);
+    // Load transcript from database, or build on-the-fly if not saved
+    let transcript = await transcriptRecorder.loadTranscript(debateId!);
+
+    if (!transcript) {
+      logger.info({ debateId }, 'No saved transcript for preview, building from utterances');
+      transcript = await buildTranscriptFromUtterances(debateId!);
+    }
 
     if (!transcript) {
       logger.warn({ debateId }, 'Transcript not found for preview');
@@ -278,8 +380,13 @@ router.post('/exports/:debateId/audio', async (req: Request, res: Response) => {
       return;
     }
 
-    // Load transcript
-    const transcript = await transcriptRecorder.loadTranscript(debateId!);
+    // Load transcript, or build on-the-fly if not saved
+    let transcript = await transcriptRecorder.loadTranscript(debateId!);
+
+    if (!transcript) {
+      logger.info({ debateId }, 'No saved transcript for audio, building from utterances');
+      transcript = await buildTranscriptFromUtterances(debateId!);
+    }
 
     if (!transcript) {
       logger.warn({ debateId }, 'Transcript not found for audio export');

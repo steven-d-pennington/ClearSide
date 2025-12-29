@@ -1,0 +1,235 @@
+/**
+ * ReplayViewer Styles
+ *
+ * Step-through transcript viewer with featured card and navigation.
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-xl);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Progress Bar */
+.progressContainer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.progressBar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-fast);
+}
+
+.progressText {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Phase Indicator */
+.phaseIndicator {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Turn Card */
+.turnCard {
+  width: 100%;
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  border-left: 4px solid var(--color-border);
+  transition: border-color var(--transition-fast);
+}
+
+.turnCard.speakerPro {
+  border-left-color: var(--color-pro, #10b981);
+  background: linear-gradient(
+    to right,
+    rgba(16, 185, 129, 0.05),
+    transparent
+  );
+}
+
+.turnCard.speakerCon {
+  border-left-color: var(--color-con, #ef4444);
+  background: linear-gradient(
+    to right,
+    rgba(239, 68, 68, 0.05),
+    transparent
+  );
+}
+
+.turnCard.speakerModerator {
+  border-left-color: var(--color-moderator, #6366f1);
+  background: linear-gradient(
+    to right,
+    rgba(99, 102, 241, 0.05),
+    transparent
+  );
+}
+
+.turnHeader {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.speakerName {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.interruptedBadge {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.interjectionBadge {
+  animation: flash 1s ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes flash {
+  0% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.turnContent {
+  font-size: var(--font-size-md);
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+}
+
+.cutoff {
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-bold);
+}
+
+.turnMeta {
+  display: flex;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.turnNumber {
+  font-weight: var(--font-weight-medium);
+}
+
+/* Navigation */
+.navigation {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.navGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.navGroup svg {
+  flex-shrink: 0;
+}
+
+/* Keyboard Hints */
+.keyboardHints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.keyboardHints kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 0 var(--color-border);
+}
+
+/* Exit Container */
+.exitContainer {
+  margin-top: var(--spacing-md);
+}
+
+/* Empty State */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.empty p {
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .container {
+    padding: var(--spacing-md);
+  }
+
+  .turnCard {
+    padding: var(--spacing-lg);
+  }
+
+  .navigation {
+    flex-direction: column;
+  }
+
+  .navGroup {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .keyboardHints {
+    display: none; /* Hide on mobile - touch-based navigation */
+  }
+}

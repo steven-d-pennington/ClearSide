@@ -68,14 +68,16 @@ describe('Debate Flow Integration', () => {
     it('handles API errors gracefully', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
+        status: 500,
         statusText: 'Internal Server Error',
+        text: async () => 'Internal Server Error',
       });
 
       const { startDebate } = useDebateStore.getState();
       await startDebate('Test proposition');
 
       const state = useDebateStore.getState();
-      expect(state.error).toBe('Failed to start debate: Internal Server Error');
+      expect(state.error).toBe('Failed to start debate (500): Internal Server Error');
       expect(state.isLoading).toBe(false);
     });
   });

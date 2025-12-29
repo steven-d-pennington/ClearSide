@@ -38,7 +38,7 @@ function getMigrationFiles(): string[] {
   const migrationsDir = join(__dirname, 'migrations');
   try {
     const files = readdirSync(migrationsDir)
-      .filter((f) => f.endsWith('.sql'))
+      .filter((f) => f.endsWith('.sql') && !f.includes('rollback'))
       .sort();
     return files;
   } catch {

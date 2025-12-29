@@ -1,8 +1,12 @@
 # Backend Development Dockerfile
 FROM node:20-alpine
 
-# Install build dependencies for native modules
-RUN apk add --no-cache python3 make g++
+# Install build dependencies for native modules and Python packages
+# Use ffmpeg-libs for full codec support including lavfi filters
+RUN apk add --no-cache python3 py3-pip make g++ ffmpeg ffmpeg-libs
+
+# Install edge-tts Python package for free TTS
+RUN pip3 install --break-system-packages edge-tts
 
 WORKDIR /app
 

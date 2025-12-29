@@ -333,14 +333,114 @@ export class TranscriptRecorder {
         return null;
       }
 
+      // Normalize transcript format if needed (handle legacy format)
+      const rawTranscript = debate.transcriptJson as Record<string, unknown>;
+      const normalized = this.normalizeTranscriptFormat(rawTranscript, debate);
+
       logger.info({ debateId }, 'Transcript loaded successfully');
-      return debate.transcriptJson as unknown as DebateTranscript;
+      return normalized;
     } catch (error) {
       logger.error({ error, debateId }, 'Failed to load transcript');
       throw new Error(
         `Failed to load transcript: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  /**
+   * Normalize transcript format to match v2.0.0 schema
+   * Handles legacy formats that used different field structures
+   */
+  private normalizeTranscriptFormat(
+    raw: Record<string, unknown>,
+    debate: Debate
+  ): DebateTranscript {
+    // Check if already in v2.0.0 format (has proposition.normalized_question)
+    const rawProposition = raw.proposition as Record<string, unknown> | undefined;
+    if (rawProposition && typeof rawProposition.normalized_question === 'string') {
+      return raw as unknown as DebateTranscript;
+    }
+
+    // Legacy format: meta.proposition is a string, utterances instead of transcript
+    const meta = raw.meta as Record<string, unknown> | undefined;
+    const legacyProposition = meta?.proposition as string | undefined;
+
+    // Build normalized transcript
+    const normalizedTranscript: DebateTranscript = {
+      meta: {
+        schema_version: '2.0.0',
+        debate_id: debate.id,
+        generated_at: new Date().toISOString(),
+        debate_format: 'live_theater',
+        total_duration_seconds: Math.floor((debate.totalDurationMs || 0) / 1000),
+        status: debate.status,
+      },
+      proposition: {
+        raw_input: debate.propositionText,
+        normalized_question: legacyProposition || debate.propositionText,
+        context: debate.propositionContext ? JSON.stringify(debate.propositionContext) : undefined,
+      },
+      transcript: this.normalizeUtterances(raw.utterances as unknown[]),
+      structured_analysis: this.buildEmptyStructuredAnalysis(),
+      user_interventions: this.normalizeInterventions(raw.interventions as unknown[]),
+    };
+
+    return normalizedTranscript;
+  }
+
+  /**
+   * Normalize utterances from legacy format
+   */
+  private normalizeUtterances(utterances: unknown[] | undefined): TranscriptUtterance[] {
+    if (!utterances || !Array.isArray(utterances)) {
+      return [];
+    }
+
+    return utterances.map((u: unknown) => {
+      const utt = u as Record<string, unknown>;
+      return {
+        id: String(utt.id || ''),
+        timestamp_ms: (utt.timestamp_ms as number) || (utt.timestampMs as number) || 0,
+        phase: this.mapPhaseToSchema((utt.phase as DebatePhase) || 'opening_statements'),
+        speaker: this.mapSpeakerToSchema((utt.speaker as string) || 'moderator'),
+        content: (utt.content as string) || '',
+        metadata: utt.metadata as Record<string, unknown> | undefined,
+      };
+    });
+  }
+
+  /**
+   * Normalize interventions from legacy format
+   */
+  private normalizeInterventions(interventions: unknown[] | undefined): TranscriptIntervention[] {
+    if (!interventions || !Array.isArray(interventions)) {
+      return [];
+    }
+
+    return interventions.map((i: unknown) => {
+      const int = i as Record<string, unknown>;
+      return {
+        id: String(int.id || ''),
+        timestamp_ms: (int.timestamp_ms as number) || (int.timestampMs as number) || 0,
+        phase: 'phase_1_opening', // Placeholder - legacy format doesn't track phase
+        type: ((int.intervention_type as string) || (int.type as string) || 'question'),
+        content: (int.content as string) || '',
+        directed_to: (int.directed_to as string) || (int.directedTo as string) || 'moderator',
+        response: int.response as string | undefined,
+        response_timestamp_ms: (int.response_timestamp_ms as number) || (int.responseTimestampMs as number) || undefined,
+      };
+    });
+  }
+
+  /**
+   * Build empty structured analysis for legacy transcripts
+   */
+  private buildEmptyStructuredAnalysis(): StructuredAnalysis {
+    return {
+      pro: { executive_summary: 'Legacy transcript - no analysis available', arguments: [], assumptions: [], uncertainties: [] },
+      con: { executive_summary: 'Legacy transcript - no analysis available', arguments: [], assumptions: [], uncertainties: [] },
+      moderator: { areas_of_agreement: [], core_disagreements: [], assumption_conflicts: [], evidence_gaps: [], decision_hinges: [] },
+    };
   }
 
   /**
@@ -406,14 +506,19 @@ export class TranscriptRecorder {
   /**
    * Map database speaker to schema speaker
    */
-  private mapSpeakerToSchema(dbSpeaker: Speaker): string {
-    const speakerMap: Record<Speaker, string> = {
+  private mapSpeakerToSchema(dbSpeaker: Speaker | string): string {
+    const speakerMap: Record<string, string> = {
       pro_advocate: 'pro',
       con_advocate: 'con',
       moderator: 'moderator',
       user: 'system',
+      // Handle legacy formats that might use different keys
+      PRO: 'pro',
+      CON: 'con',
+      MODERATOR: 'moderator',
+      USER: 'system',
     };
-    return speakerMap[dbSpeaker] || dbSpeaker;
+    return speakerMap[dbSpeaker] || String(dbSpeaker);
   }
 
   /**

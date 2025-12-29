@@ -25,7 +25,18 @@ export type SSEEventType =
   | 'continuing'             // Step mode: user clicked continue, resuming
   | 'complete'               // Debate completed
   | 'debate_complete'        // Debate completed (alternative)
-  | 'error';                 // Error occurred during debate
+  | 'error'                  // Error occurred during debate
+  // Lively mode events
+  | 'speaker_started'        // Speaker takes the floor in lively mode
+  | 'speaker_cutoff'         // Speaker was interrupted mid-utterance
+  | 'token_chunk'            // Streaming token chunk for live display
+  | 'interrupt_scheduled'    // Interrupt is queued, UI shows anticipation
+  | 'interrupt_fired'        // Interrupt happens, interrupter takes floor
+  | 'interrupt_cancelled'    // Scheduled interrupt was cancelled
+  | 'interjection'           // Short 1-2 sentence interrupt content
+  | 'speaking_resumed'       // Original speaker continues after interjection
+  | 'lively_mode_started'    // Debate switched to lively mode
+  | 'pacing_change';         // Pacing parameter changed mid-debate
 
 /**
  * SSE Client
@@ -133,4 +144,99 @@ export interface ErrorEventData {
   error: string;
   code?: string;
   timestamp: string;
+}
+
+// ============================================================================
+// Lively Mode Event Payloads
+// ============================================================================
+
+/** Speaker started event payload (lively mode) */
+export interface SpeakerStartedEventData {
+  debateId: string;
+  speaker: string;
+  phase: string;
+  timestampMs: number;
+  expectedDurationMs?: number;
+}
+
+/** Speaker cutoff event payload (lively mode) */
+export interface SpeakerCutoffEventData {
+  debateId: string;
+  cutoffSpeaker: string;
+  interruptedBy: string;
+  atTokenPosition: number;
+  partialContent: string;
+  timestampMs: number;
+}
+
+/** Token chunk event payload (lively mode streaming) */
+export interface TokenChunkEventData {
+  debateId: string;
+  speaker: string;
+  chunk: string;
+  tokenPosition: number;
+  timestampMs: number;
+}
+
+/** Interrupt scheduled event payload (lively mode) */
+export interface InterruptScheduledEventData {
+  debateId: string;
+  interrupter: string;
+  currentSpeaker: string;
+  scheduledForMs: number;
+  relevanceScore: number;
+  triggerPhrase?: string;
+}
+
+/** Interrupt fired event payload (lively mode) */
+export interface InterruptFiredEventData {
+  debateId: string;
+  interrupter: string;
+  interruptedSpeaker: string;
+  timestampMs: number;
+}
+
+/** Interrupt cancelled event payload (lively mode) */
+export interface InterruptCancelledEventData {
+  debateId: string;
+  interrupter: string;
+  reason: string;
+  timestampMs: number;
+}
+
+/** Interjection event payload (lively mode) */
+export interface InterjectionEventData {
+  id: number;
+  debateId: string;
+  speaker: string;
+  content: string;
+  timestampMs: number;
+  isInterjection: true;
+}
+
+/** Speaking resumed event payload (lively mode) */
+export interface SpeakingResumedEventData {
+  debateId: string;
+  speaker: string;
+  resumeFromToken: number;
+  timestampMs: number;
+}
+
+/** Lively mode started event payload */
+export interface LivelyModeStartedEventData {
+  debateId: string;
+  settings: {
+    aggressionLevel: number;
+    pacingMode: string;
+    maxInterruptsPerMinute: number;
+  };
+  timestampMs: number;
+}
+
+/** Pacing change event payload */
+export interface PacingChangeEventData {
+  debateId: string;
+  previousPacing: string;
+  newPacing: string;
+  timestampMs: number;
 }

@@ -7,9 +7,12 @@ import { Alert } from '../ui/Alert';
 import { CharacterCount } from './CharacterCount';
 import { ConfigPanel } from '../ConfigPanel/ConfigPanel';
 import { PersonaSelector } from './PersonaSelector';
+import { DebateModeSelector } from './DebateModeSelector';
 import type { FlowMode } from '../../types/debate';
 import type { DebateConfiguration, PersonaSelection } from '../../types/configuration';
 import { DEFAULT_CONFIGURATION, DEFAULT_PERSONA_SELECTION } from '../../types/configuration';
+import type { DebateMode, LivelySettingsInput } from '../../types/lively';
+import { DEFAULT_LIVELY_SETTINGS } from '../../types/lively';
 import styles from './InputForm.module.css';
 
 interface InputFormProps {
@@ -24,6 +27,8 @@ interface FormState {
   flowMode: FlowMode;
   configuration: DebateConfiguration;
   personaSelection: PersonaSelection;
+  debateMode: DebateMode;
+  livelySettings: LivelySettingsInput;
 }
 
 interface ValidationErrors {
@@ -43,6 +48,8 @@ export const InputForm: React.FC<InputFormProps> = ({
     flowMode: 'auto',
     configuration: DEFAULT_CONFIGURATION,
     personaSelection: DEFAULT_PERSONA_SELECTION,
+    debateMode: 'turn_based',
+    livelySettings: DEFAULT_LIVELY_SETTINGS,
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -125,6 +132,20 @@ export const InputForm: React.FC<InputFormProps> = ({
   }, []);
 
   /**
+   * Handle debate mode change
+   */
+  const handleDebateModeChange = useCallback((mode: DebateMode) => {
+    setFormState((prev) => ({ ...prev, debateMode: mode }));
+  }, []);
+
+  /**
+   * Handle lively settings change
+   */
+  const handleLivelySettingsChange = useCallback((settings: LivelySettingsInput) => {
+    setFormState((prev) => ({ ...prev, livelySettings: settings }));
+  }, []);
+
+  /**
    * Handle paste event - suggest context field for long pastes
    */
   const handleQuestionPaste = useCallback(
@@ -186,8 +207,8 @@ export const InputForm: React.FC<InputFormProps> = ({
         console.log('🔵 Starting debate with proposition:', proposition, 'flowMode:', formState.flowMode);
         console.log('🔵 Configuration:', formState.configuration);
 
-        // Build start options including configuration and personas
-        const { configuration, personaSelection } = formState;
+        // Build start options including configuration, personas, and debate mode
+        const { configuration, personaSelection, debateMode, livelySettings } = formState;
         await startDebate(proposition, {
           flowMode: formState.flowMode,
           presetMode: configuration.presetMode,
@@ -197,6 +218,8 @@ export const InputForm: React.FC<InputFormProps> = ({
           requireCitations: configuration.requireCitations,
           proPersonaId: personaSelection.proPersonaId,
           conPersonaId: personaSelection.conPersonaId,
+          debateMode,
+          livelySettings: debateMode === 'lively' ? livelySettings : undefined,
         });
         console.log('🔵 startDebate returned');
 
@@ -301,7 +324,17 @@ export const InputForm: React.FC<InputFormProps> = ({
         </div>
       )}
 
-      {/* Flow Mode Selector */}
+      {/* Debate Mode Selector */}
+      <DebateModeSelector
+        mode={formState.debateMode}
+        settings={formState.livelySettings}
+        onModeChange={handleDebateModeChange}
+        onSettingsChange={handleLivelySettingsChange}
+        disabled={isLoading}
+      />
+
+      {/* Flow Mode Selector (only for turn-based mode) */}
+      {formState.debateMode === 'turn_based' && (
       <div className={styles.flowModeSelector}>
         <span className={styles.flowModeLabel}>Debate Flow:</span>
         <div className={styles.flowModeOptions}>
@@ -335,6 +368,7 @@ export const InputForm: React.FC<InputFormProps> = ({
           </label>
         </div>
       </div>
+      )}
 
       {/* Configuration Panel */}
       <ConfigPanel

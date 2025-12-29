@@ -205,6 +205,7 @@ export class ScriptGenerator {
 
   /**
    * Generate segments for a specific phase
+   * Now includes interruption-aware prosody for lively debates
    */
   private generatePhaseSegments(
     transcript: DebateTranscript,
@@ -226,12 +227,21 @@ export class ScriptGenerator {
       const voiceType = this.mapSpeakerToVoice(utterance.speaker);
       const speakerName = SPEAKER_NAMES[utterance.speaker] || utterance.speaker;
 
+      // Extract interruption metadata for TTS prosody
+      const metadata = utterance.metadata || {};
+      const interruptionContext = {
+        wasInterrupted: !!metadata.wasInterrupted,
+        isInterjection: !!metadata.isInterjection,
+        interruptionEnergy: (metadata.interruptionEnergy as number) || 3,
+      };
+
       const segment = this.createSegment(
         utterance.content,
         voiceType,
         phase,
         speakerName,
-        i
+        i,
+        interruptionContext
       );
 
       segments.push(segment);
@@ -377,19 +387,25 @@ export class ScriptGenerator {
 
   /**
    * Create an audio segment with SSML formatting
+   * Supports interruption-aware prosody for lively debates
    */
   private createSegment(
     text: string,
     voiceType: VoiceType,
     phase: string,
     speakerName: string,
-    index: number
+    index: number,
+    interruptionContext?: {
+      wasInterrupted: boolean;
+      isInterjection: boolean;
+      interruptionEnergy: number;
+    }
   ): AudioSegment {
     // Clean and prepare text
     const cleanText = this.cleanText(text);
 
-    // Generate SSML with natural prosody
-    const ssml = this.generateSSML(cleanText, voiceType);
+    // Generate SSML with natural prosody (including interruption awareness)
+    const ssml = this.generateSSML(cleanText, voiceType, interruptionContext);
 
     // Estimate duration
     const estimatedDuration = this.estimateDuration(cleanText);
@@ -405,27 +421,45 @@ export class ScriptGenerator {
         index,
         speakerName,
         estimatedDuration,
+        // Include interruption info for downstream processing
+        wasInterrupted: interruptionContext?.wasInterrupted,
+        isInterjection: interruptionContext?.isInterjection,
+        interruptionEnergy: interruptionContext?.interruptionEnergy,
       },
     };
   }
 
   /**
    * Generate SSML for natural speech
+   * Supports interruption-aware prosody for realistic podcast audio
    */
-  private generateSSML(text: string, voiceType: VoiceType): string {
-    // Add appropriate prosody based on voice type
-    const prosodySettings = this.getProsodySettings(voiceType);
+  private generateSSML(
+    text: string,
+    voiceType: VoiceType,
+    interruptionContext?: {
+      wasInterrupted: boolean;
+      isInterjection: boolean;
+      interruptionEnergy: number;
+    }
+  ): string {
+    // Add appropriate prosody based on voice type and interruption context
+    const prosodySettings = this.getProsodySettings(voiceType, interruptionContext);
 
     // Split into sentences for better pacing
     const sentences = text.split(/(?<=[.!?])\s+/);
 
-    const ssmlContent = sentences
+    let ssmlContent = sentences
       .map((sentence) => {
         // Add emphasis to key phrases
         const emphasized = this.addEmphasis(sentence.trim());
         return emphasized;
       })
       .join('<break time="300ms"/>');
+
+    // For interrupted speech, trail off at the end
+    if (interruptionContext?.wasInterrupted) {
+      ssmlContent += '<break time="100ms"/>';
+    }
 
     return `<speak>
   <prosody rate="${prosodySettings.rate}" pitch="${prosodySettings.pitch}">
@@ -435,23 +469,63 @@ export class ScriptGenerator {
   }
 
   /**
-   * Get prosody settings for voice type
+   * Get prosody settings for voice type with interruption-aware adjustments
+   * Interjections get faster rate and higher pitch based on energy level
    */
   private getProsodySettings(
-    voiceType: VoiceType
+    voiceType: VoiceType,
+    interruptionContext?: {
+      wasInterrupted: boolean;
+      isInterjection: boolean;
+      interruptionEnergy: number;
+    }
   ): { rate: string; pitch: string } {
+    // Base prosody by voice type
+    let baseRate = 'medium';
+    let basePitch = '+0%';
+
     switch (voiceType) {
       case 'pro':
-        return { rate: 'medium', pitch: '+0%' };
+        baseRate = 'medium';
+        basePitch = '+0%';
+        break;
       case 'con':
-        return { rate: 'medium', pitch: '+0%' };
+        baseRate = 'medium';
+        basePitch = '+0%';
+        break;
       case 'moderator':
-        return { rate: 'slow', pitch: '-5%' };
+        baseRate = 'slow';
+        basePitch = '-5%';
+        break;
       case 'narrator':
-        return { rate: 'medium', pitch: '+0%' };
-      default:
-        return { rate: 'medium', pitch: '+0%' };
+        baseRate = 'medium';
+        basePitch = '+0%';
+        break;
     }
+
+    // Adjust for interruption context
+    if (interruptionContext?.isInterjection) {
+      // Interjections are more energetic - faster rate, higher pitch
+      const energy = interruptionContext.interruptionEnergy || 3;
+
+      // Map energy 1-5 to rate adjustments
+      // Energy 1-2: medium, 3: fast, 4-5: x-fast
+      if (energy >= 4) {
+        baseRate = 'fast';
+      } else if (energy >= 3) {
+        baseRate = 'medium';
+      }
+
+      // Map energy to pitch increase (+2% to +10%)
+      const pitchIncrease = energy * 2;
+      basePitch = `+${pitchIncrease}%`;
+    } else if (interruptionContext?.wasInterrupted) {
+      // Speaker was cut off - slightly slower at end (trailing off)
+      baseRate = 'medium';
+      // Keep original pitch
+    }
+
+    return { rate: baseRate, pitch: basePitch };
   }
 
   /**

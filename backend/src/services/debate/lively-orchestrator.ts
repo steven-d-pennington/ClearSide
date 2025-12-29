@@ -1,0 +1,1095 @@
+/**
+ * Lively Debate Orchestrator
+ *
+ * Specialized orchestrator for "Lively Debate" mode with interruptions.
+ * Coordinates between LivelyScheduler, InterruptionEngine, agents, and SSE.
+ *
+ * Key differences from standard DebateOrchestrator:
+ * - Streams tokens in real-time (not waiting for full response)
+ * - Evaluates for interrupts during generation
+ * - Fires interjections at safe boundaries
+ * - Manages concurrent speaker states
+ */
+
+import pino from 'pino';
+import { DebatePhase, Speaker } from '../../types/debate.js';
+import type { DebateStateMachine } from './state-machine.js';
+import type { TurnManager } from './turn-manager.js';
+import type { SSEManager } from '../sse/sse-manager.js';
+import type {
+  ProAdvocateAgent,
+  ConAdvocateAgent,
+  ModeratorAgent,
+  OrchestratorAgent,
+  AgentContext,
+} from '../agents/types.js';
+import type { Turn } from '../../types/orchestrator.js';
+import type { LivelySettings } from '../../types/lively.js';
+import { LivelyScheduler, createLivelyScheduler } from './lively-scheduler.js';
+import {
+  InterruptionEngine,
+  createInterruptionEngine,
+  type EvaluationContext,
+} from './interruption-engine.js';
+import * as livelyRepo from '../../db/repositories/lively-repository.js';
+import * as debateRepo from '../../db/repositories/debate-repository.js';
+import * as utteranceRepo from '../../db/repositories/utterance-repository.js';
+import * as interventionRepo from '../../db/repositories/intervention-repository.js';
+import { LLMClient } from '../llm/client.js';
+import type { CreateUtteranceInput } from '../../types/database.js';
+import type { DebatePhase as DbDebatePhase, Speaker as DbSpeaker } from '../../types/database.js';
+
+const logger = pino({
+  name: 'lively-orchestrator',
+  level: process.env.LOG_LEVEL || 'info',
+});
+
+/**
+ * Context for interrupted utterances and interjections
+ * Used by TTS to create realistic podcast audio
+ */
+interface InterruptionContext {
+  // For interrupted utterances
+  wasInterrupted: boolean;
+  interruptedBy?: Speaker;
+  interruptedAtToken?: number;
+  completionPercentage?: number;
+
+  // For interjections
+  interruptionId?: number;
+  interruptedSpeaker?: Speaker;
+  triggerPhrase?: string;
+  interruptionEnergy: number; // 1-5 scale
+}
+
+/**
+ * Configuration for lively orchestrator
+ */
+export interface LivelyOrchestratorConfig {
+  /** Debate ID */
+  debateId: string;
+  /** Proposition text */
+  proposition: string;
+  /** Lively mode settings */
+  settings: LivelySettings;
+  /** Token chunk size for streaming */
+  tokenChunkSize?: number;
+  /** Evaluation interval for interrupts (ms) */
+  evaluationIntervalMs?: number;
+  /** Whether to broadcast SSE events */
+  broadcastEvents?: boolean;
+}
+
+/**
+ * Map state machine speaker to database speaker
+ */
+function mapSpeakerToDb(speaker: Speaker): DbSpeaker {
+  const speakerMap: Record<Speaker, DbSpeaker> = {
+    [Speaker.PRO]: 'pro_advocate',
+    [Speaker.CON]: 'con_advocate',
+    [Speaker.MODERATOR]: 'moderator',
+    [Speaker.SYSTEM]: 'moderator',
+  };
+  return speakerMap[speaker];
+}
+
+/**
+ * Map state machine phase to database phase
+ */
+function mapPhaseToDb(phase: DebatePhase): DbDebatePhase {
+  const phaseMap: Record<string, DbDebatePhase> = {
+    [DebatePhase.PHASE_1_OPENING]: 'opening_statements',
+    [DebatePhase.PHASE_2_CONSTRUCTIVE]: 'evidence_presentation',
+    [DebatePhase.PHASE_3_CROSSEXAM]: 'clarifying_questions',
+    [DebatePhase.PHASE_4_REBUTTAL]: 'rebuttals',
+    [DebatePhase.PHASE_5_CLOSING]: 'closing_statements',
+    [DebatePhase.PHASE_6_SYNTHESIS]: 'synthesis',
+  };
+  return phaseMap[phase] || 'opening_statements';
+}
+
+/**
+ * Lively Debate Orchestrator Class
+ */
+export class LivelyDebateOrchestrator {
+  private readonly debateId: string;
+  private readonly proposition: string;
+  private readonly settings: LivelySettings;
+  private readonly scheduler: LivelyScheduler;
+  private readonly interruptionEngine: InterruptionEngine;
+  private readonly sseManager: SSEManager;
+  private readonly stateMachine: DebateStateMachine;
+  private readonly turnManager: TurnManager;
+  private readonly llmClient: LLMClient;
+  private readonly agents: {
+    pro: ProAdvocateAgent;
+    con: ConAdvocateAgent;
+    moderator: ModeratorAgent;
+    orchestrator: OrchestratorAgent;
+  };
+
+  private readonly broadcastEvents: boolean;
+  private readonly evaluationIntervalMs: number;
+
+  private startTimeMs: number = 0;
+  private isRunning: boolean = false;
+  private isPaused: boolean = false;
+  private lastEvaluationMs: number = 0;
+
+  // Track last interruption context for passing to saveUtterance
+  private lastInterruptionContext: InterruptionContext | null = null;
+
+  constructor(
+    config: LivelyOrchestratorConfig,
+    sseManager: SSEManager,
+    stateMachine: DebateStateMachine,
+    turnManager: TurnManager,
+    agents: {
+      pro: ProAdvocateAgent;
+      con: ConAdvocateAgent;
+      moderator: ModeratorAgent;
+      orchestrator: OrchestratorAgent;
+    },
+    llmClient?: LLMClient
+  ) {
+    this.debateId = config.debateId;
+    this.proposition = config.proposition;
+    this.settings = config.settings;
+    this.sseManager = sseManager;
+    this.stateMachine = stateMachine;
+    this.turnManager = turnManager;
+    this.agents = agents;
+    this.llmClient = llmClient ?? new LLMClient();
+
+    this.broadcastEvents = config.broadcastEvents ?? true;
+    this.evaluationIntervalMs = config.evaluationIntervalMs ?? 1000;
+
+    // Create lively components
+    this.scheduler = createLivelyScheduler(config.settings);
+    this.interruptionEngine = createInterruptionEngine(
+      config.debateId,
+      config.settings,
+      this.llmClient
+    );
+
+    // Wire up scheduler events
+    this.setupSchedulerEvents();
+    this.setupInterruptionEvents();
+
+    logger.info(
+      { debateId: this.debateId, settings: config.settings },
+      'LivelyDebateOrchestrator created'
+    );
+  }
+
+  /**
+   * Start lively debate execution
+   */
+  async start(): Promise<void> {
+    logger.info({ debateId: this.debateId }, 'Starting lively debate');
+
+    this.startTimeMs = Date.now();
+    this.isRunning = true;
+    this.scheduler.start(this.startTimeMs);
+
+    // Broadcast lively mode started
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'lively_mode_started', {
+        debateId: this.debateId,
+        settings: {
+          aggressionLevel: this.settings.aggressionLevel,
+          pacingMode: this.settings.pacingMode,
+          maxInterruptsPerMinute: this.settings.maxInterruptsPerMinute,
+        },
+        timestampMs: this.getElapsedMs(),
+      });
+    }
+
+    // Update database
+    await livelyRepo.updateDebateMode(this.debateId, 'lively');
+
+    // Execute all phases in lively mode
+    await this.executeAllPhasesLively();
+
+    this.isRunning = false;
+    this.scheduler.stop();
+
+    // Build and save transcript
+    const transcript = await this.buildFinalTranscript();
+    await debateRepo.saveTranscript(this.debateId, transcript as unknown as Record<string, unknown>);
+
+    // Mark debate as completed in database
+    await debateRepo.complete(this.debateId);
+
+    // Broadcast completion event
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'debate_complete', {
+        debateId: this.debateId,
+        completedAt: new Date().toISOString(),
+        totalDurationMs: this.getElapsedMs(),
+        debateMode: 'lively',
+      });
+    }
+
+    logger.info({ debateId: this.debateId }, 'Lively debate completed');
+  }
+
+  /**
+   * Pause the debate
+   */
+  pause(): void {
+    this.isPaused = true;
+    logger.info({ debateId: this.debateId }, 'Lively debate paused');
+  }
+
+  /**
+   * Resume the debate
+   */
+  resume(): void {
+    this.isPaused = false;
+    logger.info({ debateId: this.debateId }, 'Lively debate resumed');
+  }
+
+  /**
+   * Stop the debate
+   */
+  stop(): void {
+    this.isRunning = false;
+    this.scheduler.stop();
+    logger.info({ debateId: this.debateId }, 'Lively debate stopped');
+  }
+
+  // ===========================================================================
+  // Phase Execution
+  // ===========================================================================
+
+  /**
+   * Execute all phases with lively mode handling
+   */
+  private async executeAllPhasesLively(): Promise<void> {
+    const phases = [
+      DebatePhase.PHASE_1_OPENING,
+      DebatePhase.PHASE_2_CONSTRUCTIVE,
+      DebatePhase.PHASE_3_CROSSEXAM,
+      DebatePhase.PHASE_4_REBUTTAL,
+      DebatePhase.PHASE_5_CLOSING,
+      DebatePhase.PHASE_6_SYNTHESIS,
+    ];
+
+    for (const phase of phases) {
+      if (!this.isRunning) break;
+
+      while (this.isPaused) {
+        await this.sleep(100);
+      }
+
+      await this.executePhaseLively(phase);
+    }
+  }
+
+  /**
+   * Execute a single phase with interruption support
+   */
+  private async executePhaseLively(phase: DebatePhase): Promise<void> {
+    logger.info({ debateId: this.debateId, phase }, 'Starting lively phase');
+
+    const plan = this.turnManager.getPhaseExecutionPlan(phase);
+
+    // Broadcast phase start
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'phase_start', {
+        phase,
+        phaseName: plan.metadata.name,
+        turnCount: plan.turns.length,
+        debateMode: 'lively',
+      });
+    }
+
+    // Execute turns with interrupt handling
+    for (const turn of plan.turns) {
+      if (!this.isRunning) break;
+
+      while (this.isPaused) {
+        await this.sleep(100);
+      }
+
+      await this.executeTurnLively(turn, phase);
+    }
+
+    // Broadcast phase complete
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'phase_complete', {
+        phase,
+        phaseName: plan.metadata.name,
+      });
+    }
+  }
+
+  /**
+   * Execute a turn with token streaming and interrupt evaluation
+   */
+  private async executeTurnLively(turn: Turn, phase: DebatePhase): Promise<void> {
+    logger.debug({ turn, phase }, 'Executing lively turn');
+
+    const speaker = turn.speaker;
+    const startMs = this.getElapsedMs();
+
+    // Reset interruption context at start of turn
+    this.lastInterruptionContext = null;
+
+    // Start speaker in scheduler
+    this.scheduler.startSpeaker(speaker);
+
+    // Broadcast speaker started
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'speaker_started', {
+        debateId: this.debateId,
+        speaker: mapSpeakerToDb(speaker),
+        phase: mapPhaseToDb(phase),
+        timestampMs: startMs,
+      });
+    }
+
+    // Update active speaker in database
+    await livelyRepo.updateActiveSpeaker(this.debateId, speaker, startMs);
+
+    try {
+      // Build context and generate with streaming
+      const context = await this.buildAgentContext(speaker);
+      const fullContent = await this.generateWithInterrupts(speaker, turn, context, phase);
+
+      // End speaker turn
+      this.scheduler.endSpeaker();
+
+      // Capture interruption context before saving (for logging)
+      // Type assertion needed because TypeScript can't track async flow through fireInterrupt()
+      const interruptionContext = this.lastInterruptionContext as InterruptionContext | null;
+      const wasInterrupted = interruptionContext?.wasInterrupted ?? false;
+
+      // Save utterance to database with interruption context if this speaker was interrupted
+      await this.saveUtterance(speaker, phase, fullContent, turn, interruptionContext);
+
+      // Reset context after saving
+      this.lastInterruptionContext = null;
+
+      logger.debug({
+        speaker,
+        contentLength: fullContent.length,
+        wasInterrupted,
+      }, 'Turn complete');
+
+    } catch (error) {
+      logger.error({ speaker, error }, 'Turn execution failed');
+      this.scheduler.endSpeaker();
+      this.lastInterruptionContext = null;
+      throw error;
+    }
+  }
+
+  /**
+   * Generate content with streaming and interrupt evaluation
+   */
+  private async generateWithInterrupts(
+    speaker: Speaker,
+    turn: Turn,
+    context: AgentContext,
+    phase: DebatePhase
+  ): Promise<string> {
+    // For now, use the standard agent call (non-streaming)
+    // TODO: Implement true token streaming when LLM client supports it
+    const content = await this.callAgent(speaker, turn.promptType, context);
+
+    // Store total expected length for accurate completion percentage
+    const totalExpectedLength = content.length;
+
+    // Simulate streaming by chunking the response
+    const chunks = this.chunkContent(content);
+    let fullContent = '';
+
+    for (const chunk of chunks) {
+      if (!this.isRunning) break;
+
+      // Process chunk through scheduler
+      fullContent += chunk;
+      const boundaryDetected = this.scheduler.processTokenChunk(chunk);
+
+      // Broadcast token chunk
+      if (this.broadcastEvents) {
+        this.sseManager.broadcastToDebate(this.debateId, 'token_chunk', {
+          debateId: this.debateId,
+          speaker: mapSpeakerToDb(speaker),
+          chunk,
+          tokenPosition: this.scheduler.getTokenPosition(),
+          timestampMs: this.getElapsedMs(),
+        });
+      }
+
+      // Evaluate for interrupts periodically
+      const now = Date.now();
+      if (now - this.lastEvaluationMs >= this.evaluationIntervalMs) {
+        await this.evaluateForInterrupt(speaker, fullContent, phase);
+        this.lastEvaluationMs = now;
+      }
+
+      // If interrupt is pending and boundary detected, fire it
+      if (boundaryDetected && this.interruptionEngine.hasPendingInterrupt()) {
+        const interrupted = await this.fireInterrupt(speaker, fullContent, phase, totalExpectedLength);
+        if (interrupted) {
+          // Speaker was interrupted - content is partial
+          return fullContent;
+        }
+      }
+
+      // Small delay to simulate streaming
+      await this.sleep(50);
+    }
+
+    return fullContent;
+  }
+
+  /**
+   * Evaluate current content for potential interrupts
+   */
+  private async evaluateForInterrupt(
+    currentSpeaker: Speaker,
+    content: string,
+    _phase: DebatePhase
+  ): Promise<void> {
+    if (!this.scheduler.canInterrupt()) {
+      return;
+    }
+
+    // Determine other participants
+    const otherParticipants = this.getOtherParticipants(currentSpeaker);
+
+    const evalContext: EvaluationContext = {
+      debateId: this.debateId,
+      topic: this.proposition,
+      currentSpeaker,
+      otherParticipants,
+      recentContent: content.slice(-500), // Last 500 chars
+      debateElapsedMs: this.getElapsedMs(),
+    };
+
+    const candidate = await this.interruptionEngine.evaluateForInterrupt(evalContext);
+
+    if (candidate) {
+      // Schedule interrupt for next boundary
+      await this.interruptionEngine.scheduleInterrupt(
+        candidate,
+        this.getElapsedMs(),
+        currentSpeaker
+      );
+
+      // Broadcast interrupt scheduled
+      if (this.broadcastEvents) {
+        this.sseManager.broadcastToDebate(this.debateId, 'interrupt_scheduled', {
+          debateId: this.debateId,
+          interrupter: mapSpeakerToDb(candidate.speaker),
+          currentSpeaker: mapSpeakerToDb(currentSpeaker),
+          scheduledForMs: this.getElapsedMs(),
+          relevanceScore: candidate.relevanceScore,
+          triggerPhrase: candidate.triggerPhrase,
+        });
+      }
+    }
+  }
+
+  /**
+   * Fire a scheduled interrupt
+   * Stores interruption context for the interrupted utterance and saves interjection with context
+   */
+  private async fireInterrupt(
+    interruptedSpeaker: Speaker,
+    partialContent: string,
+    phase: DebatePhase,
+    totalExpectedLength?: number
+  ): Promise<boolean> {
+    const candidate = this.interruptionEngine.getPendingCandidate();
+    if (!candidate) {
+      return false;
+    }
+
+    const firedAtMs = this.getElapsedMs();
+    const atToken = this.scheduler.getTokenPosition();
+
+    // Calculate completion percentage (estimate based on typical response length if not provided)
+    const expectedLength = totalExpectedLength || 1000; // Default estimate
+    const completionPercentage = Math.round((partialContent.length / expectedLength) * 100);
+
+    // Calculate interruption energy based on aggression level and relevance score
+    // Scale: 1=mild, 5=sharp
+    const baseEnergy = Math.min(this.settings.aggressionLevel, 5);
+    const relevanceBoost = (candidate.relevanceScore || 0.5) > 0.8 ? 1 : 0;
+    const interruptionEnergy = Math.min(baseEnergy + relevanceBoost, 5);
+
+    // Store context for the interrupted utterance (will be used in executeTurnLively)
+    this.lastInterruptionContext = {
+      wasInterrupted: true,
+      interruptedBy: candidate.speaker,
+      interruptedAtToken: atToken,
+      completionPercentage,
+      interruptedSpeaker,
+      triggerPhrase: candidate.triggerPhrase,
+      interruptionEnergy,
+    };
+
+    // Broadcast speaker cutoff
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'speaker_cutoff', {
+        debateId: this.debateId,
+        cutoffSpeaker: mapSpeakerToDb(interruptedSpeaker),
+        interruptedBy: mapSpeakerToDb(candidate.speaker),
+        atTokenPosition: atToken,
+        partialContent: partialContent.slice(-100),
+        timestampMs: firedAtMs,
+        completionPercentage,
+      });
+    }
+
+    // Mark speaker as interrupted
+    this.scheduler.markInterrupted(interruptedSpeaker);
+
+    // Build context for interjection
+    const evalContext: EvaluationContext = {
+      debateId: this.debateId,
+      topic: this.proposition,
+      currentSpeaker: candidate.speaker,
+      otherParticipants: [interruptedSpeaker],
+      recentContent: partialContent,
+      debateElapsedMs: firedAtMs,
+    };
+
+    // Fire the interrupt and generate interjection
+    const result = await this.interruptionEngine.fireInterrupt(
+      evalContext,
+      atToken,
+      firedAtMs
+    );
+
+    if (!result) {
+      // Reset context if interrupt failed
+      this.lastInterruptionContext = null;
+      return false;
+    }
+
+    // Update context with interruption ID from database
+    this.lastInterruptionContext.interruptionId = result.interruption.id;
+
+    // Broadcast interrupt fired
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'interrupt_fired', {
+        debateId: this.debateId,
+        interrupter: mapSpeakerToDb(candidate.speaker),
+        interruptedSpeaker: mapSpeakerToDb(interruptedSpeaker),
+        timestampMs: firedAtMs,
+        interruptionEnergy,
+      });
+    }
+
+    // Broadcast the interjection
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'interjection', {
+        id: result.interruption.id,
+        debateId: this.debateId,
+        speaker: mapSpeakerToDb(candidate.speaker),
+        content: result.interjection,
+        timestampMs: firedAtMs,
+        isInterjection: true,
+        interruptionEnergy,
+      });
+    }
+
+    // Build interjection context
+    const interjectionContext: InterruptionContext = {
+      wasInterrupted: false, // This is the interjection, not the interrupted utterance
+      interruptionId: result.interruption.id,
+      interruptedSpeaker,
+      triggerPhrase: candidate.triggerPhrase,
+      interruptionEnergy,
+    };
+
+    // Save interjection as utterance with context
+    await this.saveInterjection(candidate.speaker, phase, result.interjection, interjectionContext);
+
+    // Update speaker states
+    this.scheduler.setSpeakerState(candidate.speaker, 'cooldown');
+
+    // Close interrupt window
+    this.scheduler.closeInterruptWindow('interrupt_fired');
+
+    logger.info(
+      {
+        interrupter: candidate.speaker,
+        interrupted: interruptedSpeaker,
+        energy: interruptionEnergy,
+        completionPct: completionPercentage,
+      },
+      'Interrupt fired successfully'
+    );
+
+    return true;
+  }
+
+  // ===========================================================================
+  // Agent Calls
+  // ===========================================================================
+
+  /**
+   * Call the appropriate agent method based on speaker and prompt type
+   * Uses the specific phase methods that properly include the proposition
+   */
+  private async callAgent(
+    speaker: Speaker,
+    promptType: string,
+    context: AgentContext
+  ): Promise<string> {
+    let retries = 0;
+    const maxRetries = 3;
+
+    while (retries < maxRetries) {
+      try {
+        // Call the appropriate phase-specific method
+        switch (speaker) {
+          case Speaker.PRO:
+            return await this.callProAgent(promptType, context);
+          case Speaker.CON:
+            return await this.callConAgent(promptType, context);
+          case Speaker.MODERATOR:
+            return await this.callModeratorAgent(promptType, context);
+          default:
+            throw new Error(`Unknown speaker: ${speaker}`);
+        }
+      } catch (error) {
+        retries++;
+        if (retries >= maxRetries) {
+          throw error;
+        }
+        logger.warn({ speaker, retries, error }, 'Agent call failed, retrying...');
+        await this.sleep(1000 * retries);
+      }
+    }
+
+    throw new Error('Max retries exceeded');
+  }
+
+  /**
+   * Call Pro advocate with the appropriate phase method
+   */
+  private async callProAgent(promptType: string, context: AgentContext): Promise<string> {
+    switch (promptType) {
+      case 'opening':
+        return await this.agents.pro.generateOpeningStatement(context);
+      case 'constructive':
+        return await this.agents.pro.generateConstructiveArgument(context);
+      case 'crossExamQuestion':
+        return await this.agents.pro.generateCrossExamQuestion(context);
+      case 'crossExamResponse':
+        // For cross-exam responses, we need the question from the last utterance
+        const lastQuestion = this.getLastOpponentUtterance(context);
+        return await this.agents.pro.respondToCrossExam(lastQuestion, context);
+      case 'rebuttal':
+        return await this.agents.pro.generateRebuttal(context);
+      case 'closing':
+        return await this.agents.pro.generateClosingStatement(context);
+      default:
+        // Fallback to generic response with proposition in prompt
+        return await this.agents.pro.generateResponse(
+          `Proposition: ${context.proposition}\n\nRespond as the Pro advocate for the above proposition.`,
+          context
+        );
+    }
+  }
+
+  /**
+   * Call Con advocate with the appropriate phase method
+   */
+  private async callConAgent(promptType: string, context: AgentContext): Promise<string> {
+    switch (promptType) {
+      case 'opening':
+        return await this.agents.con.generateOpeningStatement(context);
+      case 'constructive':
+        return await this.agents.con.generateConstructiveArgument(context);
+      case 'crossExamQuestion':
+        return await this.agents.con.generateCrossExamQuestion(context);
+      case 'crossExamResponse':
+        const lastQuestion = this.getLastOpponentUtterance(context);
+        return await this.agents.con.respondToCrossExam(lastQuestion, context);
+      case 'rebuttal':
+        return await this.agents.con.generateRebuttal(context);
+      case 'closing':
+        return await this.agents.con.generateClosingStatement(context);
+      default:
+        return await this.agents.con.generateResponse(
+          `Proposition: ${context.proposition}\n\nRespond as the Con advocate against the above proposition.`,
+          context
+        );
+    }
+  }
+
+  /**
+   * Call Moderator with the appropriate phase method
+   */
+  private async callModeratorAgent(promptType: string, context: AgentContext): Promise<string> {
+    switch (promptType) {
+      case 'opening':
+        return await this.agents.moderator.generateIntroduction(context);
+      case 'transition':
+        return await this.agents.moderator.generateTransition(context.currentPhase, context);
+      case 'synthesis':
+        return await this.agents.moderator.generateSynthesis(context);
+      case 'closing':
+        return await this.agents.moderator.generateClosingRemarks(context);
+      default:
+        return await this.agents.moderator.generateResponse(
+          `Proposition: ${context.proposition}\n\nProvide moderator commentary for the above debate.`,
+          context
+        );
+    }
+  }
+
+  /**
+   * Get the last opponent utterance for cross-exam responses
+   */
+  private getLastOpponentUtterance(context: AgentContext): string {
+    if (!context.previousUtterances || context.previousUtterances.length === 0) {
+      return '';
+    }
+
+    // Find the last utterance from a different speaker
+    const currentSpeaker = context.speaker;
+    for (let i = context.previousUtterances.length - 1; i >= 0; i--) {
+      const utterance = context.previousUtterances[i];
+      if (utterance.speaker !== currentSpeaker) {
+        return utterance.content;
+      }
+    }
+
+    return '';
+  }
+
+  /**
+   * Build agent context
+   */
+  private async buildAgentContext(speaker: Speaker): Promise<AgentContext> {
+    // Get debate data
+    const debate = await debateRepo.findById(this.debateId);
+    const utterances = await utteranceRepo.findByDebateId(this.debateId);
+
+    // Build context matching AgentContext interface
+    const context: AgentContext = {
+      debateId: this.debateId,
+      proposition: this.proposition,
+      currentPhase: this.stateMachine.getCurrentPhase(),
+      previousUtterances: utterances, // Already Utterance[] type
+      speaker,
+      propositionContext: debate?.propositionContext,
+    };
+
+    return context;
+  }
+
+  // ===========================================================================
+  // Persistence
+  // ===========================================================================
+
+  /**
+   * Save utterance to database
+   * @param interruptionContext - Optional context if this utterance was interrupted
+   */
+  private async saveUtterance(
+    speaker: Speaker,
+    phase: DebatePhase,
+    content: string,
+    turn: Turn,
+    interruptionContext?: InterruptionContext | null
+  ): Promise<void> {
+    const input: CreateUtteranceInput = {
+      debateId: this.debateId,
+      phase: mapPhaseToDb(phase),
+      speaker: mapSpeakerToDb(speaker),
+      content,
+      timestampMs: this.getElapsedMs(),
+      metadata: {
+        promptType: turn.promptType,
+        turnNumber: turn.turnNumber,
+        debateMode: 'lively',
+        // TTS-friendly interruption metadata
+        ...(interruptionContext?.wasInterrupted && {
+          wasInterrupted: true,
+          interruptedBy: interruptionContext.interruptedBy
+            ? mapSpeakerToDb(interruptionContext.interruptedBy)
+            : undefined,
+          interruptedAtToken: interruptionContext.interruptedAtToken,
+          completionPercentage: interruptionContext.completionPercentage,
+        }),
+      },
+    };
+
+    await utteranceRepo.create(input);
+
+    // Broadcast utterance
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'utterance', {
+        debateId: this.debateId,
+        phase: mapPhaseToDb(phase),
+        speaker: mapSpeakerToDb(speaker),
+        content,
+        timestampMs: this.getElapsedMs(),
+        wasInterrupted: interruptionContext?.wasInterrupted ?? false,
+      });
+    }
+  }
+
+  /**
+   * Save interjection as a special utterance
+   * @param interruptionContext - Context linking interjection to the interrupted speaker
+   */
+  private async saveInterjection(
+    speaker: Speaker,
+    phase: DebatePhase,
+    content: string,
+    interruptionContext: InterruptionContext
+  ): Promise<void> {
+    const input: CreateUtteranceInput = {
+      debateId: this.debateId,
+      phase: mapPhaseToDb(phase),
+      speaker: mapSpeakerToDb(speaker),
+      content,
+      timestampMs: this.getElapsedMs(),
+      metadata: {
+        isInterjection: true,
+        debateMode: 'lively',
+        // TTS-friendly interjection metadata
+        interruptionId: interruptionContext.interruptionId,
+        interruptedSpeaker: interruptionContext.interruptedSpeaker
+          ? mapSpeakerToDb(interruptionContext.interruptedSpeaker)
+          : undefined,
+        triggerPhrase: interruptionContext.triggerPhrase,
+        interruptionEnergy: interruptionContext.interruptionEnergy,
+      },
+    };
+
+    await utteranceRepo.create(input);
+  }
+
+  // ===========================================================================
+  // Event Handlers
+  // ===========================================================================
+
+  /**
+   * Set up scheduler event handlers
+   */
+  private setupSchedulerEvents(): void {
+    this.scheduler.on('speaker:started', (speaker, timestampMs) => {
+      logger.debug({ speaker, timestampMs }, 'Scheduler: speaker started');
+    });
+
+    this.scheduler.on('speaker:ended', (speaker, timestampMs) => {
+      logger.debug({ speaker, timestampMs }, 'Scheduler: speaker ended');
+    });
+
+    this.scheduler.on('boundary:safe', (speaker, position, _content) => {
+      logger.debug({ speaker, position }, 'Scheduler: safe boundary detected');
+    });
+
+    this.scheduler.on('window:opened', (speaker, sinceMs) => {
+      logger.debug({ speaker, sinceMs }, 'Scheduler: interrupt window opened');
+    });
+  }
+
+  /**
+   * Set up interruption engine event handlers
+   */
+  private setupInterruptionEvents(): void {
+    this.interruptionEngine.on('candidate:detected', (candidate) => {
+      logger.debug({ candidate }, 'Engine: interrupt candidate detected');
+    });
+
+    this.interruptionEngine.on('interrupt:fired', (candidate, interjection) => {
+      logger.info(
+        { speaker: candidate.speaker, interjectionLength: interjection.length },
+        'Engine: interrupt fired'
+      );
+    });
+
+    this.interruptionEngine.on('interrupt:cancelled', (candidate, reason) => {
+      logger.debug({ speaker: candidate.speaker, reason }, 'Engine: interrupt cancelled');
+    });
+  }
+
+  // ===========================================================================
+  // Utilities
+  // ===========================================================================
+
+  /**
+   * Get elapsed time since debate start
+   */
+  private getElapsedMs(): number {
+    return Date.now() - this.startTimeMs;
+  }
+
+  /**
+   * Get other participants (for interrupt evaluation)
+   */
+  private getOtherParticipants(currentSpeaker: Speaker): Speaker[] {
+    const all = [Speaker.PRO, Speaker.CON, Speaker.MODERATOR];
+    return all.filter(s => s !== currentSpeaker);
+  }
+
+  /**
+   * Chunk content for simulated streaming
+   */
+  private chunkContent(content: string): string[] {
+    const chunkSize = 50; // characters per chunk
+    const chunks: string[] = [];
+
+    for (let i = 0; i < content.length; i += chunkSize) {
+      chunks.push(content.slice(i, i + chunkSize));
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Sleep utility
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // ===========================================================================
+  // Transcript Building
+  // ===========================================================================
+
+  /**
+   * Build final debate transcript for export
+   * Uses the format expected by the markdown exporter (transcript-recorder schema)
+   */
+  private async buildFinalTranscript(): Promise<Record<string, unknown>> {
+    logger.info({ debateId: this.debateId }, 'Building final transcript');
+
+    // Fetch all data
+    const debate = await debateRepo.findById(this.debateId);
+    const utterances = await utteranceRepo.findByDebateId(this.debateId);
+    const interventions = await interventionRepo.findByDebateId(this.debateId);
+
+    if (!debate) {
+      throw new Error('Debate not found');
+    }
+
+    // Convert speaker from database format to schema format
+    const mapSpeakerToSchema = (s: string) => {
+      const map: Record<string, string> = {
+        'pro_advocate': 'pro',
+        'con_advocate': 'con',
+        'moderator': 'moderator',
+      };
+      return map[s] || s;
+    };
+
+    // Convert phase from database format to schema format
+    const mapPhaseToSchema = (p: string) => {
+      const map: Record<string, string> = {
+        'opening_statements': 'phase_1_opening',
+        'evidence_presentation': 'phase_2_constructive',
+        'clarifying_questions': 'phase_3_crossexam',
+        'rebuttals': 'phase_4_rebuttal',
+        'closing_statements': 'phase_5_closing',
+        'synthesis': 'phase_6_synthesis',
+      };
+      return map[p] || p;
+    };
+
+    // Calculate duration in seconds
+    const durationMs = this.getElapsedMs();
+    const durationSeconds = Math.round(durationMs / 1000);
+
+    // Build transcript in the format expected by markdown exporter
+    const transcript = {
+      meta: {
+        schema_version: '2.0.0',
+        debate_id: this.debateId,
+        generated_at: new Date().toISOString(),
+        debate_format: 'lively',
+        total_duration_seconds: durationSeconds,
+        status: 'completed',
+      },
+      proposition: {
+        raw_input: debate.propositionText,
+        normalized_question: debate.propositionText,
+        context: debate.propositionContext ? JSON.stringify(debate.propositionContext) : undefined,
+      },
+      transcript: utterances.map((u) => ({
+        id: u.id,
+        timestamp_ms: u.timestampMs,
+        phase: mapPhaseToSchema(u.phase),
+        speaker: mapSpeakerToSchema(u.speaker),
+        content: u.content,
+        metadata: u.metadata || {},
+      })),
+      structured_analysis: {
+        pro: null,
+        con: null,
+        moderator: null,
+      },
+      user_interventions: interventions.map((i) => ({
+        id: i.id,
+        timestamp_ms: i.timestampMs,
+        type: i.interventionType,
+        content: i.content,
+        metadata: {
+          directed_to: i.directedTo,
+          response: i.response,
+          response_timestamp_ms: i.responseTimestampMs,
+        },
+      })),
+    };
+
+    return transcript;
+  }
+}
+
+/**
+ * Create a lively debate orchestrator
+ */
+export async function createLivelyOrchestrator(
+  debateId: string,
+  proposition: string,
+  sseManager: SSEManager,
+  stateMachine: DebateStateMachine,
+  turnManager: TurnManager,
+  agents: {
+    pro: ProAdvocateAgent;
+    con: ConAdvocateAgent;
+    moderator: ModeratorAgent;
+    orchestrator: OrchestratorAgent;
+  },
+  settingsOverrides?: Partial<LivelySettings>
+): Promise<LivelyDebateOrchestrator> {
+  // Get or create lively settings
+  let settings = await livelyRepo.findLivelySettingsByDebateId(debateId);
+
+  if (!settings) {
+    settings = await livelyRepo.createLivelySettings({
+      debateId,
+      ...settingsOverrides,
+    });
+  } else if (settingsOverrides) {
+    settings = await livelyRepo.updateLivelySettings(debateId, settingsOverrides) || settings;
+  }
+
+  const config: LivelyOrchestratorConfig = {
+    debateId,
+    proposition,
+    settings,
+  };
+
+  return new LivelyDebateOrchestrator(
+    config,
+    sseManager,
+    stateMachine,
+    turnManager,
+    agents
+  );
+}
