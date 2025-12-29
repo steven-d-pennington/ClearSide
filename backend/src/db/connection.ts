@@ -14,26 +14,30 @@ const { Pool } = pg;
 /**
  * Database configuration from environment variables
  */
-const dbConfig = {
-  // Support both individual config vars and DATABASE_URL
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME || 'clearside',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD,
-  // Or use DATABASE_URL if provided (common in cloud environments)
-  connectionString: process.env.DATABASE_URL,
-
-  // SSL configuration for cloud databases (Supabase, Neon, etc.)
-  ssl: process.env.DATABASE_URL
-    ? { rejectUnauthorized: false }
-    : undefined,
-
-  // Connection pool configuration
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return error after 2 seconds if connection cannot be established
-};
+const dbConfig: pg.PoolConfig = process.env.DATABASE_URL
+  ? {
+      // Cloud environment: use DATABASE_URL with SSL enabled
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false, // Accept self-signed certificates from Timescale Cloud
+      },
+      // Connection pool configuration
+      max: 20, // Maximum number of clients in the pool
+      idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+      connectionTimeoutMillis: 5000, // Increased timeout for cloud connections
+    }
+  : {
+      // Local development: use individual config vars without SSL
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      database: process.env.DB_NAME || 'clearside',
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD,
+      // Connection pool configuration
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    };
 
 /**
  * PostgreSQL connection pool instance
