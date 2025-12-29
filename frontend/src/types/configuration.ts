@@ -290,3 +290,116 @@ export const ARCHETYPE_INFO: Record<PersonaArchetype, { name: string; descriptio
     icon: '🧭',
   },
 };
+
+// ============================================================================
+// Model Selection Types (OpenRouter Integration)
+// ============================================================================
+
+/**
+ * Model tier classification
+ */
+export type ModelTier = 'frontier' | 'mid_tier' | 'budget' | 'free';
+
+/**
+ * Cost threshold for model filtering
+ */
+export type CostThreshold = 'unlimited' | 'high' | 'medium' | 'low' | 'free_only';
+
+/**
+ * Model selection mode
+ */
+export type ModelSelectionMode = 'auto' | 'manual';
+
+/**
+ * Model information from OpenRouter
+ */
+export interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  tier: ModelTier;
+  costPer1MTokens: number;
+  contextLength: number;
+}
+
+/**
+ * Model pairing from the backend
+ */
+export interface ModelPairing {
+  proModel: ModelInfo;
+  conModel: ModelInfo;
+  tier: ModelTier;
+  estimatedCostPerDebate: number;
+}
+
+/**
+ * Model selection configuration
+ */
+export interface ModelSelection {
+  mode: ModelSelectionMode;
+  costThreshold: CostThreshold;
+  proModelId: string | null;
+  conModelId: string | null;
+}
+
+/**
+ * Default model selection (auto mode with medium cost)
+ */
+export const DEFAULT_MODEL_SELECTION: ModelSelection = {
+  mode: 'auto',
+  costThreshold: 'medium',
+  proModelId: null,
+  conModelId: null,
+};
+
+/**
+ * Cost threshold display info
+ */
+export const COST_THRESHOLD_INFO: Record<CostThreshold, { name: string; description: string }> = {
+  unlimited: {
+    name: 'Unlimited',
+    description: 'Use any models (highest quality)',
+  },
+  high: {
+    name: 'High',
+    description: 'Premium models only',
+  },
+  medium: {
+    name: 'Medium',
+    description: 'Balanced cost and quality',
+  },
+  low: {
+    name: 'Low',
+    description: 'Budget-friendly options',
+  },
+  free_only: {
+    name: 'Free Only',
+    description: 'Only free models',
+  },
+};
+
+/**
+ * Model tier display info
+ */
+export const MODEL_TIER_INFO: Record<ModelTier, { name: string; description: string; color: string }> = {
+  frontier: {
+    name: 'Frontier',
+    description: 'State-of-the-art models',
+    color: '#8b5cf6', // Purple
+  },
+  mid_tier: {
+    name: 'Mid-Tier',
+    description: 'Great balance of quality and cost',
+    color: '#3b82f6', // Blue
+  },
+  budget: {
+    name: 'Budget',
+    description: 'Cost-effective options',
+    color: '#22c55e', // Green
+  },
+  free: {
+    name: 'Free',
+    description: 'No cost models',
+    color: '#6b7280', // Gray
+  },
+};

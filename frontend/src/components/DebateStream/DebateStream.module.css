@@ -69,6 +69,65 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* Model Info Display */
+.modelInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.modelInfoLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.modelPairing {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.modelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.modelBadge[data-role="pro"] {
+  border-color: var(--color-pro);
+  background: color-mix(in srgb, var(--color-pro) 10%, transparent);
+}
+
+.modelBadge[data-role="con"] {
+  border-color: var(--color-con);
+  background: color-mix(in srgb, var(--color-con) 10%, transparent);
+}
+
+.modelRole {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
+.modelVs {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+}
+
 .errorAlert {
   margin: var(--spacing-md);
 }

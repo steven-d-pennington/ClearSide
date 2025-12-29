@@ -98,6 +98,28 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
           </span>
         </div>
 
+        {/* Model Info (when using OpenRouter) */}
+        {(debate.proModelName || debate.conModelName) && (
+          <div className={styles.modelInfo}>
+            <span className={styles.modelInfoLabel}>Models:</span>
+            <div className={styles.modelPairing}>
+              {debate.proModelName && (
+                <span className={styles.modelBadge} data-role="pro">
+                  <span className={styles.modelRole}>Pro:</span> {debate.proModelName}
+                </span>
+              )}
+              {debate.proModelName && debate.conModelName && (
+                <span className={styles.modelVs}>vs</span>
+              )}
+              {debate.conModelName && (
+                <span className={styles.modelBadge} data-role="con">
+                  <span className={styles.modelRole}>Con:</span> {debate.conModelName}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         <PhaseIndicator currentPhase={debate.currentPhase} />
       </header>
 

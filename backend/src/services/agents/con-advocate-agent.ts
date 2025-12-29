@@ -51,12 +51,24 @@ const logger = pino({
 export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
   private llmClient: LLMClient;
   private modelName: string;
-  private provider: 'openai' | 'anthropic';
+  private provider: 'openai' | 'anthropic' | 'openrouter';
 
-  constructor(llmClient: LLMClient) {
+  constructor(
+    llmClient: LLMClient,
+    modelOverride?: { provider?: string; model?: string }
+  ) {
     this.llmClient = llmClient;
-    this.provider = llmConfig.defaultProvider;
-    this.modelName = llmConfig.defaultModels[this.provider];
+
+    if (modelOverride?.model) {
+      // Use OpenRouter model
+      this.provider = 'openrouter';
+      this.modelName = modelOverride.model;
+    } else {
+      // Use default provider (always 'openai' or 'anthropic')
+      const defaultProvider = llmConfig.defaultProvider;
+      this.provider = defaultProvider;
+      this.modelName = llmConfig.defaultModels[defaultProvider];
+    }
 
     logger.info({
       provider: this.provider,

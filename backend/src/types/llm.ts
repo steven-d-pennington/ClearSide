@@ -8,7 +8,12 @@
 /**
  * Supported LLM providers
  */
-export type LLMProviderName = 'openai' | 'anthropic';
+export type LLMProviderName = 'openai' | 'anthropic' | 'openrouter';
+
+/**
+ * Default providers (excludes OpenRouter since it's a router, not a direct provider)
+ */
+export type DefaultLLMProvider = 'openai' | 'anthropic';
 
 /**
  * LLM provider configuration

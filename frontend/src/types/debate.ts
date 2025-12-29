@@ -257,6 +257,16 @@ export interface Debate {
   maxTokensPerResponse: number;
   /** Whether citations are required */
   requireCitations: boolean;
+
+  // Model information (optional - only present when using OpenRouter)
+  /** Model ID used for Pro advocate */
+  proModelId?: string;
+  /** Model ID used for Con advocate */
+  conModelId?: string;
+  /** Display name for Pro model */
+  proModelName?: string;
+  /** Display name for Con model */
+  conModelName?: string;
 }
 
 /**

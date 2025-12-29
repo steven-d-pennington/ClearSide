@@ -6,7 +6,7 @@
  */
 
 import { config } from 'dotenv';
-import type { LLMProviderName, RetryConfig } from '../types/llm.js';
+import type { DefaultLLMProvider, RetryConfig } from '../types/llm.js';
 
 // Load environment variables
 config();
@@ -25,8 +25,8 @@ export interface LLMConfig {
     apiKey: string;
     baseURL?: string;
   };
-  /** Default provider to use */
-  defaultProvider: LLMProviderName;
+  /** Default provider to use (OpenRouter is excluded as it's a router, not direct provider) */
+  defaultProvider: DefaultLLMProvider;
   /** Default model for each provider */
   defaultModels: {
     openai: string;
@@ -72,11 +72,11 @@ function getEnvInt(key: string, defaultValue: number): number {
 /**
  * Validate provider name
  */
-function validateProvider(provider: string): LLMProviderName {
+function validateProvider(provider: string): DefaultLLMProvider {
   if (provider !== 'openai' && provider !== 'anthropic') {
     throw new Error(`Invalid LLM provider: ${provider}. Must be 'openai' or 'anthropic'`);
   }
-  return provider as LLMProviderName;
+  return provider as DefaultLLMProvider;
 }
 
 /**

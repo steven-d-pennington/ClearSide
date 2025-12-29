@@ -49,6 +49,14 @@ export interface StartDebateOptions {
   proPersonaId?: string | null;
   /** Persona ID for Con advocate */
   conPersonaId?: string | null;
+  /** Model selection mode - auto (smart pairing) or manual (user picks) */
+  modelSelectionMode?: 'auto' | 'manual';
+  /** Cost threshold for model selection (auto mode) */
+  costThreshold?: 'unlimited' | 'high' | 'medium' | 'low' | 'free_only';
+  /** Model ID for Pro advocate (manual mode) */
+  proModelId?: string | null;
+  /** Model ID for Con advocate (manual mode) */
+  conModelId?: string | null;
   /** Debate mode - turn_based or lively */
   debateMode?: DebateMode;
   /** Lively mode settings (only used if debateMode is 'lively') */
@@ -205,6 +213,20 @@ export const useDebateStore = create<DebateState>()(
             requestBody.livelySettings = options.livelySettings;
           }
 
+          // Add model selection fields if provided
+          if (options.modelSelectionMode !== undefined) {
+            requestBody.modelSelectionMode = options.modelSelectionMode;
+          }
+          if (options.costThreshold !== undefined) {
+            requestBody.costThreshold = options.costThreshold;
+          }
+          if (options.proModelId !== undefined) {
+            requestBody.proModelId = options.proModelId;
+          }
+          if (options.conModelId !== undefined) {
+            requestBody.conModelId = options.conModelId;
+          }
+
           console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);
           const response = await fetch(`${API_BASE_URL}/api/debates`, {
             method: 'POST',
@@ -240,6 +262,12 @@ export const useDebateStore = create<DebateState>()(
               llmTemperature: debate.llmTemperature || 0.7,
               maxTokensPerResponse: debate.maxTokensPerResponse || 1024,
               requireCitations: debate.requireCitations || false,
+              // Include model info if available
+              proModelId: options.proModelId || undefined,
+              conModelId: options.conModelId || undefined,
+              // Extract model names from IDs (format: "provider/model-name")
+              proModelName: options.proModelId?.split('/').pop() || undefined,
+              conModelName: options.conModelId?.split('/').pop() || undefined,
             },
             isLoading: false,
             // Set lively mode immediately if selected (don't wait for SSE event)

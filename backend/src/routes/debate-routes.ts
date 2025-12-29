@@ -19,11 +19,13 @@ import {
   type BrevityLevel,
 } from '../types/configuration.js';
 import type { DebateMode, LivelySettingsInput } from '../types/lively.js';
+import type { DebateModelConfig, ModelSelectionMode, CostThreshold } from '../types/openrouter.js';
+import { createDebateClients } from '../services/llm/openrouter-adapter.js';
+import { getOpenRouterClient, createModelPairingService } from '../services/openrouter/index.js';
 
 // Orchestrator and dependencies
 import { DebateOrchestrator, DebateStateMachine, turnManager } from '../services/debate/index.js';
 import { createLivelyOrchestrator } from '../services/debate/lively-orchestrator.js';
-import { defaultLLMClient } from '../services/llm/index.js';
 import {
   ProAdvocateAgent,
   ConAdvocateAgent,
@@ -49,6 +51,11 @@ interface ConfigInput {
   conPersonaId?: unknown;
   debateMode?: unknown;
   livelySettings?: unknown;
+  // Model selection
+  modelSelectionMode?: unknown;
+  proModelId?: unknown;
+  conModelId?: unknown;
+  costThreshold?: unknown;
 }
 
 function validateConfigInput(config: ConfigInput): string[] {
@@ -154,6 +161,63 @@ async function validatePersonaIds(proPersonaId?: string | null, conPersonaId?: s
 }
 
 /**
+ * Build model configuration for debate
+ * Handles both auto and manual mode
+ */
+async function buildModelConfig(configInput: ConfigInput): Promise<DebateModelConfig | undefined> {
+  const selectionMode = configInput.modelSelectionMode as ModelSelectionMode | undefined;
+
+  // If no model selection specified, return undefined (use defaults)
+  if (!selectionMode) {
+    return undefined;
+  }
+
+  // Manual mode - use provided model IDs
+  if (selectionMode === 'manual') {
+    return {
+      selectionMode: 'manual',
+      proModelId: configInput.proModelId as string | undefined,
+      conModelId: configInput.conModelId as string | undefined,
+      costThreshold: configInput.costThreshold as CostThreshold | undefined,
+    };
+  }
+
+  // Auto mode - use smart pairing service
+  if (selectionMode === 'auto') {
+    const costThreshold = (configInput.costThreshold as CostThreshold) || 'medium';
+
+    try {
+      const openRouterClient = getOpenRouterClient();
+      const pairingService = createModelPairingService(openRouterClient);
+      const pairing = await pairingService.autoSelectPairing(costThreshold);
+
+      if (pairing) {
+        logger.info({
+          proModel: pairing.proModel.id,
+          conModel: pairing.conModel.id,
+          tier: pairing.tier,
+        }, 'Auto-selected model pairing');
+
+        return {
+          selectionMode: 'auto',
+          proModelId: pairing.proModel.id,
+          conModelId: pairing.conModel.id,
+          costThreshold,
+        };
+      } else {
+        logger.warn({ costThreshold }, 'Could not auto-select models, using defaults');
+        return undefined;
+      }
+    } catch (error) {
+      logger.warn({ error }, 'Error in auto model selection, using defaults');
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Start the debate orchestrator in the background
  * This is a fire-and-forget operation - the HTTP response is sent before this completes
  */
@@ -163,20 +227,36 @@ async function startDebateOrchestrator(
   propositionContext?: Record<string, unknown>,
   flowMode: FlowMode = 'auto',
   debateMode: DebateMode = 'turn_based',
-  livelySettings?: LivelySettingsInput
+  livelySettings?: LivelySettingsInput,
+  modelConfig?: DebateModelConfig
 ): Promise<void> {
-  logger.info({ debateId, propositionText, flowMode, debateMode }, 'Starting debate orchestrator');
+  logger.info({
+    debateId,
+    propositionText,
+    flowMode,
+    debateMode,
+    modelConfig,
+  }, 'Starting debate orchestrator');
 
   try {
     // Create per-debate state machine
     const stateMachine = new DebateStateMachine(debateId);
 
-    // Create per-debate agent instances
+    // Create model-specific LLM clients if model config provided
+    const clients = createDebateClients(modelConfig);
+
+    // Create per-debate agent instances with model overrides
     const agents = {
-      pro: new ProAdvocateAgent(defaultLLMClient),
-      con: new ConAdvocateAgent(defaultLLMClient),
-      moderator: new ModeratorAgent(defaultLLMClient),
-      orchestrator: new OrchestratorAgent(defaultLLMClient),
+      pro: new ProAdvocateAgent(
+        clients.proClient,
+        clients.proModelId ? { model: clients.proModelId } : undefined
+      ),
+      con: new ConAdvocateAgent(
+        clients.conClient,
+        clients.conModelId ? { model: clients.conModelId } : undefined
+      ),
+      moderator: new ModeratorAgent(clients.moderatorClient),
+      orchestrator: new OrchestratorAgent(clients.moderatorClient),
     };
 
     // Check if lively mode is requested
@@ -345,6 +425,11 @@ router.post('/debates', async (req: Request, res: Response) => {
       conPersonaId: req.body.conPersonaId,
       debateMode: req.body.debateMode,
       livelySettings: req.body.livelySettings,
+      // Model selection fields
+      modelSelectionMode: req.body.modelSelectionMode,
+      proModelId: req.body.proModelId,
+      conModelId: req.body.conModelId,
+      costThreshold: req.body.costThreshold,
     };
 
     const configErrors = validateConfigInput(configInput);
@@ -430,6 +515,9 @@ router.post('/debates', async (req: Request, res: Response) => {
       ? (configInput.livelySettings as LivelySettingsInput | undefined)
       : undefined;
 
+    // Build model configuration (handles auto and manual modes)
+    const modelConfig = await buildModelConfig(configInput);
+
     // Start orchestrator in background (fire and forget)
     // The .catch() ensures errors don't crash the server
     startDebateOrchestrator(
@@ -438,7 +526,8 @@ router.post('/debates', async (req: Request, res: Response) => {
       input.propositionContext as Record<string, unknown> | undefined,
       flowMode,
       debateMode,
-      livelySettings
+      livelySettings,
+      modelConfig
     ).catch((error) => {
       // This catch is a safety net - startDebateOrchestrator has its own error handling
       logger.error({ debateId: debate.id, error }, 'Unhandled orchestrator error');
