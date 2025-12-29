@@ -1,0 +1,145 @@
+2025-12-29T19:41:19.485440508Z [inf]  
+2025-12-29T19:41:20.112062181Z [inf]  [35m[Region: us-west1][0m
+2025-12-29T19:41:20.124787826Z [inf]  [35m==============
+2025-12-29T19:41:20.124853108Z [inf]  Using Nixpacks
+2025-12-29T19:41:20.124860105Z [inf]  ==============
+2025-12-29T19:41:20.124865219Z [inf]  [0m
+2025-12-29T19:41:20.126013266Z [inf]  context: 5rgh-dGYg
+2025-12-29T19:41:20.350453352Z [inf]  ╔═════════════ Nixpacks v1.38.0 ════════════╗
+2025-12-29T19:41:20.350529221Z [inf]  ║ setup      │ nodejs_22, npm-9_x           ║
+2025-12-29T19:41:20.350537909Z [inf]  ║───────────────────────────────────────────║
+2025-12-29T19:41:20.350544165Z [inf]  ║ install    │ npm i                        ║
+2025-12-29T19:41:20.350552499Z [inf]  ║───────────────────────────────────────────║
+2025-12-29T19:41:20.350563446Z [inf]  ║ build      │ npm install && npm run build ║
+2025-12-29T19:41:20.350570637Z [inf]  ║───────────────────────────────────────────║
+2025-12-29T19:41:20.350576979Z [inf]  ║ start      │ npm start                    ║
+2025-12-29T19:41:20.350582485Z [inf]  ╚═══════════════════════════════════════════╝
+2025-12-29T19:41:20.749979776Z [inf]  [internal] load build definition from Dockerfile
+2025-12-29T19:41:20.750478303Z [inf]  [internal] load build definition from Dockerfile
+2025-12-29T19:41:20.751923740Z [inf]  [internal] load build definition from Dockerfile
+2025-12-29T19:41:20.777299062Z [inf]  [internal] load build definition from Dockerfile
+2025-12-29T19:41:20.782315332Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2025-12-29T19:41:21.050719876Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2025-12-29T19:41:21.050785561Z [inf]  [internal] load .dockerignore
+2025-12-29T19:41:21.050811525Z [inf]  [internal] load .dockerignore
+2025-12-29T19:41:21.051212093Z [inf]  [internal] load .dockerignore
+2025-12-29T19:41:21.069560350Z [inf]  [internal] load .dockerignore
+2025-12-29T19:41:21.082049216Z [inf]  [stage-0 10/10] COPY . /app
+2025-12-29T19:41:21.082129869Z [inf]  [stage-0  9/10] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2025-12-29T19:41:21.082154408Z [inf]  [stage-0  8/10] RUN --mount=type=cache,id=s/d932d8af-9726-49aa-859d-337207e1f018-node_modules/cache,target=/app/node_modules/.cache npm install && npm run build
+2025-12-29T19:41:21.082168593Z [inf]  [stage-0  7/10] COPY . /app/.
+2025-12-29T19:41:21.082178296Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/d932d8af-9726-49aa-859d-337207e1f018-/root/npm,target=/root/.npm npm i
+2025-12-29T19:41:21.082200415Z [inf]  [stage-0  5/10] COPY . /app/.
+2025-12-29T19:41:21.082211642Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2025-12-29T19:41:21.082226098Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2025-12-29T19:41:21.082239308Z [inf]  [internal] load build context
+2025-12-29T19:41:21.082252832Z [inf]  [stage-0  2/10] WORKDIR /app/
+2025-12-29T19:41:21.082264202Z [inf]  [stage-0  1/10] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-29T19:41:21.082805006Z [inf]  [stage-0  1/10] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2025-12-29T19:41:21.082898725Z [inf]  [internal] load build context
+2025-12-29T19:41:21.082958879Z [inf]  [internal] load build context
+2025-12-29T19:41:21.149064570Z [inf]  [internal] load build context
+2025-12-29T19:41:21.156472226Z [inf]  [stage-0  2/10] WORKDIR /app/
+2025-12-29T19:41:21.156515922Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix
+2025-12-29T19:41:21.156533029Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7.nix && nix-collect-garbage -d
+2025-12-29T19:41:21.156546079Z [inf]  [stage-0  5/10] COPY . /app/.
+2025-12-29T19:41:21.393260432Z [inf]  [stage-0  5/10] COPY . /app/.
+2025-12-29T19:41:21.395225789Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/d932d8af-9726-49aa-859d-337207e1f018-/root/npm,target=/root/.npm npm i
+2025-12-29T19:41:21.907448571Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2025-12-29T19:41:54.663693811Z [inf]  npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+
+2025-12-29T19:41:57.770871893Z [inf]  npm warn deprecated fluent-ffmpeg@2.1.3: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+
+2025-12-29T19:41:58.441299819Z [inf]  
+added 376 packages, and audited 377 packages in 37s
+
+
+2025-12-29T19:41:58.44133851Z [inf]  89 packages are looking for funding
+  run `npm fund` for details
+
+2025-12-29T19:41:58.464946471Z [inf]  
+6 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+2025-12-29T19:41:59.173548042Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/d932d8af-9726-49aa-859d-337207e1f018-/root/npm,target=/root/.npm npm i
+2025-12-29T19:41:59.176001272Z [inf]  [stage-0  7/10] COPY . /app/.
+2025-12-29T19:41:59.381802617Z [inf]  [stage-0  7/10] COPY . /app/.
+2025-12-29T19:41:59.384097596Z [inf]  [stage-0  8/10] RUN --mount=type=cache,id=s/d932d8af-9726-49aa-859d-337207e1f018-node_modules/cache,target=/app/node_modules/.cache npm install && npm run build
+2025-12-29T19:41:59.655335542Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2025-12-29T19:42:03.678864203Z [inf]  
+added 1 package, and audited 378 packages in 4s
+
+2025-12-29T19:42:03.678893701Z [inf]  
+
+2025-12-29T19:42:03.679005017Z [inf]  89 packages are looking for funding
+
+2025-12-29T19:42:03.679017214Z [inf]    run `npm fund` for details
+
+2025-12-29T19:42:03.70350531Z [inf]  
+6 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+2025-12-29T19:42:03.892479299Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2025-12-29T19:42:03.931799094Z [inf]  
+> @clearside/backend@0.1.0 build
+> tsc && npm run copy-migrations
+
+
+2025-12-29T19:42:10.794136916Z [inf]  src/routes/debate-routes.ts(279,9): error TS2345: Argument of type '{ pro: import("/app/src/services/agents/pro-advocate-agent", { with: { "resolution-mode": "import" } }).ProAdvocateAgent; con: import("/app/src/services/agents/con-advocate-agent", { with: { "resolution-mode": "import" } }).ConAdvocateAgent; moderator: import("/app/src/services/agents/moderator-agent", { with: { "re...' is not assignable to parameter of type '{ pro: import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).ProAdvocateAgent; con: import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).ConAdvocateAgent; moderator: import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).Modera...'.
+  Types of property 'orchestrator' are incompatible.
+    Property 'getLLMClient' is missing in type 'import("/app/src/services/agents/orchestrator-agent", { with: { "resolution-mode": "import" } }).OrchestratorAgent' but required in type 'import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).OrchestratorAgent'.
+src/routes/debate-routes.ts(297,7): error TS2345: Argument of type '{ pro: import("/app/src/services/agents/pro-advocate-agent", { with: { "resolution-mode": "import" } }).ProAdvocateAgent; con: import("/app/src/services/agents/con-advocate-agent", { with: { "resolution-mode": "import" } }).ConAdvocateAgent; moderator: import("/app/src/services/agents/moderator-agent", { with: { "re...' is not assignable to parameter of type '{ pro: import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).ProAdvocateAgent; con: import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).ConAdvocateAgent; moderator: import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).Modera...'.
+  Types of property 'orchestrator' are incompatible.
+    Property 'getLLMClient' is missing in type 'import("/app/src/services/agents/orchestrator-agent", { with: { "resolution-mode": "import" } }).OrchestratorAgent' but required in type 'import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).OrchestratorAgent'.
+src/services/agents/mock-agents.ts(24,16): error TS2420: Class 'BaseMockAgent' incorrectly implements interface 'BaseAgent'.
+  Property 'getLLMClient' is missing in type 'BaseMockAgent' but required in type 'BaseAgent'.
+
+2025-12-29T19:42:10.794162565Z [inf]  src/services/agents/mock-agents.ts(49,14): error TS2420: Class 'MockProAdvocate' incorrectly implements interface 'ProAdvocateAgent'.
+  Property 'getLLMClient' is missing in type 'MockProAdvocate' but required in type 'ProAdvocateAgent'.
+
+2025-12-29T19:42:10.794166202Z [inf]  src/services/agents/mock-agents.ts(83,14): error TS2420: Class 'MockConAdvocate' incorrectly implements interface 'ConAdvocateAgent'.
+  Property 'getLLMClient' is missing in type 'MockConAdvocate' but required in type 'ConAdvocateAgent'.
+
+2025-12-29T19:42:10.79433945Z [inf]  src/services/agents/mock-agents.ts(117,14): error TS2420: Class 'MockModerator' incorrectly implements interface 'ModeratorAgent'.
+  Property 'getLLMClient' is missing in type 'MockModerator' but required in type 'ModeratorAgent'.
+src/services/agents/mock-agents.ts(159,14): error TS2420: Class 'MockOrchestrator' incorrectly implements interface 'OrchestratorAgent'.
+  Property 'getLLMClient' is missing in type 'MockOrchestrator' but required in type 'OrchestratorAgent'.
+src/services/agents/mock-agents.ts(222,46): error TS2741: Property 'getLLMClient' is missing in type 'MockProAdvocate' but required in type 'ProAdvocateAgent'.
+
+2025-12-29T19:42:10.794442509Z [inf]  src/services/agents/mock-agents.ts(223,46): error TS2741: Property 'getLLMClient' is missing in type 'MockConAdvocate' but required in type 'ConAdvocateAgent'.
+
+2025-12-29T19:42:10.794718253Z [inf]  src/services/agents/mock-agents.ts(224,42): error TS2741: Property 'getLLMClient' is missing in type 'MockModerator' but required in type 'ModeratorAgent'.
+
+2025-12-29T19:42:10.794803833Z [inf]  src/services/agents/mock-agents.ts(225,48): error TS2741: Property 'getLLMClient' is missing in type 'MockOrchestrator' but required in type 'OrchestratorAgent'.
+
+2025-12-29T19:42:10.795223071Z [inf]  src/services/agents/orchestrator-agent.ts(52,14): error TS2420: Class 'OrchestratorAgent' incorrectly implements interface 'BaseAgent'.
+  Property 'getLLMClient' is missing in type 'OrchestratorAgent' but required in type 'BaseAgent'.
+src/services/agents/orchestrator-agent.ts(52,14): error TS2420: Class 'import("/app/src/services/agents/orchestrator-agent", { with: { "resolution-mode": "import" } }).OrchestratorAgent' incorrectly implements interface 'import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).OrchestratorAgent'.
+  Property 'getLLMClient' is missing in type 'import("/app/src/services/agents/orchestrator-agent", { with: { "resolution-mode": "import" } }).OrchestratorAgent' but required in type 'import("/app/src/services/agents/types", { with: { "resolution-mode": "import" } }).OrchestratorAgent'.
+
+2025-12-29T19:42:10.79540831Z [inf]  src/services/debate/lively-orchestrator.ts(788,41): error TS2339: Property 'streamChat' does not exist on type 'LLMClient'.
+src/services/debate/lively-orchestrator.ts(809,41): error TS2339: Property 'streamChat' does not exist on type 'LLMClient'.
+src/services/debate/lively-orchestrator.ts(830,41): error TS2339: Property 'streamChat' does not exist on type 'LLMClient'.
+
+2025-12-29T19:42:11.164757034Z [err]  [stage-0  8/10] RUN --mount=type=cache,id=s/d932d8af-9726-49aa-859d-337207e1f018-node_modules/cache,target=/app/node_modules/.cache npm install && npm run build
+2025-12-29T19:42:11.195353210Z [err]  Dockerfile:24
+2025-12-29T19:42:11.195434948Z [err]  -------------------
+2025-12-29T19:42:11.195451731Z [err]  22 |     # build phase
+2025-12-29T19:42:11.195463555Z [err]  23 |     COPY . /app/.
+2025-12-29T19:42:11.195481355Z [err]  24 | >>> RUN --mount=type=cache,id=s/d932d8af-9726-49aa-859d-337207e1f018-node_modules/cache,target=/app/node_modules/.cache npm install && npm run build
+2025-12-29T19:42:11.195489740Z [err]  25 |
+2025-12-29T19:42:11.195495260Z [err]  26 |
+2025-12-29T19:42:11.195501366Z [err]  -------------------
+2025-12-29T19:42:11.195508097Z [err]  ERROR: failed to build: failed to solve: process "/bin/bash -ol pipefail -c npm install && npm run build" did not complete successfully: exit code: 2
+2025-12-29T19:42:11.211391512Z [err]  Error: Docker build failed

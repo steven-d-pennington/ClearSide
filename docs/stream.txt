@@ -1,0 +1,264 @@
+id: 0e898fdf-ac3c-476c-a884-32f1975d8208
+data: {"event":"connected","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","clientId":"1cd6e664-e450-4088-8ec8-2f16150e17eb","message":"Connected to debate stream"},"timestamp":"2025-12-29T19:08:20.174Z","id":"0e898fdf-ac3c-476c-a884-32f1975d8208"}
+
+: heartbeat
+
+: heartbeat
+
+id: 06fcf3bd-ef6e-49e6-8e5d-cd8eae00e064
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"Yes—AI should be taught in high school. Integratin","tokenPosition":50,"timestampMs":19635},"timestamp":"2025-12-29T19:08:39.418Z","id":"06fcf3bd-ef6e-49e6-8e5d-cd8eae00e064"}
+
+id: 8753f37d-b704-4878-9c0e-40c8daea149a
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"g foundational AI education into secondary curricu","tokenPosition":100,"timestampMs":22240},"timestamp":"2025-12-29T19:08:42.023Z","id":"8753f37d-b704-4878-9c0e-40c8daea149a"}
+
+id: dc60abee-e27e-4e8e-96a1-f1082db4d728
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"la is essential to prepare students for a world in","tokenPosition":150,"timestampMs":24105},"timestamp":"2025-12-29T19:08:43.889Z","id":"dc60abee-e27e-4e8e-96a1-f1082db4d728"}
+
+id: cf91dd1b-7008-4bd2-a029-9d9f60eee30c
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"creasingly shaped by artificial intelligence, to f","tokenPosition":200,"timestampMs":27918},"timestamp":"2025-12-29T19:08:47.701Z","id":"cf91dd1b-7008-4bd2-a029-9d9f60eee30c"}
+
+: heartbeat
+
+: heartbeat
+
+id: 9fc22348-f7e6-4830-9ab5-883672dd9091
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"oster informed citizenship, and to promote equitab","tokenPosition":250,"timestampMs":50353},"timestamp":"2025-12-29T19:09:10.137Z","id":"9fc22348-f7e6-4830-9ab5-883672dd9091"}
+
+: heartbeat
+
+id: 8983083f-5bc0-4807-8bae-1a90a50dd3cd
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"le access to emerging technologies.\n\nMy case rests","tokenPosition":300,"timestampMs":73991},"timestamp":"2025-12-29T19:09:33.774Z","id":"8983083f-5bc0-4807-8bae-1a90a50dd3cd"}
+
+: heartbeat
+
+: heartbeat
+
+id: c7025162-1856-439c-9e59-b7f9b9a3df78
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":" on three core arguments. First, AI literacy is be","tokenPosition":350,"timestampMs":97570},"timestamp":"2025-12-29T19:09:57.353Z","id":"c7025162-1856-439c-9e59-b7f9b9a3df78"}
+
+: heartbeat
+
+id: e3243e76-28a3-4772-a0e6-c46f9cfc77e6
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"coming as fundamental as digital literacy was in t","tokenPosition":400,"timestampMs":119849},"timestamp":"2025-12-29T19:10:19.632Z","id":"e3243e76-28a3-4772-a0e6-c46f9cfc77e6"}
+
+: heartbeat
+
+: heartbeat
+
+id: 1cbd5530-147b-4119-8bba-ad5bb70fef2c
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"he 1990s. Students interact with AI daily—through ","tokenPosition":450,"timestampMs":142282},"timestamp":"2025-12-29T19:10:42.065Z","id":"1cbd5530-147b-4119-8bba-ad5bb70fef2c"}
+
+id: f95f8382-4ea1-437d-8c0a-199e5ad861d5
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"social media algorithms, voice assistants, and rec","tokenPosition":500,"timestampMs":145273},"timestamp":"2025-12-29T19:10:45.056Z","id":"f95f8382-4ea1-437d-8c0a-199e5ad861d5"}
+
+: heartbeat
+
+id: af8aea28-90d1-4b35-a2d7-3343197eedd3
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ommendation engines—yet most lack even a basic und","tokenPosition":550,"timestampMs":168304},"timestamp":"2025-12-29T19:11:08.087Z","id":"af8aea28-90d1-4b35-a2d7-3343197eedd3"}
+
+: heartbeat
+
+: heartbeat
+
+id: b9209a65-9491-46f6-af41-a089ffff982c
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"erstanding of how these systems work, their limita","tokenPosition":600,"timestampMs":191246},"timestamp":"2025-12-29T19:11:31.030Z","id":"b9209a65-9491-46f6-af41-a089ffff982c"}
+
+: heartbeat
+
+: heartbeat
+
+id: ea216ce5-60f4-47bd-84aa-8c7574c6121f
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"tions, or their societal implications. Teaching AI","tokenPosition":650,"timestampMs":216376},"timestamp":"2025-12-29T19:11:56.159Z","id":"ea216ce5-60f4-47bd-84aa-8c7574c6121f"}
+
+: heartbeat
+
+id: 27af1cb7-f7af-4385-a960-0c9feb37a322
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":" demystifies these technologies and empowers stude","tokenPosition":700,"timestampMs":239064},"timestamp":"2025-12-29T19:12:18.847Z","id":"27af1cb7-f7af-4385-a960-0c9feb37a322"}
+
+: heartbeat
+
+: heartbeat
+
+id: 23471ca9-d6f7-40ab-aeca-1b226da63f78
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"nts to use them critically and responsibly. Second","tokenPosition":750,"timestampMs":262217},"timestamp":"2025-12-29T19:12:42.001Z","id":"23471ca9-d6f7-40ab-aeca-1b226da63f78"}
+
+id: 65d58739-81c7-4ba3-95c4-f7ace0b4541e
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":", early exposure to AI concepts broadens opportuni","tokenPosition":800,"timestampMs":265148},"timestamp":"2025-12-29T19:12:44.931Z","id":"65d58739-81c7-4ba3-95c4-f7ace0b4541e"}
+
+: heartbeat
+
+id: adffffa6-f406-415a-b11a-36c92800c192
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ty. Introducing AI in high school—especially throu","tokenPosition":850,"timestampMs":287708},"timestamp":"2025-12-29T19:13:07.491Z","id":"adffffa6-f406-415a-b11a-36c92800c192"}
+
+: heartbeat
+
+: heartbeat
+
+id: fbd04a24-d3c9-4855-a041-172885601f2d
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"gh project-based, interdisciplinary modules—can sp","tokenPosition":900,"timestampMs":310133},"timestamp":"2025-12-29T19:13:29.916Z","id":"fbd04a24-d3c9-4855-a041-172885601f2d"}
+
+: heartbeat
+
+id: bbf62e4e-ccb1-4173-b698-43dcdbba967e
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ark interest in STEM fields and help close partici","tokenPosition":950,"timestampMs":333005},"timestamp":"2025-12-29T19:13:52.788Z","id":"bbf62e4e-ccb1-4173-b698-43dcdbba967e"}
+
+: heartbeat
+
+: heartbeat
+
+id: c8bc924a-cbac-42d8-934e-cde921b9b752
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"pation gaps among underrepresented groups before c","tokenPosition":1000,"timestampMs":355739},"timestamp":"2025-12-29T19:14:15.522Z","id":"c8bc924a-cbac-42d8-934e-cde921b9b752"}
+
+: heartbeat
+
+id: 7b6ebfaa-022e-4e96-8e98-b46c9814cbb5
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ollege-level tracking occurs. Third, democratic so","tokenPosition":1050,"timestampMs":377899},"timestamp":"2025-12-29T19:14:37.682Z","id":"7b6ebfaa-022e-4e96-8e98-b46c9814cbb5"}
+
+: heartbeat
+
+: heartbeat
+
+id: 04f0b5b1-dc61-4cce-ba9a-917c9693cda7
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"cieties require citizens who can engage thoughtful","tokenPosition":1100,"timestampMs":400079},"timestamp":"2025-12-29T19:14:59.862Z","id":"04f0b5b1-dc61-4cce-ba9a-917c9693cda7"}
+
+: heartbeat
+
+id: 51642b5c-3cc8-4ba9-bf7c-f7caab3a5e5a
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ly with AI-driven policy issues, from deepfakes in","tokenPosition":1150,"timestampMs":422660},"timestamp":"2025-12-29T19:15:22.443Z","id":"51642b5c-3cc8-4ba9-bf7c-f7caab3a5e5a"}
+
+: heartbeat
+
+id: 62aa32f5-e788-44e0-8b9f-d1816502a051
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":" elections to algorithmic bias in hiring. High sch","tokenPosition":1200,"timestampMs":424986},"timestamp":"2025-12-29T19:15:24.769Z","id":"62aa32f5-e788-44e0-8b9f-d1816502a051"}
+
+: heartbeat
+
+id: 9df3155e-389e-4ef4-90b0-24f12189574b
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ool is the appropriate venue to cultivate this civ","tokenPosition":1250,"timestampMs":447571},"timestamp":"2025-12-29T19:15:47.354Z","id":"9df3155e-389e-4ef4-90b0-24f12189574b"}
+
+: heartbeat
+
+: heartbeat
+
+id: f79642da-0fe9-496a-8e07-59c10304de9d
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ic competence.\n\nThis position relies on several ex","tokenPosition":1300,"timestampMs":470334},"timestamp":"2025-12-29T19:16:10.118Z","id":"f79642da-0fe9-496a-8e07-59c10304de9d"}
+
+: heartbeat
+
+id: aa1366f4-c3f8-4c46-bd3d-d78860fd249c
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"plicit assumptions: (1) that high school curricula","tokenPosition":1350,"timestampMs":493139},"timestamp":"2025-12-29T19:16:32.922Z","id":"aa1366f4-c3f8-4c46-bd3d-d78860fd249c"}
+
+: heartbeat
+
+: heartbeat
+
+id: 877360d5-a778-4018-bd76-f13829042df3
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":" can be adapted to include new literacies without ","tokenPosition":1400,"timestampMs":515783},"timestamp":"2025-12-29T19:16:55.566Z","id":"877360d5-a778-4018-bd76-f13829042df3"}
+
+: heartbeat
+
+id: 6c59c183-3503-4efc-b5b7-3da7fb4bf123
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"overburdening students or teachers; (2) that AI ed","tokenPosition":1450,"timestampMs":538224},"timestamp":"2025-12-29T19:17:18.007Z","id":"6c59c183-3503-4efc-b5b7-3da7fb4bf123"}
+
+: heartbeat
+
+: heartbeat
+
+id: 31744781-2cec-4793-99ef-c5adffc5fc0a
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ucation can be delivered in an age-appropriate, no","tokenPosition":1500,"timestampMs":561243},"timestamp":"2025-12-29T19:17:41.026Z","id":"31744781-2cec-4793-99ef-c5adffc5fc0a"}
+
+id: ee02930f-f8a9-4d61-a4a6-aabd8f0b9db7
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"n-technical manner—focusing on concepts, ethics, a","tokenPosition":1550,"timestampMs":563791},"timestamp":"2025-12-29T19:17:43.574Z","id":"ee02930f-f8a9-4d61-a4a6-aabd8f0b9db7"}
+
+: heartbeat
+
+id: 90406b52-6410-4e73-8778-5ad37a2c071d
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"nd applications rather than advanced coding; and (","tokenPosition":1600,"timestampMs":586556},"timestamp":"2025-12-29T19:18:06.339Z","id":"90406b52-6410-4e73-8778-5ad37a2c071d"}
+
+: heartbeat
+
+: heartbeat
+
+id: d37b5328-4dde-4ee2-872c-ae5a256b657f
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"3) that equitable implementation is possible throu","tokenPosition":1650,"timestampMs":608860},"timestamp":"2025-12-29T19:18:28.643Z","id":"d37b5328-4dde-4ee2-872c-ae5a256b657f"}
+
+: heartbeat
+
+id: 4a02cfa5-1b04-4627-a12e-d924bdba21ab
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"gh public investment and teacher training, rather ","tokenPosition":1700,"timestampMs":630729},"timestamp":"2025-12-29T19:18:50.512Z","id":"4a02cfa5-1b04-4627-a12e-d924bdba21ab"}
+
+: heartbeat
+
+: heartbeat
+
+id: eb72e22d-8d11-47e6-811f-57e73a042f15
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"than being limited to well-resourced schools.\n\nThe","tokenPosition":1750,"timestampMs":653068},"timestamp":"2025-12-29T19:19:12.851Z","id":"eb72e22d-8d11-47e6-811f-57e73a042f15"}
+
+: heartbeat
+
+id: 9476c3ec-5632-440e-b545-54144b78a8d8
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":" stakes are significant. Without foundational AI e","tokenPosition":1800,"timestampMs":675918},"timestamp":"2025-12-29T19:19:35.701Z","id":"9476c3ec-5632-440e-b545-54144b78a8d8"}
+
+: heartbeat
+
+: heartbeat
+
+id: 799cb37d-5137-4555-b5df-9e782a920067
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ducation, we risk deepening the digital divide and","tokenPosition":1850,"timestampMs":698338},"timestamp":"2025-12-29T19:19:58.121Z","id":"799cb37d-5137-4555-b5df-9e782a920067"}
+
+: heartbeat
+
+id: bf78560f-18a4-4a87-b62c-e024ce1edf5b
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":" producing generations of passive consumers rather","tokenPosition":1900,"timestampMs":720891},"timestamp":"2025-12-29T19:20:20.674Z","id":"bf78560f-18a4-4a87-b62c-e024ce1edf5b"}
+
+id: 1234ee20-8675-4188-94f2-c117171c8a90
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":" than informed participants in a technology-satura","tokenPosition":1950,"timestampMs":723731},"timestamp":"2025-12-29T19:20:23.514Z","id":"1234ee20-8675-4188-94f2-c117171c8a90"}
+
+: heartbeat
+
+: heartbeat
+
+id: 2165f4b3-c17f-4178-9ff1-7511af71bbf8
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ted world. Countries like Finland and Singapore ha","tokenPosition":2000,"timestampMs":746895},"timestamp":"2025-12-29T19:20:46.678Z","id":"2165f4b3-c17f-4178-9ff1-7511af71bbf8"}
+
+: heartbeat
+
+: heartbeat
+
+id: 0a8ab565-0cfa-4bad-9f1e-141817149ebd
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ve already piloted national AI education programs ","tokenPosition":2050,"timestampMs":769851},"timestamp":"2025-12-29T19:21:09.634Z","id":"0a8ab565-0cfa-4bad-9f1e-141817149ebd"}
+
+: heartbeat
+
+id: 2d8a03e6-5248-4037-8ba4-2f4742ed898a
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"for youth, demonstrating feasibility (FACT: Finlan","tokenPosition":2100,"timestampMs":792760},"timestamp":"2025-12-29T19:21:32.543Z","id":"2d8a03e6-5248-4037-8ba4-2f4742ed898a"}
+
+: heartbeat
+
+: heartbeat
+
+id: 32548d27-4382-43c7-9ffb-e973f6d2fab7
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"d’s “Elements of AI” course has been adapted for t","tokenPosition":2150,"timestampMs":814795},"timestamp":"2025-12-29T19:21:54.578Z","id":"32548d27-4382-43c7-9ffb-e973f6d2fab7"}
+
+: heartbeat
+
+id: dbb45874-92d6-446c-a96a-020a748087a1
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"eens and made freely available). Moreover, organiz","tokenPosition":2200,"timestampMs":837213},"timestamp":"2025-12-29T19:22:16.996Z","id":"dbb45874-92d6-446c-a96a-020a748087a1"}
+
+: heartbeat
+
+: heartbeat
+
+id: 84ef5e7f-a12d-49d9-b929-4c24335b5b22
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ations such as UNESCO advocate for AI curriculum i","tokenPosition":2250,"timestampMs":859657},"timestamp":"2025-12-29T19:22:39.440Z","id":"84ef5e7f-a12d-49d9-b929-4c24335b5b22"}
+
+: heartbeat
+
+id: b6d05f0e-d234-4674-a04c-0b78ed7b9b5f
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ntegration as part of global digital citizenship e","tokenPosition":2300,"timestampMs":881978},"timestamp":"2025-12-29T19:23:01.761Z","id":"b6d05f0e-d234-4674-a04c-0b78ed7b9b5f"}
+
+id: a227fb05-2f00-4907-8a30-060f984ba11f
+data: {"event":"token_chunk","data":{"debateId":"202eb44b-9e8b-4ba3-96e8-45646269cb01","speaker":"pro_advocate","chunk":"ducation (EXPERT consensus).\n\nTeaching AI in high ","tokenPosition":2350,"timestampMs":884084},"timestamp":"2025-12-29T19:23:03.867Z","id":"a227fb05-2f00-4907-8a30-060f984ba11f"}
+
+: heartbeat
+

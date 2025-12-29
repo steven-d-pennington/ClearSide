@@ -65,6 +65,51 @@ export class LLMClient {
   }
 
   /**
+   * Get the OpenAI client for direct streaming access
+   * This is used by adapters like OpenRouterLLMClient
+   */
+  getOpenAIClient(): OpenAI | null {
+    return this.openaiClient;
+  }
+
+  /**
+   * Stream chat completion with token-by-token streaming
+   * Base implementation throws error - override in provider-specific adapters
+   */
+  async *streamChat(
+    _messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    _options?: {
+      temperature?: number;
+      maxTokens?: number;
+    }
+  ): AsyncGenerator<string, void, unknown> {
+    throw new Error('streamChat not implemented for this LLM provider. Use OpenRouterLLMClient for streaming.');
+  }
+
+  /**
+   * Simple chat method for non-streaming requests
+   * Convenience wrapper around complete()
+   */
+  async chat(
+    messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    options?: {
+      temperature?: number;
+      maxTokens?: number;
+    }
+  ): Promise<string> {
+    const request: LLMRequest = {
+      provider: llmConfig.defaultProvider,
+      model: llmConfig.defaultModels[llmConfig.defaultProvider],
+      messages,
+      temperature: options?.temperature,
+      maxTokens: options?.maxTokens,
+    };
+
+    const response = await this.complete(request);
+    return response.content;
+  }
+
+  /**
    * Complete a chat request with automatic retry logic
    */
   async complete(request: LLMRequest): Promise<LLMResponse> {

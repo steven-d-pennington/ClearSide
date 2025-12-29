@@ -86,6 +86,13 @@ export class OrchestratorAgent implements BaseAgent, IOrchestratorAgent {
   }
 
   /**
+   * Get the LLM client for direct streaming access
+   */
+  getLLMClient(): LLMClient {
+    return this.llmClient;
+  }
+
+  /**
    * Normalize a raw user proposition into structured format
    *
    * @param rawInput - Raw user input (question or statement)

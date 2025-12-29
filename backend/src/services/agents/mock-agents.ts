@@ -17,6 +17,7 @@ import type {
   OrchestratorAgent,
   NormalizedProposition,
 } from './types.js';
+import type { LLMClient } from '../llm/client.js';
 
 /**
  * Base mock agent with common functionality
@@ -40,6 +41,13 @@ abstract class BaseMockAgent implements BaseAgent {
       model: 'mock-agent',
       capabilities: ['mock-responses'],
     };
+  }
+
+  /**
+   * Mock agents don't support streaming
+   */
+  getLLMClient(): LLMClient {
+    throw new Error('Mock agents do not have LLM clients - streaming not supported');
   }
 }
 
