@@ -79,6 +79,13 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
   }
 
   /**
+   * Get the LLM client for direct streaming access
+   */
+  getLLMClient(): LLMClient {
+    return this.llmClient;
+  }
+
+  /**
    * Get agent metadata
    */
   getMetadata() {

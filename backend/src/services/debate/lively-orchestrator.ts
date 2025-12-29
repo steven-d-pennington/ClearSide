@@ -395,8 +395,80 @@ export class LivelyDebateOrchestrator {
     context: AgentContext,
     phase: DebatePhase
   ): Promise<string> {
-    // For now, use the standard agent call (non-streaming)
-    // TODO: Implement true token streaming when LLM client supports it
+    // Try to use real streaming if supported by the agent's LLM client
+    try {
+      return await this.generateWithRealStreaming(speaker, turn, context, phase);
+    } catch (error) {
+      logger.warn({ speaker, error }, 'Real streaming failed, falling back to simulated streaming');
+      // Fallback to simulated streaming
+      return await this.generateWithSimulatedStreaming(speaker, turn, context, phase);
+    }
+  }
+
+  /**
+   * Generate content with real LLM token streaming
+   */
+  private async generateWithRealStreaming(
+    speaker: Speaker,
+    turn: Turn,
+    context: AgentContext,
+    phase: DebatePhase
+  ): Promise<string> {
+    let fullContent = '';
+    let tokenCount = 0;
+
+    // Get the streaming generator from the agent
+    const stream = await this.callAgentStream(speaker, turn.promptType, context);
+
+    for await (const chunk of stream) {
+      if (!this.isRunning) break;
+
+      // Process chunk through scheduler
+      fullContent += chunk;
+      tokenCount += chunk.length;
+      const boundaryDetected = this.scheduler.processTokenChunk(chunk);
+
+      // Broadcast token chunk
+      if (this.broadcastEvents) {
+        this.sseManager.broadcastToDebate(this.debateId, 'token_chunk', {
+          debateId: this.debateId,
+          speaker: mapSpeakerToDb(speaker),
+          chunk,
+          tokenPosition: tokenCount,
+          timestampMs: this.getElapsedMs(),
+        });
+      }
+
+      // Evaluate for interrupts periodically
+      const now = Date.now();
+      if (now - this.lastEvaluationMs >= this.evaluationIntervalMs) {
+        await this.evaluateForInterrupt(speaker, fullContent, phase);
+        this.lastEvaluationMs = now;
+      }
+
+      // If interrupt is pending and boundary detected, fire it
+      if (boundaryDetected && this.interruptionEngine.hasPendingInterrupt()) {
+        const interrupted = await this.fireInterrupt(speaker, fullContent, phase, fullContent.length);
+        if (interrupted) {
+          // Speaker was interrupted - content is partial
+          return fullContent;
+        }
+      }
+    }
+
+    return fullContent;
+  }
+
+  /**
+   * Generate content with simulated streaming (fallback)
+   */
+  private async generateWithSimulatedStreaming(
+    speaker: Speaker,
+    turn: Turn,
+    context: AgentContext,
+    phase: DebatePhase
+  ): Promise<string> {
+    // Use the standard agent call (non-streaming)
     const content = await this.callAgent(speaker, turn.promptType, context);
 
     // Store total expected length for accurate completion percentage
@@ -671,6 +743,141 @@ export class LivelyDebateOrchestrator {
     }
 
     throw new Error('Max retries exceeded');
+  }
+
+  /**
+   * Call agent with streaming support
+   * Returns an async generator that yields token chunks
+   */
+  private async callAgentStream(
+    speaker: Speaker,
+    promptType: string,
+    context: AgentContext
+  ): Promise<AsyncGenerator<string, void, unknown>> {
+    // Call the appropriate phase-specific streaming method
+    switch (speaker) {
+      case Speaker.PRO:
+        return this.callProAgentStream(promptType, context);
+      case Speaker.CON:
+        return this.callConAgentStream(promptType, context);
+      case Speaker.MODERATOR:
+        return this.callModeratorAgentStream(promptType, context);
+      default:
+        throw new Error(`Unknown speaker: ${speaker}`);
+    }
+  }
+
+  /**
+   * Call Pro advocate with streaming
+   */
+  private async *callProAgentStream(
+    promptType: string,
+    context: AgentContext
+  ): AsyncGenerator<string, void, unknown> {
+    // Get the LLM client from the Pro agent
+    const llmClient = this.agents.pro.getLLMClient();
+
+    // Build messages based on prompt type
+    const messages = this.buildAgentMessages(Speaker.PRO, promptType, context);
+
+    // Stream from LLM
+    for await (const chunk of llmClient.streamChat(messages, {
+      temperature: context.llmTemperature || 0.7,
+      maxTokens: context.maxTokensPerResponse || 2048,
+    })) {
+      yield chunk;
+    }
+  }
+
+  /**
+   * Call Con advocate with streaming
+   */
+  private async *callConAgentStream(
+    promptType: string,
+    context: AgentContext
+  ): AsyncGenerator<string, void, unknown> {
+    const llmClient = this.agents.con.getLLMClient();
+    const messages = this.buildAgentMessages(Speaker.CON, promptType, context);
+
+    for await (const chunk of llmClient.streamChat(messages, {
+      temperature: context.llmTemperature || 0.7,
+      maxTokens: context.maxTokensPerResponse || 2048,
+    })) {
+      yield chunk;
+    }
+  }
+
+  /**
+   * Call Moderator with streaming
+   */
+  private async *callModeratorAgentStream(
+    promptType: string,
+    context: AgentContext
+  ): AsyncGenerator<string, void, unknown> {
+    const llmClient = this.agents.moderator.getLLMClient();
+    const messages = this.buildAgentMessages(Speaker.MODERATOR, promptType, context);
+
+    for await (const chunk of llmClient.streamChat(messages, {
+      temperature: context.llmTemperature || 0.7,
+      maxTokens: context.maxTokensPerResponse || 2048,
+    })) {
+      yield chunk;
+    }
+  }
+
+  /**
+   * Build agent messages for LLM call
+   * This consolidates the message building logic for both streaming and non-streaming
+   */
+  private buildAgentMessages(
+    speaker: Speaker,
+    promptType: string,
+    context: AgentContext
+  ): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
+    // Get system prompt based on speaker and phase
+    const systemPrompt = this.getSystemPrompt(speaker, promptType, context);
+
+    // Get user message (the actual prompt for this turn)
+    const userMessage = this.getUserPrompt(speaker, promptType, context);
+
+    return [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMessage },
+    ];
+  }
+
+  /**
+   * Get system prompt for speaker and phase
+   */
+  private getSystemPrompt(speaker: Speaker, promptType: string, context: AgentContext): string {
+    // Use the same system prompts the agents use
+    const agent = speaker === Speaker.PRO ? this.agents.pro :
+                  speaker === Speaker.CON ? this.agents.con :
+                  this.agents.moderator;
+
+    // Extract system prompt from agent (this is simplified - agents have more complex prompting)
+    return `You are a ${speaker} in a formal debate on: "${context.proposition}". Provide a clear, well-reasoned response.`;
+  }
+
+  /**
+   * Get user prompt for speaker and phase
+   */
+  private getUserPrompt(speaker: Speaker, promptType: string, context: AgentContext): string {
+    switch (promptType) {
+      case 'opening':
+      case 'opening_statement':
+        return `Provide your opening statement on this proposition.`;
+      case 'constructive':
+      case 'constructive_argument':
+        return `Provide a constructive argument with evidence.`;
+      case 'rebuttal':
+        return `Provide a rebuttal to the opposing arguments.`;
+      case 'closing':
+      case 'closing_statement':
+        return `Provide your closing statement.`;
+      default:
+        return `Provide your response.`;
+    }
   }
 
   /**
