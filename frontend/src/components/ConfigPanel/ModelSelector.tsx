@@ -41,11 +41,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
   // Check if OpenRouter is configured
   useEffect(() => {
     async function checkStatus() {
       try {
-        const response = await fetch('/api/models/status');
+        const response = await fetch(`${API_BASE_URL}/api/models/status`);
         const data: OpenRouterStatus = await response.json();
         setIsConfigured(data.configured);
         if (!data.configured) {
@@ -58,7 +60,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       }
     }
     checkStatus();
-  }, []);
+  }, [API_BASE_URL]);
 
   // Fetch models when configured
   useEffect(() => {
@@ -66,7 +68,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
 
     async function loadModels() {
       try {
-        const response = await fetch('/api/models');
+        const response = await fetch(`${API_BASE_URL}/api/models`);
         if (!response.ok) throw new Error('Failed to load models');
         const data = await response.json();
         setModels(data.models || []);
@@ -78,7 +80,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       }
     }
     loadModels();
-  }, [isConfigured]);
+  }, [isConfigured, API_BASE_URL]);
 
   // Fetch preview pairing when in auto mode
   useEffect(() => {
@@ -90,7 +92,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     async function loadPairing() {
       try {
         const response = await fetch(
-          `/api/models/pairings?threshold=${selection.costThreshold}`
+          `${API_BASE_URL}/api/models/pairings?threshold=${selection.costThreshold}`
         );
         if (!response.ok) {
           setPreviewPairing(null);
@@ -104,7 +106,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       }
     }
     loadPairing();
-  }, [isConfigured, selection.mode, selection.costThreshold]);
+  }, [isConfigured, selection.mode, selection.costThreshold, API_BASE_URL]);
 
   // Handle mode toggle
   const handleModeChange = useCallback(

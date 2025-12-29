@@ -38,11 +38,13 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
     configuration.presetMode === 'custom'
   );
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
   // Fetch presets on mount
   useEffect(() => {
     async function loadPresets() {
       try {
-        const response = await fetch('/api/presets');
+        const response = await fetch(`${API_BASE_URL}/api/presets`);
         if (!response.ok) {
           throw new Error('Failed to load presets');
         }
@@ -56,7 +58,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       }
     }
     loadPresets();
-  }, []);
+  }, [API_BASE_URL]);
 
   // Handle preset selection
   const handlePresetChange = useCallback(
