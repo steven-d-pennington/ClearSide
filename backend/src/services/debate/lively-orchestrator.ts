@@ -780,10 +780,14 @@ export class LivelyDebateOrchestrator {
     // Build messages based on prompt type
     const messages = this.buildAgentMessages(Speaker.PRO, promptType, context);
 
+    // Get configuration
+    const temperature = context.configuration?.llmSettings?.temperature || 0.7;
+    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 2048;
+
     // Stream from LLM
     for await (const chunk of llmClient.streamChat(messages, {
-      temperature: context.llmTemperature || 0.7,
-      maxTokens: context.maxTokensPerResponse || 2048,
+      temperature,
+      maxTokens,
     })) {
       yield chunk;
     }
@@ -799,9 +803,12 @@ export class LivelyDebateOrchestrator {
     const llmClient = this.agents.con.getLLMClient();
     const messages = this.buildAgentMessages(Speaker.CON, promptType, context);
 
+    const temperature = context.configuration?.llmSettings?.temperature || 0.7;
+    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 2048;
+
     for await (const chunk of llmClient.streamChat(messages, {
-      temperature: context.llmTemperature || 0.7,
-      maxTokens: context.maxTokensPerResponse || 2048,
+      temperature,
+      maxTokens,
     })) {
       yield chunk;
     }
@@ -817,9 +824,12 @@ export class LivelyDebateOrchestrator {
     const llmClient = this.agents.moderator.getLLMClient();
     const messages = this.buildAgentMessages(Speaker.MODERATOR, promptType, context);
 
+    const temperature = context.configuration?.llmSettings?.temperature || 0.7;
+    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 2048;
+
     for await (const chunk of llmClient.streamChat(messages, {
-      temperature: context.llmTemperature || 0.7,
-      maxTokens: context.maxTokensPerResponse || 2048,
+      temperature,
+      maxTokens,
     })) {
       yield chunk;
     }
@@ -849,12 +859,7 @@ export class LivelyDebateOrchestrator {
   /**
    * Get system prompt for speaker and phase
    */
-  private getSystemPrompt(speaker: Speaker, promptType: string, context: AgentContext): string {
-    // Use the same system prompts the agents use
-    const agent = speaker === Speaker.PRO ? this.agents.pro :
-                  speaker === Speaker.CON ? this.agents.con :
-                  this.agents.moderator;
-
+  private getSystemPrompt(speaker: Speaker, _promptType: string, context: AgentContext): string {
     // Extract system prompt from agent (this is simplified - agents have more complex prompting)
     return `You are a ${speaker} in a formal debate on: "${context.proposition}". Provide a clear, well-reasoned response.`;
   }
@@ -862,7 +867,7 @@ export class LivelyDebateOrchestrator {
   /**
    * Get user prompt for speaker and phase
    */
-  private getUserPrompt(speaker: Speaker, promptType: string, context: AgentContext): string {
+  private getUserPrompt(_speaker: Speaker, promptType: string, _context: AgentContext): string {
     switch (promptType) {
       case 'opening':
       case 'opening_statement':

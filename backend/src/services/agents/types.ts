@@ -104,6 +104,12 @@ export interface BaseAgent {
     model?: string;
     capabilities?: string[];
   };
+
+  /**
+   * Get the LLM client for direct streaming access
+   * Used by lively orchestrator for real-time token streaming
+   */
+  getLLMClient(): import('../llm/client.js').LLMClient;
 }
 
 /**
