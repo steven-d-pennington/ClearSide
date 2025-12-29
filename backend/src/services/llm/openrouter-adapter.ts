@@ -4,17 +4,29 @@
  * Creates LLM clients configured to use OpenRouter with specific models.
  * Uses OpenAI SDK with baseURL override for compatibility since OpenRouter
  * is OpenAI-compatible.
+ *
+ * Includes proactive rate limiting and smart retry logic.
  */
 
 import OpenAI from 'openai';
 import pino from 'pino';
 import { LLMClient } from './client.js';
 import type { DebateModelConfig } from '../../types/openrouter.js';
+import { getRateLimiter, parseRateLimitHeaders, type RateLimitHeaders } from './rate-limiter.js';
 
 const logger = pino({
   name: 'openrouter-adapter',
   level: process.env.LOG_LEVEL || 'info',
 });
+
+/**
+ * Retry configuration
+ */
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 60000,
+};
 
 /**
  * OpenRouter-specific configuration
@@ -70,67 +82,174 @@ export class OpenRouterLLMClient extends LLMClient {
   /**
    * Override complete method to use OpenRouter
    * This is the main method used by agents
+   * Includes rate limiting and smart retry logic
    */
   async complete(request: import('../../types/llm.js').LLMRequest): Promise<import('../../types/llm.js').LLMResponse> {
-    const startTime = Date.now();
+    const rateLimiter = getRateLimiter();
+    let lastError: Error | null = null;
 
-    logger.info({
-      provider: 'openrouter',
-      model: this.modelId,
-      messageCount: request.messages.length,
-      temperature: request.temperature,
-      maxTokens: request.maxTokens,
-    }, 'Starting OpenRouter completion request');
+    for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+      const startTime = Date.now();
 
-    try {
-      const completion = await this.openRouterClient.chat.completions.create({
-        model: this.modelId,
-        messages: request.messages.map(msg => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        temperature: request.temperature ?? 0.7,
-        max_tokens: request.maxTokens ?? 4096,
-        stream: false,
-      });
+      try {
+        // Wait if rate limited
+        await rateLimiter.waitIfNeeded(this.modelId);
 
-      const choice = completion.choices[0];
-      const content = choice?.message?.content ?? '';
+        // Record the request
+        rateLimiter.recordRequest(this.modelId);
 
-      const duration = Date.now() - startTime;
-      const usage = {
-        promptTokens: completion.usage?.prompt_tokens ?? 0,
-        completionTokens: completion.usage?.completion_tokens ?? 0,
-        totalTokens: completion.usage?.total_tokens ?? 0,
-      };
+        logger.info({
+          provider: 'openrouter',
+          model: this.modelId,
+          messageCount: request.messages.length,
+          temperature: request.temperature,
+          maxTokens: request.maxTokens,
+          attempt: attempt > 0 ? attempt + 1 : undefined,
+        }, 'Starting OpenRouter completion request');
 
-      logger.info({
-        provider: 'openrouter',
-        model: this.modelId,
-        duration,
-        usage,
-      }, 'OpenRouter completion successful');
+        const completion = await this.openRouterClient.chat.completions.create({
+          model: this.modelId,
+          messages: request.messages.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          temperature: request.temperature ?? 0.7,
+          max_tokens: request.maxTokens ?? 4096,
+          stream: false,
+        });
 
-      return {
-        content,
-        model: completion.model || this.modelId,
-        usage,
-        finishReason: choice?.finish_reason === 'length' ? 'length' : 'stop',
-        provider: 'openrouter',
-      };
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.error({
-        error: error instanceof Error ? error.message : String(error),
-        modelId: this.modelId,
-        duration,
-      }, 'OpenRouter completion error');
-      throw error;
+        const choice = completion.choices[0];
+        const content = choice?.message?.content ?? '';
+
+        const duration = Date.now() - startTime;
+        const usage = {
+          promptTokens: completion.usage?.prompt_tokens ?? 0,
+          completionTokens: completion.usage?.completion_tokens ?? 0,
+          totalTokens: completion.usage?.total_tokens ?? 0,
+        };
+
+        logger.info({
+          provider: 'openrouter',
+          model: this.modelId,
+          duration,
+          usage,
+        }, 'OpenRouter completion successful');
+
+        return {
+          content,
+          model: completion.model || this.modelId,
+          usage,
+          finishReason: choice?.finish_reason === 'length' ? 'length' : 'stop',
+          provider: 'openrouter',
+        };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if this is a rate limit error
+        const isRateLimitError = this.isRateLimitError(error);
+        const rateLimitHeaders = this.extractRateLimitHeaders(error);
+
+        // Update rate limiter with headers from error response
+        if (rateLimitHeaders) {
+          rateLimiter.updateFromHeaders(this.modelId, rateLimitHeaders);
+        }
+
+        logger.warn({
+          error: lastError.message,
+          modelId: this.modelId,
+          duration,
+          attempt: attempt + 1,
+          maxRetries: RETRY_CONFIG.maxRetries,
+          isRateLimitError,
+        }, 'OpenRouter completion failed');
+
+        // If we've exhausted retries, throw
+        if (attempt >= RETRY_CONFIG.maxRetries) {
+          logger.error({
+            error: lastError.message,
+            modelId: this.modelId,
+            totalAttempts: attempt + 1,
+          }, 'OpenRouter completion failed after all retries');
+          throw lastError;
+        }
+
+        // Calculate wait time before retry
+        let waitTime: number;
+        if (isRateLimitError) {
+          // Use rate limiter's smart backoff for rate limit errors
+          waitTime = rateLimiter.getRetryAfter(this.modelId, rateLimitHeaders);
+        } else {
+          // Exponential backoff for other errors
+          waitTime = Math.min(
+            RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt),
+            RETRY_CONFIG.maxDelayMs
+          );
+        }
+
+        logger.info({
+          modelId: this.modelId,
+          waitTimeMs: waitTime,
+          nextAttempt: attempt + 2,
+        }, 'Waiting before retry');
+
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
+
+    // Should never reach here, but TypeScript needs it
+    throw lastError || new Error('Unknown error in OpenRouter completion');
+  }
+
+  /**
+   * Check if an error is a rate limit error
+   */
+  private isRateLimitError(error: unknown): boolean {
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+      if (message.includes('429') || message.includes('rate limit')) {
+        return true;
+      }
+    }
+    // Check for OpenAI SDK error structure
+    if (typeof error === 'object' && error !== null) {
+      const e = error as Record<string, unknown>;
+      if (e.status === 429 || e.code === 429) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Extract rate limit headers from error response
+   */
+  private extractRateLimitHeaders(error: unknown): RateLimitHeaders | undefined {
+    if (typeof error === 'object' && error !== null) {
+      const e = error as Record<string, unknown>;
+
+      // Check for headers in error object
+      if (e.headers && typeof e.headers === 'object') {
+        return parseRateLimitHeaders(e.headers as Record<string, string>);
+      }
+
+      // Check for nested error with metadata
+      if (e.error && typeof e.error === 'object') {
+        const innerError = e.error as Record<string, unknown>;
+        if (innerError.metadata && typeof innerError.metadata === 'object') {
+          const metadata = innerError.metadata as Record<string, unknown>;
+          if (metadata.headers && typeof metadata.headers === 'object') {
+            return parseRateLimitHeaders(metadata.headers as Record<string, string>);
+          }
+        }
+      }
+    }
+    return undefined;
   }
 
   /**
    * Override chat method to use OpenRouter
+   * Includes rate limiting and retry logic
    */
   async chat(
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
@@ -140,24 +259,61 @@ export class OpenRouterLLMClient extends LLMClient {
       stream?: boolean;
     }
   ): Promise<string> {
-    try {
-      const response = await this.openRouterClient.chat.completions.create({
-        model: this.modelId,
-        messages,
-        temperature: options?.temperature ?? 0.7,
-        max_tokens: options?.maxTokens ?? 1024,
-        stream: false,
-      });
+    const rateLimiter = getRateLimiter();
+    let lastError: Error | null = null;
 
-      return response.choices[0]?.message?.content || '';
-    } catch (error) {
-      logger.error({ error, modelId: this.modelId }, 'OpenRouter chat error');
-      throw error;
+    for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+      try {
+        // Wait if rate limited
+        await rateLimiter.waitIfNeeded(this.modelId);
+
+        // Record the request
+        rateLimiter.recordRequest(this.modelId);
+
+        const response = await this.openRouterClient.chat.completions.create({
+          model: this.modelId,
+          messages,
+          temperature: options?.temperature ?? 0.7,
+          max_tokens: options?.maxTokens ?? 1024,
+          stream: false,
+        });
+
+        return response.choices[0]?.message?.content || '';
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const isRateLimitError = this.isRateLimitError(error);
+        const rateLimitHeaders = this.extractRateLimitHeaders(error);
+
+        if (rateLimitHeaders) {
+          rateLimiter.updateFromHeaders(this.modelId, rateLimitHeaders);
+        }
+
+        logger.warn({
+          error: lastError.message,
+          modelId: this.modelId,
+          attempt: attempt + 1,
+          isRateLimitError,
+        }, 'OpenRouter chat failed');
+
+        if (attempt >= RETRY_CONFIG.maxRetries) {
+          logger.error({ error: lastError.message, modelId: this.modelId }, 'OpenRouter chat failed after all retries');
+          throw lastError;
+        }
+
+        const waitTime = isRateLimitError
+          ? rateLimiter.getRetryAfter(this.modelId, rateLimitHeaders)
+          : Math.min(RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt), RETRY_CONFIG.maxDelayMs);
+
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
+
+    throw lastError || new Error('Unknown error in OpenRouter chat');
   }
 
   /**
    * Override streamChat method to use OpenRouter
+   * Includes rate limiting (retry is harder with streaming)
    */
   async *streamChat(
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
@@ -166,6 +322,14 @@ export class OpenRouterLLMClient extends LLMClient {
       maxTokens?: number;
     }
   ): AsyncGenerator<string, void, unknown> {
+    const rateLimiter = getRateLimiter();
+
+    // Wait if rate limited before starting stream
+    await rateLimiter.waitIfNeeded(this.modelId);
+
+    // Record the request
+    rateLimiter.recordRequest(this.modelId);
+
     try {
       const stream = await this.openRouterClient.chat.completions.create({
         model: this.modelId,
@@ -182,6 +346,12 @@ export class OpenRouterLLMClient extends LLMClient {
         }
       }
     } catch (error) {
+      // Update rate limiter from error if rate limit
+      const rateLimitHeaders = this.extractRateLimitHeaders(error);
+      if (rateLimitHeaders) {
+        rateLimiter.updateFromHeaders(this.modelId, rateLimitHeaders);
+      }
+
       logger.error({ error, modelId: this.modelId }, 'OpenRouter stream error');
       throw error;
     }
