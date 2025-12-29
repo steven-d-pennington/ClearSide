@@ -198,6 +198,11 @@ export interface DebateTurn {
     assumptions?: string[];
     evidenceType?: string;
     uncertaintyLevel?: 'low' | 'medium' | 'high';
+    // Lively mode interruption metadata
+    wasInterrupted?: boolean;
+    isInterjection?: boolean;
+    interruptedBy?: Speaker;
+    interruptionEnergy?: 'low' | 'medium' | 'high';
   };
 }
 

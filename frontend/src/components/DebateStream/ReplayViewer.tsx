@@ -38,13 +38,16 @@ function getSpeakerName(speaker: Speaker): string {
  */
 function getPhaseName(phase: DebatePhase): string {
   const phaseNames: Record<string, string> = {
-    [DebatePhase.OPENING]: 'Opening Statements',
-    [DebatePhase.CONSTRUCTIVE]: 'Evidence Presentation',
-    [DebatePhase.CROSSEXAM]: 'Clarifying Questions',
-    [DebatePhase.REBUTTAL]: 'Rebuttals',
-    [DebatePhase.CLOSING]: 'Closing Statements',
-    [DebatePhase.SYNTHESIS]: 'Moderator Synthesis',
+    [DebatePhase.INITIALIZING]: 'Initializing',
+    [DebatePhase.PHASE_1_OPENING]: 'Opening Statements',
+    [DebatePhase.PHASE_2_CONSTRUCTIVE]: 'Evidence Presentation',
+    [DebatePhase.PHASE_3_CROSSEXAM]: 'Clarifying Questions',
+    [DebatePhase.PHASE_4_REBUTTAL]: 'Rebuttals',
+    [DebatePhase.PHASE_5_CLOSING]: 'Closing Statements',
+    [DebatePhase.PHASE_6_SYNTHESIS]: 'Moderator Synthesis',
     [DebatePhase.COMPLETED]: 'Completed',
+    [DebatePhase.PAUSED]: 'Paused',
+    [DebatePhase.ERROR]: 'Error',
   };
   return phaseNames[phase] || phase;
 }
@@ -151,10 +154,10 @@ export function ReplayViewer({ turns, onExit }: ReplayViewerProps) {
 
   // Extract interruption metadata
   const metadata = currentTurn.metadata || {};
-  const wasInterrupted = metadata.wasInterrupted as boolean | undefined;
-  const isInterjection = metadata.isInterjection as boolean | undefined;
-  const interruptedBy = metadata.interruptedBy as string | undefined;
-  const interruptionEnergy = metadata.interruptionEnergy as number | undefined;
+  const wasInterrupted = metadata.wasInterrupted;
+  const isInterjection = metadata.isInterjection;
+  const interruptedBy = metadata.interruptedBy;
+  const interruptionEnergy = metadata.interruptionEnergy;
 
   // Calculate progress percentage
   const progressPercent = ((currentIndex + 1) / turns.length) * 100;
@@ -197,7 +200,7 @@ export function ReplayViewer({ turns, onExit }: ReplayViewerProps) {
           {isInterjection && (
             <Badge variant="primary" className={styles.interjectionBadge}>
               Interjection
-              {interruptionEnergy && interruptionEnergy >= 4 && ' (High Energy)'}
+              {interruptionEnergy === 'high' && ' (High Energy)'}
             </Badge>
           )}
         </div>
