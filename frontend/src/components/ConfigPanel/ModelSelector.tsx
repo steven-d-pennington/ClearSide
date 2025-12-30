@@ -12,10 +12,12 @@ import type {
   CostThreshold,
   ModelInfo,
   ModelPairing,
+  ReasoningEffort,
 } from '../../types/configuration';
 import {
   COST_THRESHOLD_INFO,
   MODEL_TIER_INFO,
+  REASONING_EFFORT_INFO,
 } from '../../types/configuration';
 import styles from './ModelSelector.module.css';
 
@@ -134,6 +136,17 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     [selection, onChange]
   );
 
+  // Handle reasoning effort change
+  const handleReasoningEffortChange = useCallback(
+    (effort: ReasoningEffort) => {
+      onChange({
+        ...selection,
+        reasoningEffort: effort,
+      });
+    },
+    [selection, onChange]
+  );
+
   // Handle model selection
   const handleModelChange = useCallback(
     (role: 'pro' | 'con' | 'moderator', modelId: string) => {
@@ -218,6 +231,32 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           <span className={styles.modeName}>Manual</span>
           <span className={styles.modeDesc}>Choose specific models</span>
         </button>
+      </div>
+
+      {/* Reasoning Effort Control */}
+      <div className={styles.reasoningControl}>
+        <label className={styles.sliderLabel}>
+          <span>Extended Thinking</span>
+          <span className={styles.thresholdValue}>
+            {REASONING_EFFORT_INFO[selection.reasoningEffort].name}
+          </span>
+        </label>
+        <select
+          value={selection.reasoningEffort}
+          onChange={(e) => handleReasoningEffortChange(e.target.value as ReasoningEffort)}
+          disabled={disabled}
+          className={styles.select}
+        >
+          <option value="none">Disabled - No extended thinking</option>
+          <option value="minimal">Minimal - Quick reasoning (~10%)</option>
+          <option value="low">Low - Light reasoning (~20%)</option>
+          <option value="medium">Medium - Balanced reasoning (~50%)</option>
+          <option value="high">High - Thorough reasoning (~80%)</option>
+          <option value="xhigh">Maximum - Deepest reasoning (~95%)</option>
+        </select>
+        <p className={styles.reasoningNote}>
+          Extended thinking allows reasoning-capable models (marked with 🧠) to "think through" complex arguments before responding.
+        </p>
       </div>
 
       {/* Auto Mode: Cost Threshold Slider */}

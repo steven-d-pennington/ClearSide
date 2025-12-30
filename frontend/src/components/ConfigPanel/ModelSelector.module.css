@@ -104,6 +104,21 @@
   margin-top: var(--spacing-xs);
 }
 
+/* Reasoning Control */
+.reasoningControl {
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+}
+
+.reasoningNote {
+  margin: var(--spacing-sm) 0 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
 /* Auto Mode */
 .autoMode {
   padding-top: var(--spacing-md);

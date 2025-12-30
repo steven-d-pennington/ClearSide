@@ -301,6 +301,42 @@ export const ARCHETYPE_INFO: Record<PersonaArchetype, { name: string; descriptio
 export type ModelTier = 'frontier' | 'mid_tier' | 'budget' | 'free';
 
 /**
+ * Reasoning effort levels for extended thinking
+ * xhigh = ~95% of budget, high = ~80%, medium = ~50%, low = ~20%, minimal = ~10%
+ */
+export type ReasoningEffort = 'xhigh' | 'high' | 'medium' | 'low' | 'minimal' | 'none';
+
+/**
+ * Reasoning effort display info
+ */
+export const REASONING_EFFORT_INFO: Record<ReasoningEffort, { name: string; description: string }> = {
+  xhigh: {
+    name: 'Maximum',
+    description: 'Deepest reasoning (~95% token budget)',
+  },
+  high: {
+    name: 'High',
+    description: 'Thorough reasoning (~80% token budget)',
+  },
+  medium: {
+    name: 'Medium',
+    description: 'Balanced reasoning (~50% token budget)',
+  },
+  low: {
+    name: 'Low',
+    description: 'Light reasoning (~20% token budget)',
+  },
+  minimal: {
+    name: 'Minimal',
+    description: 'Quick reasoning (~10% token budget)',
+  },
+  none: {
+    name: 'Disabled',
+    description: 'No extended thinking',
+  },
+};
+
+/**
  * Cost threshold for model filtering
  */
 export type CostThreshold = 'unlimited' | 'high' | 'medium' | 'low' | 'free_only';
@@ -343,6 +379,8 @@ export interface ModelSelection {
   proModelId: string | null;
   conModelId: string | null;
   moderatorModelId: string | null;
+  /** Extended thinking effort level (only for reasoning-capable models) */
+  reasoningEffort: ReasoningEffort;
 }
 
 /**
@@ -354,6 +392,7 @@ export const DEFAULT_MODEL_SELECTION: ModelSelection = {
   proModelId: null,
   conModelId: null,
   moderatorModelId: null,
+  reasoningEffort: 'none',
 };
 
 /**

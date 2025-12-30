@@ -59,6 +59,8 @@ export interface StartDebateOptions {
   conModelId?: string | null;
   /** Model ID for Moderator (manual mode) */
   moderatorModelId?: string | null;
+  /** Extended thinking effort level (for reasoning-capable models) */
+  reasoningEffort?: 'xhigh' | 'high' | 'medium' | 'low' | 'minimal' | 'none';
   /** Debate mode - turn_based or lively */
   debateMode?: DebateMode;
   /** Lively mode settings (only used if debateMode is 'lively') */
@@ -231,6 +233,10 @@ export const useDebateStore = create<DebateState>()(
           }
           if (options.moderatorModelId !== undefined) {
             requestBody.moderatorModelId = options.moderatorModelId;
+          }
+          // Add reasoning effort if provided and not 'none'
+          if (options.reasoningEffort !== undefined && options.reasoningEffort !== 'none') {
+            requestBody.reasoningEffort = options.reasoningEffort;
           }
 
           console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);

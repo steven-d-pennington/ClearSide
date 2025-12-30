@@ -19,7 +19,7 @@ import {
   type BrevityLevel,
 } from '../types/configuration.js';
 import type { DebateMode, LivelySettingsInput } from '../types/lively.js';
-import type { DebateModelConfig, ModelSelectionMode, CostThreshold } from '../types/openrouter.js';
+import type { DebateModelConfig, ModelSelectionMode, CostThreshold, ReasoningEffort, ReasoningConfig } from '../types/openrouter.js';
 import { createDebateClients } from '../services/llm/openrouter-adapter.js';
 import { getOpenRouterClient, createModelPairingService } from '../services/openrouter/index.js';
 
@@ -57,6 +57,8 @@ interface ConfigInput {
   conModelId?: unknown;
   moderatorModelId?: unknown;
   costThreshold?: unknown;
+  // Reasoning configuration
+  reasoningEffort?: unknown;
 }
 
 function validateConfigInput(config: ConfigInput): string[] {
@@ -134,6 +136,14 @@ function validateConfigInput(config: ConfigInput): string[] {
     }
   }
 
+  // Reasoning effort validation
+  if (config.reasoningEffort !== undefined) {
+    const validEfforts = ['xhigh', 'high', 'medium', 'low', 'minimal', 'none'];
+    if (!validEfforts.includes(String(config.reasoningEffort))) {
+      errors.push(`Invalid reasoningEffort: must be one of ${validEfforts.join(', ')}`);
+    }
+  }
+
   return errors;
 }
 
@@ -162,15 +172,39 @@ async function validatePersonaIds(proPersonaId?: string | null, conPersonaId?: s
 }
 
 /**
+ * Build reasoning configuration from effort level
+ */
+function buildReasoningConfig(reasoningEffort?: ReasoningEffort): ReasoningConfig | undefined {
+  if (!reasoningEffort || reasoningEffort === 'none') {
+    return undefined;
+  }
+
+  return {
+    enabled: true,
+    effort: reasoningEffort,
+  };
+}
+
+/**
  * Build model configuration for debate
  * Handles both auto and manual mode
  */
 async function buildModelConfig(configInput: ConfigInput): Promise<DebateModelConfig | undefined> {
   const selectionMode = configInput.modelSelectionMode as ModelSelectionMode | undefined;
+  const reasoningEffort = configInput.reasoningEffort as ReasoningEffort | undefined;
+  const reasoning = buildReasoningConfig(reasoningEffort);
 
-  // If no model selection specified, return undefined (use defaults)
-  if (!selectionMode) {
+  // If no model selection specified but reasoning is set, still return config
+  if (!selectionMode && !reasoning) {
     return undefined;
+  }
+
+  // If no model selection but reasoning is specified, return just reasoning config
+  if (!selectionMode && reasoning) {
+    return {
+      selectionMode: 'auto',
+      reasoning,
+    };
   }
 
   // Manual mode - use provided model IDs
@@ -181,6 +215,7 @@ async function buildModelConfig(configInput: ConfigInput): Promise<DebateModelCo
       conModelId: configInput.conModelId as string | undefined,
       moderatorModelId: configInput.moderatorModelId as string | undefined,
       costThreshold: configInput.costThreshold as CostThreshold | undefined,
+      reasoning,
     };
   }
 
@@ -198,6 +233,7 @@ async function buildModelConfig(configInput: ConfigInput): Promise<DebateModelCo
           proModel: pairing.proModel.id,
           conModel: pairing.conModel.id,
           tier: pairing.tier,
+          reasoning: reasoning?.effort || 'disabled',
         }, 'Auto-selected model pairing');
 
         return {
@@ -205,14 +241,15 @@ async function buildModelConfig(configInput: ConfigInput): Promise<DebateModelCo
           proModelId: pairing.proModel.id,
           conModelId: pairing.conModel.id,
           costThreshold,
+          reasoning,
         };
       } else {
         logger.warn({ costThreshold }, 'Could not auto-select models, using defaults');
-        return undefined;
+        return reasoning ? { selectionMode: 'auto', reasoning } : undefined;
       }
     } catch (error) {
       logger.warn({ error }, 'Error in auto model selection, using defaults');
-      return undefined;
+      return reasoning ? { selectionMode: 'auto', reasoning } : undefined;
     }
   }
 
@@ -458,6 +495,8 @@ router.post('/debates', async (req: Request, res: Response) => {
       conModelId: req.body.conModelId,
       moderatorModelId: req.body.moderatorModelId,
       costThreshold: req.body.costThreshold,
+      // Reasoning configuration
+      reasoningEffort: req.body.reasoningEffort,
     };
 
     const configErrors = validateConfigInput(configInput);

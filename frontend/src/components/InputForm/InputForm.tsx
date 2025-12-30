@@ -234,6 +234,8 @@ export const InputForm: React.FC<InputFormProps> = ({
           proModelId: modelSelection.proModelId,
           conModelId: modelSelection.conModelId,
           moderatorModelId: modelSelection.moderatorModelId,
+          // Extended thinking/reasoning
+          reasoningEffort: modelSelection.reasoningEffort,
           debateMode,
           livelySettings: debateMode === 'lively' ? livelySettings : undefined,
         });
