@@ -32,6 +32,12 @@ export const TurnCard: React.FC<TurnCardProps> = ({
   // Check if this is an interjection from lively mode
   const isInterjection = turn.metadata?.isInterjection === true;
 
+  // Extract model name for attribution (show short version)
+  const modelName = turn.metadata?.model;
+  const shortModelName = modelName
+    ? modelName.split('/').pop()?.split(':')[0] || modelName
+    : null;
+
   return (
     <article
       className={`${styles.turnCard} ${styles[turn.speaker.toLowerCase()]} ${isSelected ? styles.selected : ''} ${isInterjection ? styles.interjection : ''} ${className}`}
@@ -53,6 +59,11 @@ export const TurnCard: React.FC<TurnCardProps> = ({
           </span>
         )}
         <span className={styles.phase}>{phaseInfo.shortName}</span>
+        {shortModelName && (
+          <span className={styles.modelBadge} title={modelName}>
+            🤖 {shortModelName}
+          </span>
+        )}
         <span className={styles.time}>{formatTime(turn.timestamp)}</span>
       </header>
 

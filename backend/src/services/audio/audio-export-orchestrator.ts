@@ -16,7 +16,6 @@ import { AudioProcessor, createAudioProcessor } from './audio-processor.js';
 import { ID3Manager, createID3Manager } from './id3-manager.js';
 import { getTTSService, getDefaultProvider } from './tts-provider-factory.js';
 import * as exportJobRepository from '../../db/repositories/export-job-repository.js';
-import type { ExportJob } from '../../types/export-job.js';
 import type {
   AudioExportJob,
   AudioExportOptions,
@@ -141,8 +140,8 @@ export class AudioExportOrchestrator {
       debateId: job.debateId,
       status: job.status as AudioExportJob['status'],
       progress: job.progress,
-      stage: job.stage || undefined,
-      options: job.options as Partial<AudioExportOptions>,
+      stage: job.stage || 'initializing',
+      options: job.options as AudioExportOptions,
       outputPath: job.outputPath || undefined,
       outputUrl: job.outputUrl || undefined,
       fileSizeBytes: job.fileSizeBytes || undefined,
@@ -473,8 +472,8 @@ export class AudioExportOrchestrator {
       debateId: job.debateId,
       status: job.status as AudioExportJob['status'],
       progress: job.progress,
-      stage: job.stage || undefined,
-      options: job.options as Partial<AudioExportOptions>,
+      stage: job.stage || 'initializing',
+      options: job.options as AudioExportOptions,
       outputPath: job.outputPath || undefined,
       outputUrl: job.outputUrl || undefined,
       fileSizeBytes: job.fileSizeBytes || undefined,

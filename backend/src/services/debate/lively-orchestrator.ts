@@ -1203,6 +1203,12 @@ export class LivelyDebateOrchestrator {
     turn: Turn,
     interruptionContext?: InterruptionContext | null
   ): Promise<void> {
+    // Get model attribution from the agent
+    const agentKey = speaker === Speaker.PRO ? 'pro' : speaker === Speaker.CON ? 'con' : 'moderator';
+    const agent = this.agents[agentKey];
+    const agentMetadata = agent.getMetadata();
+    const modelName = agentMetadata.model || 'unknown';
+
     const input: CreateUtteranceInput = {
       debateId: this.debateId,
       phase: mapPhaseToDb(phase),
@@ -1213,6 +1219,8 @@ export class LivelyDebateOrchestrator {
         promptType: turn.promptType,
         turnNumber: turn.turnNumber,
         debateMode: 'lively',
+        // Model attribution
+        model: modelName,
         // TTS-friendly interruption metadata
         ...(interruptionContext?.wasInterrupted && {
           wasInterrupted: true,
@@ -1227,7 +1235,7 @@ export class LivelyDebateOrchestrator {
 
     await utteranceRepo.create(input);
 
-    // Broadcast utterance
+    // Broadcast utterance with model attribution
     if (this.broadcastEvents) {
       this.sseManager.broadcastToDebate(this.debateId, 'utterance', {
         debateId: this.debateId,
@@ -1235,6 +1243,7 @@ export class LivelyDebateOrchestrator {
         speaker: mapSpeakerToDb(speaker),
         content,
         timestampMs: this.getElapsedMs(),
+        model: modelName,
         wasInterrupted: interruptionContext?.wasInterrupted ?? false,
       });
     }

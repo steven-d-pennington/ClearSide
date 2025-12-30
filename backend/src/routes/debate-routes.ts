@@ -400,8 +400,10 @@ async function startDebateOrchestrator(
 router.get('/debates/:debateId/stream', async (req: Request, res: Response) => {
   const { debateId } = req.params;
   const lastEventId = req.headers['last-event-id'] as string | undefined;
+  // Query param for catch-up: ?lastTurnNumber=5 means client has seen turns 0-5
+  const lastTurnNumber = req.query.lastTurnNumber ? parseInt(req.query.lastTurnNumber as string, 10) : undefined;
 
-  logger.info({ debateId, lastEventId }, 'SSE stream requested');
+  logger.info({ debateId, lastEventId, lastTurnNumber }, 'SSE stream requested');
 
   try {
     // Verify debate exists
@@ -432,6 +434,61 @@ router.get('/debates/:debateId/stream', async (req: Request, res: Response) => {
       logger.error({ debateId: debateId!, clientId, error }, 'SSE stream error');
       sseManager.unregisterClient(clientId);
     });
+
+    // CATCH-UP MECHANISM: Send historical utterances if client is reconnecting
+    if (lastTurnNumber !== undefined && !isNaN(lastTurnNumber)) {
+      try {
+        // Fetch all utterances for this debate
+        const allUtterances = await utteranceRepository.findByDebateId(debateId!);
+
+        // Filter to get missed utterances (turns after lastTurnNumber)
+        // Turn numbers are stored in metadata.turnNumber or inferred from order
+        const missedUtterances = allUtterances.filter((u, index) => {
+          const turnNum = (u.metadata?.turnNumber as number) ?? index;
+          return turnNum > lastTurnNumber;
+        });
+
+        if (missedUtterances.length > 0) {
+          logger.info(
+            { debateId, clientId, missedCount: missedUtterances.length, lastTurnNumber },
+            'Sending catch-up utterances'
+          );
+
+          // Send catch-up start event
+          sseManager.sendToClient(clientId, 'catchup_start' as any, {
+            debateId: debateId!,
+            missedTurnCount: missedUtterances.length,
+            fromTurnNumber: lastTurnNumber + 1,
+            toTurnNumber: (missedUtterances[missedUtterances.length - 1]?.metadata?.turnNumber as number) ??
+              (allUtterances.length - 1),
+          });
+
+          // Send each missed utterance
+          for (const utterance of missedUtterances) {
+            sseManager.sendToClient(clientId, 'catchup_utterance' as any, {
+              id: utterance.id,
+              timestamp_ms: utterance.timestampMs,
+              phase: utterance.phase,
+              speaker: utterance.speaker,
+              content: utterance.content,
+              metadata: utterance.metadata,
+              isCatchup: true,
+            });
+          }
+
+          // Send catch-up complete event
+          sseManager.sendToClient(clientId, 'catchup_complete' as any, {
+            debateId: debateId!,
+            utterancesSent: missedUtterances.length,
+            currentPhase: debate.currentPhase,
+            debateStatus: debate.status,
+          });
+        }
+      } catch (catchupError) {
+        logger.error({ debateId, clientId, catchupError }, 'Error sending catch-up data');
+        // Continue with normal stream even if catch-up fails
+      }
+    }
 
     // If debate is already completed, send complete event immediately
     if (debate.status === 'completed') {

@@ -1,5 +1,11 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useDebateStore, selectIsAwaitingContinue, selectIsStepMode } from '../../stores/debate-store';
+import {
+  useDebateStore,
+  selectIsAwaitingContinue,
+  selectIsStepMode,
+  selectIsCatchingUp,
+  selectCatchupState,
+} from '../../stores/debate-store';
 import { PhaseIndicator } from './PhaseIndicator';
 import { TurnCard } from './TurnCard';
 import { StreamingTurn } from './StreamingTurn';
@@ -34,6 +40,8 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
 
   const isAwaitingContinue = useDebateStore(selectIsAwaitingContinue);
   const isStepMode = useDebateStore(selectIsStepMode);
+  const isCatchingUp = useDebateStore(selectIsCatchingUp);
+  const catchupState = useDebateStore(selectCatchupState);
 
   // State for intervention panel visibility
   const [isInterventionPanelOpen, setIsInterventionPanelOpen] = useState(false);
@@ -128,6 +136,30 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
       {hasError && (
         <Alert variant="error" className={styles.errorAlert}>
           <strong>An error occurred:</strong> {error || debate.error || 'Connection lost'}
+        </Alert>
+      )}
+
+      {/* Catch-up Indicator */}
+      {isCatchingUp && catchupState.missedTurnCount > 0 && (
+        <Alert variant="info" className={styles.catchupAlert}>
+          <div className={styles.catchupContent}>
+            <span className={styles.catchupIcon}>🔄</span>
+            <span>
+              Catching up... Receiving {catchupState.receivedCount} of {catchupState.missedTurnCount} missed turns
+            </span>
+          </div>
+        </Alert>
+      )}
+
+      {/* Catch-up Complete Indicator (shown briefly after catch-up) */}
+      {!isCatchingUp && catchupState.missedTurnCount > 0 && (
+        <Alert variant="success" className={styles.catchupAlert}>
+          <div className={styles.catchupContent}>
+            <span className={styles.catchupIcon}>✅</span>
+            <span>
+              Welcome back! You've caught up on {catchupState.missedTurnCount} missed turns.
+            </span>
+          </div>
         </Alert>
       )}
 

@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, Alert } from '../components/ui';
+import { Alert } from '../components/ui';
 import styles from './AdminConfigPage.module.css';
 
 interface Preset {
@@ -45,7 +45,8 @@ export function AdminConfigPage() {
   const [providers, setProviders] = useState<TTSProvider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [actionMessage, _setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 

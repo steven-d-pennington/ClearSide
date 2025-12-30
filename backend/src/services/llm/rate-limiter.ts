@@ -148,11 +148,11 @@ export class RateLimiter {
 
     // Mid-tier models
     const midTierPatterns = [
-      'claude-3-sonnet', 'claude-3-haiku',
-      'gpt-3.5-turbo', 'gpt-4o-mini',
-      'gemini-1.5-flash', 'gemini-2.0-flash',
+      'claude-3-sonnet', 'claude-3-haiku', 'claude-3.5-haiku', 'claude-haiku',
+      'gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-5-mini',
+      'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-flash',
       'mistral-large', 'mistral-medium',
-      'llama-3.1-70b', 'llama-3.1-405b',
+      'llama-3.1-70b', 'llama-3.1-405b', 'llama-3.3',
     ];
     if (midTierPatterns.some(p => lowerId.includes(p))) {
       return 'mid_tier';

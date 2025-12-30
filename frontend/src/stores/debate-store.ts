@@ -79,6 +79,27 @@ interface StreamingTurn {
 }
 
 /**
+ * Catch-up state for reconnecting clients
+ */
+interface CatchupState {
+  /** Whether catch-up is in progress */
+  isInProgress: boolean;
+  /** Number of missed turns being sent */
+  missedTurnCount: number;
+  /** Number of turns received so far */
+  receivedCount: number;
+}
+
+/**
+ * Initial catch-up state
+ */
+const initialCatchupState: CatchupState = {
+  isInProgress: false,
+  missedTurnCount: 0,
+  receivedCount: 0,
+};
+
+/**
  * Debate store state
  */
 interface DebateState {
@@ -104,6 +125,9 @@ interface DebateState {
 
   // Lively mode state
   lively: LivelyState;
+
+  // Catch-up state for reconnection
+  catchup: CatchupState;
 
   // Actions
   startDebate: (proposition: string, options?: StartDebateOptions) => Promise<void>;
@@ -153,6 +177,7 @@ const initialState = {
   isAutoScrollEnabled: true,
   selectedTurnId: null,
   lively: initialLivelyState,
+  catchup: initialCatchupState,
 };
 
 /**
@@ -484,9 +509,10 @@ export const useDebateStore = create<DebateState>()(
 
       /**
        * Connect to SSE stream for a debate
+       * If reconnecting with existing turns, requests catch-up data
        */
       connectToDebate: (debateId: string) => {
-        const { eventSource } = get();
+        const { eventSource, debate } = get();
 
         // Close existing connection
         if (eventSource) {
@@ -495,7 +521,17 @@ export const useDebateStore = create<DebateState>()(
 
         set({ connectionStatus: 'connecting' });
 
-        const newEventSource = new EventSource(`${API_BASE_URL}/api/debates/${debateId}/stream`);
+        // Build SSE URL with optional lastTurnNumber for catch-up
+        let sseUrl = `${API_BASE_URL}/api/debates/${debateId}/stream`;
+
+        // If we have existing turns, we're reconnecting - request catch-up
+        if (debate?.id === debateId && debate.turns.length > 0) {
+          const lastTurnNumber = debate.turns.length - 1;
+          sseUrl += `?lastTurnNumber=${lastTurnNumber}`;
+          console.log('🔄 Reconnecting with catch-up from turn', lastTurnNumber);
+        }
+
+        const newEventSource = new EventSource(sseUrl);
 
         newEventSource.onopen = () => {
           set({
@@ -1271,6 +1307,102 @@ export const useDebateStore = create<DebateState>()(
             set({ isAwaitingContinue: false });
             break;
 
+          // Catch-up events for reconnecting clients
+          case 'catchup_start': {
+            const data = message.data as {
+              debateId: string;
+              missedTurnCount: number;
+              fromTurnNumber: number;
+              toTurnNumber: number;
+            };
+            console.log('🔄 Catch-up starting:', data);
+            set({
+              catchup: {
+                isInProgress: true,
+                missedTurnCount: data.missedTurnCount,
+                receivedCount: 0,
+              },
+            });
+            break;
+          }
+
+          case 'catchup_utterance': {
+            const data = message.data as {
+              id: number;
+              timestamp_ms: number;
+              phase: string;
+              speaker: string;
+              content: string;
+              metadata?: Record<string, unknown>;
+              isCatchup: true;
+            };
+
+            // Convert to DebateTurn and add to turns
+            const phase = (Object.values(DebatePhase).includes(data.phase as DebatePhase)
+              ? data.phase
+              : DebatePhase.PHASE_1_OPENING) as DebatePhase;
+
+            const speaker = (Object.values(Speaker).includes(data.speaker as Speaker)
+              ? data.speaker
+              : Speaker.MODERATOR) as Speaker;
+
+            const currentDebate = get().debate;
+            const newTurn: DebateTurn = {
+              id: `${currentDebate?.id ?? 'unknown'}-catchup-${data.id}`,
+              debateId: currentDebate?.id ?? '',
+              phase,
+              speaker,
+              content: data.content,
+              turnNumber: currentDebate?.turns.length ?? 0,
+              timestamp: new Date(data.timestamp_ms),
+              metadata: data.metadata as DebateTurn['metadata'],
+            };
+
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    turns: [...state.debate.turns, newTurn],
+                  }
+                : null,
+              catchup: {
+                ...state.catchup,
+                receivedCount: state.catchup.receivedCount + 1,
+              },
+            }));
+            break;
+          }
+
+          case 'catchup_complete': {
+            const data = message.data as {
+              debateId: string;
+              utterancesSent: number;
+              currentPhase: string;
+              debateStatus: string;
+            };
+            console.log('✅ Catch-up complete:', data);
+
+            // Update debate state with current phase/status
+            const phase = (Object.values(DebatePhase).includes(data.currentPhase as DebatePhase)
+              ? data.currentPhase
+              : null) as DebatePhase | null;
+
+            set((state) => ({
+              debate: state.debate && phase
+                ? {
+                    ...state.debate,
+                    currentPhase: phase,
+                    status: data.debateStatus as Debate['status'],
+                  }
+                : state.debate,
+              catchup: {
+                ...state.catchup,
+                isInProgress: false,
+              },
+            }));
+            break;
+          }
+
           default:
             // Check if it's a lively mode event
             const livelyEvents = [
@@ -1408,5 +1540,14 @@ export const selectCanInterrupt = (state: DebateState) => {
 
 export const selectLivelyPacingMode = (state: DebateState) =>
   state.lively.settings?.pacingMode ?? 'medium';
+
+/**
+ * Catch-up selectors
+ */
+export const selectCatchupState = (state: DebateState) => state.catchup;
+
+export const selectIsCatchingUp = (state: DebateState) => state.catchup.isInProgress;
+
+export const selectMissedTurnCount = (state: DebateState) => state.catchup.missedTurnCount;
 
 export default useDebateStore;

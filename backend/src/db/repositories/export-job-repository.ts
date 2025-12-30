@@ -11,8 +11,6 @@ import type {
   UpdateExportJobInput,
   ListExportJobsOptions,
   ExportJobCounts,
-  ExportJobStatus,
-  rowToExportJob,
 } from '../../types/export-job.js';
 import { rowToExportJob as convertRow } from '../../types/export-job.js';
 

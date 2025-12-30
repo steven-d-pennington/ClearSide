@@ -198,6 +198,8 @@ export interface DebateTurn {
     assumptions?: string[];
     evidenceType?: string;
     uncertaintyLevel?: 'low' | 'medium' | 'high';
+    // Model attribution
+    model?: string;
     // Lively mode interruption metadata
     wasInterrupted?: boolean;
     isInterjection?: boolean;
@@ -300,6 +302,10 @@ export type SSEEventType =
   | 'debate_error'
   | 'error'              // Backend sends this
   | 'heartbeat'
+  // Catch-up events for reconnecting clients
+  | 'catchup_start'        // Client reconnected, receiving missed turns
+  | 'catchup_utterance'    // Historical utterance during catch-up
+  | 'catchup_complete'     // All catch-up data sent
   // Lively mode events
   | 'speaker_started'      // Speaker takes the floor
   | 'speaker_cutoff'       // Speaker was interrupted mid-turn

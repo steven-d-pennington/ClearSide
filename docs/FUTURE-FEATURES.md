@@ -8,18 +8,19 @@ This document tracks planned features and ideas for ClearSide. These are not yet
 
 **Priority:** P2
 **Complexity:** Low
+**Status:** IMPLEMENTED
 
 Display which AI model generated each response in the debate UI.
 
 ### Requirements
-- Show model name/ID alongside each turn in the debate transcript
-- Consider showing model info in a subtle way (tooltip, badge, or footnote)
-- Useful for comparing model quality when using different models for Pro vs Con
+- [x] Show model name/ID alongside each turn in the debate transcript
+- [x] Consider showing model info in a subtle way (tooltip, badge, or footnote)
+- [x] Useful for comparing model quality when using different models for Pro vs Con
 
 ### Implementation Notes
-- Model info is already returned in LLM responses (`model` field)
-- Need to store model ID with each turn in debate transcript
-- Frontend needs to display model attribution per turn
+- Model info is stored in utterance metadata (`metadata.model`)
+- Both `debate-orchestrator.ts` and `lively-orchestrator.ts` capture model attribution
+- Frontend `TurnCard` component displays model badge with tooltip for full model name
 
 ---
 
@@ -27,27 +28,28 @@ Display which AI model generated each response in the debate UI.
 
 **Priority:** P1
 **Complexity:** Medium
+**Status:** IMPLEMENTED
 
 Allow users to join debates already in progress and leave/rejoin at will.
 
 ### Requirements
-- **Join in-progress debates**: User can view ongoing debates as a spectator
-- **Leave and return**: User can navigate away and return to continue watching
-- **State preservation**: Debate continues running server-side while user is away
-- **Catch-up mechanism**: Show user what they missed when returning
-- **Multiple viewers**: Consider future support for multiple users watching same debate
+- [x] **Join in-progress debates**: User can view ongoing debates as a spectator
+- [x] **Leave and return**: User can navigate away and return to continue watching
+- [x] **State preservation**: Debate continues running server-side while user is away
+- [x] **Catch-up mechanism**: Show user what they missed when returning
+- [ ] **Multiple viewers**: Consider future support for multiple users watching same debate
 
 ### Implementation Notes
-- Current architecture uses SSE which naturally supports reconnection
-- Need to track debate progress independently of client connection
-- Consider adding "debate session" concept separate from user session
-- May need debate checkpointing for efficient catch-up
+- SSE stream endpoint accepts `?lastTurnNumber=N` query param for catch-up
+- Backend sends `catchup_start`, `catchup_utterance`, and `catchup_complete` events
+- Frontend stores turn count and requests catch-up on reconnection
+- UI shows "Catching up..." indicator with progress, then "Welcome back" message
 
-### Technical Approach
-1. Decouple debate execution from SSE connection lifecycle
-2. Store full debate state in database (already partially done)
-3. On reconnect, stream historical turns then switch to live
-4. Add "time since last seen" indicator for returning users
+### Technical Approach (Completed)
+1. ~~Decouple debate execution from SSE connection lifecycle~~ (already done)
+2. ~~Store full debate state in database~~ (already done)
+3. [x] On reconnect, stream historical turns then switch to live
+4. [x] Add "missed turns" indicator for returning users
 
 ---
 

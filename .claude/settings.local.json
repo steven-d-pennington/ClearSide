@@ -13,7 +13,15 @@
       "Bash(wsl --shutdown:*)",
       "Bash(cat:*)",
       "Bash(docker-compose logs:*)",
-      "Bash(docker-compose restart:*)"
+      "Bash(docker-compose restart:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat\\(reasoning\\): add extended thinking support for OpenRouter models\n\n- Add ReasoningConfig type with effort levels \\(xhigh, high, medium, low, minimal, none\\)\n- Update OpenRouterLLMClient to pass reasoning parameter in API requests\n- Add reasoning model detection based on known model patterns\n- Sort models alphabetically by provider then name\n- Show 🧠 indicator for models that support extended thinking\n- Add supportsReasoning field to model API responses\n\nThis enables deeper, more thorough responses from models that support\nextended thinking/reasoning tokens.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(docker logs:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(curl:*)",
+      "Bash(git push:*)"
     ]
   }
 }

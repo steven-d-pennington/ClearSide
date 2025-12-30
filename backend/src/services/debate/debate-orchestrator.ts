@@ -341,6 +341,13 @@ export class DebateOrchestrator {
         context
       );
 
+      // Get model attribution from the agent
+      const agentKey = turn.speaker === Speaker.PRO ? 'pro' :
+                       turn.speaker === Speaker.CON ? 'con' : 'moderator';
+      const agent = this.agents[agentKey];
+      const agentMetadata = agent.getMetadata();
+      const modelName = agentMetadata.model || 'unknown';
+
       // Create utterance
       const utterance: OrchestratorUtterance = {
         debateId: this.debateId,
@@ -352,6 +359,7 @@ export class DebateOrchestrator {
           promptType: turn.promptType,
           turnNumber: turn.turnNumber,
           generationTimeMs: Date.now() - startTime,
+          model: modelName,
         },
       };
 

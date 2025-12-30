@@ -67,6 +67,20 @@
   border-radius: var(--radius-sm);
 }
 
+.modelBadge {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-primary);
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, monospace);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
 .time {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);

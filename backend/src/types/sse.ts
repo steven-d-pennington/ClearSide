@@ -27,6 +27,10 @@ export type SSEEventType =
   | 'debate_complete'        // Debate completed (alternative)
   | 'debate_stopped'         // Debate stopped by user
   | 'error'                  // Error occurred during debate
+  // Catch-up events for reconnecting clients
+  | 'catchup_start'          // Client reconnected, catch-up beginning
+  | 'catchup_utterance'      // Historical utterance sent during catch-up
+  | 'catchup_complete'       // All catch-up data sent, switching to live
   // Lively mode events
   | 'speaker_started'        // Speaker takes the floor in lively mode
   | 'speaker_cutoff'         // Speaker was interrupted mid-utterance
@@ -248,4 +252,35 @@ export interface PacingChangeEventData {
   previousPacing: string;
   newPacing: string;
   timestampMs: number;
+}
+
+// ============================================================================
+// Catch-up Event Payloads (for reconnecting clients)
+// ============================================================================
+
+/** Catch-up start event payload */
+export interface CatchupStartEventData {
+  debateId: string;
+  missedTurnCount: number;
+  fromTurnNumber: number;
+  toTurnNumber: number;
+}
+
+/** Catch-up utterance event payload (same as utterance but marked) */
+export interface CatchupUtteranceEventData {
+  id: number;
+  timestamp_ms: number;
+  phase: string;
+  speaker: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  isCatchup: true;
+}
+
+/** Catch-up complete event payload */
+export interface CatchupCompleteEventData {
+  debateId: string;
+  utterancesSent: number;
+  currentPhase: string;
+  debateStatus: string;
 }
