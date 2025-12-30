@@ -5,7 +5,7 @@
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { HomePage, HistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage } from './pages';
+import { HomePage, HistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage, AdminEventsPage } from './pages';
 import './styles/tokens.css';
 import './App.css';
 
@@ -28,6 +28,7 @@ function App() {
             <Route path="/admin/exports" element={<AdminExportsPage />} />
             <Route path="/admin/system" element={<AdminSystemPage />} />
             <Route path="/admin/config" element={<AdminConfigPage />} />
+            <Route path="/admin/events" element={<AdminEventsPage />} />
           </Routes>
         </main>
       </div>

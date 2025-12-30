@@ -16,7 +16,15 @@ const __dirname = dirname(__filename);
  * List of migration files in order
  * Add new migrations to the end of this array
  */
-const MIGRATIONS = ['001_create_debates_schema.sql'];
+const MIGRATIONS = [
+  '001_create_debates_schema.sql',
+  '002_add_flow_mode.sql',
+  '003_add_debate_configuration.sql',
+  '004_add_personas.sql',
+  '005_add_lively_mode.sql',
+  '006_add_export_jobs.sql',
+  '007_add_system_events.sql',
+];
 
 /**
  * Check if a migration has already been applied

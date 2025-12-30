@@ -286,3 +286,128 @@ export interface UpdateDebateStatusInput {
   currentPhase?: DebatePhase;
   currentSpeaker?: Speaker;
 }
+
+// ============================================================================
+// SYSTEM EVENTS
+// ============================================================================
+
+/**
+ * Event severity levels
+ */
+export type EventSeverity = 'debug' | 'info' | 'warn' | 'error';
+
+/**
+ * Event types for the system events table
+ * Categorizes different types of orchestrator and system events
+ */
+export type SystemEventType =
+  // Debate lifecycle
+  | 'debate_started'
+  | 'debate_completed'
+  | 'debate_error'
+  | 'debate_paused'
+  | 'debate_resumed'
+  // Phase management
+  | 'phase_transition'
+  | 'turn_started'
+  | 'turn_completed'
+  | 'turn_skipped'
+  // Response quality
+  | 'empty_response'
+  | 'retry_attempt'
+  | 'retry_success'
+  | 'retry_exhausted'
+  | 'truncated_response'
+  // Rate limiting
+  | 'rate_limit_hit'
+  | 'rate_limit_wait'
+  // Interruptions
+  | 'interruption_fired'
+  | 'resumption'
+  // Model events
+  | 'model_selected'
+  | 'reasoning_enabled'
+  // Generic
+  | 'info'
+  | 'warning'
+  | 'error';
+
+/**
+ * System event entity
+ * Represents a logged event for monitoring and debugging
+ */
+export interface SystemEvent {
+  /** Unique identifier (auto-increment) */
+  id: number;
+
+  /** Type of event */
+  eventType: SystemEventType;
+
+  /** Severity level */
+  severity: EventSeverity;
+
+  /** Optional reference to associated debate */
+  debateId: string | null;
+
+  /** Speaker involved (if applicable) */
+  speaker: string | null;
+
+  /** Debate phase (if applicable) */
+  phase: string | null;
+
+  /** Prompt type being processed (if applicable) */
+  promptType: string | null;
+
+  /** Human-readable event message */
+  message: string;
+
+  /** Additional event metadata */
+  metadata: Record<string, unknown>;
+
+  /** Record creation timestamp */
+  createdAt: Date;
+}
+
+/**
+ * Raw database row for system_events table
+ */
+export interface SystemEventRow {
+  id: number;
+  event_type: string;
+  severity: EventSeverity;
+  debate_id: string | null;
+  speaker: string | null;
+  phase: string | null;
+  prompt_type: string | null;
+  message: string;
+  metadata: unknown;
+  created_at: Date;
+}
+
+/**
+ * Create system event input
+ */
+export interface CreateSystemEventInput {
+  eventType: SystemEventType;
+  severity?: EventSeverity;
+  debateId?: string | null;
+  speaker?: string | null;
+  phase?: string | null;
+  promptType?: string | null;
+  message: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * System event query filters
+ */
+export interface SystemEventFilters {
+  debateId?: string;
+  eventType?: SystemEventType | SystemEventType[];
+  severity?: EventSeverity | EventSeverity[];
+  speaker?: string;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+  offset?: number;
+}

@@ -138,9 +138,22 @@ export class RateLimiter {
 
     // Frontier models (expensive, high-capability)
     const frontierPatterns = [
-      'claude-3-opus', 'claude-3.5-sonnet', 'claude-opus',
-      'gpt-4-turbo', 'gpt-4o', 'gpt-4-32k',
-      'gemini-1.5-pro', 'gemini-ultra',
+      // Anthropic Claude models (frontier tier)
+      'claude-3-opus', 'claude-3.5-sonnet', 'claude-3.7-sonnet',
+      'claude-opus-4', 'claude-opus-4.1', 'claude-opus-4.5',
+      'claude-sonnet-4', 'claude-sonnet-4.5',
+      'claude-haiku-4.5',
+      // GPT-4 models
+      'gpt-4-turbo', 'gpt-4o', 'gpt-4-32k', 'gpt-4.1',
+      // GPT-5 models (excluding mini/nano variants)
+      'gpt-5-pro', 'gpt-5-codex', 'gpt-5-image', 'gpt-5-chat',
+      'gpt-5.1-codex', 'gpt-5.1-chat', 'gpt-5.1',
+      'gpt-5.2-pro', 'gpt-5.2-chat', 'gpt-5.2',
+      'gpt-5',  // Base GPT-5 (must be after more specific patterns)
+      // Google Gemini Pro models
+      'gemini-1.5-pro', 'gemini-2.5-pro', 'gemini-3-pro', 'gemini-ultra',
+      // OpenAI reasoning models
+      'o1', 'o3', 'o4',
     ];
     if (frontierPatterns.some(p => lowerId.includes(p))) {
       return 'frontier';
@@ -148,11 +161,18 @@ export class RateLimiter {
 
     // Mid-tier models
     const midTierPatterns = [
-      'claude-3-sonnet', 'claude-3-haiku', 'claude-3.5-haiku', 'claude-haiku',
-      'gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-5-mini',
-      'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-flash',
+      // Anthropic Claude models (mid-tier)
+      'claude-3-sonnet', 'claude-3-haiku', 'claude-3.5-haiku',
+      // GPT models
+      'gpt-3.5-turbo', 'gpt-4o-mini', 'gpt-4.1-mini',
+      'gpt-5-mini', 'gpt-5-image-mini', 'gpt-5.1-codex-mini',
+      // Google Gemini Flash models
+      'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-3-flash',
+      'gemma-2-27b',
+      // Other providers
       'mistral-large', 'mistral-medium',
       'llama-3.1-70b', 'llama-3.1-405b', 'llama-3.3',
+      'deepseek-chat', 'deepseek-r1', 'deepseek-v3',
     ];
     if (midTierPatterns.some(p => lowerId.includes(p))) {
       return 'mid_tier';
@@ -160,8 +180,14 @@ export class RateLimiter {
 
     // Budget models
     const budgetPatterns = [
+      // OpenAI nano models
+      'gpt-4.1-nano', 'gpt-5-nano',
+      // Google Gemini Lite/Flash models
+      'gemini-2.0-flash', 'gemini-2.5-flash-lite',
+      'gemma-2-9b', 'gemma-3',
+      // Other providers
       'mistral-7b', 'mixtral', 'llama-3.1-8b',
-      'phi-3', 'gemma',
+      'phi-3', 'phi-4',
     ];
     if (budgetPatterns.some(p => lowerId.includes(p))) {
       return 'budget';

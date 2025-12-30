@@ -276,6 +276,12 @@ export function AdminDashboardPage() {
             </Button>
           </Link>
 
+          <Link to="/admin/events" className={styles.actionLink}>
+            <Button variant="ghost" className={styles.actionButton}>
+              Event Logs
+            </Button>
+          </Link>
+
           <Button
             variant="ghost"
             onClick={handleCleanup}

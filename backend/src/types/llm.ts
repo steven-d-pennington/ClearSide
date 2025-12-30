@@ -63,6 +63,23 @@ export interface LLMRequest {
 }
 
 /**
+ * Simplified LLM request for adapter clients that manage provider/model internally
+ * Used by OpenRouterLLMClient and similar adapters
+ */
+export interface SimpleLLMRequest {
+  /** Conversation messages */
+  messages: ChatMessage[];
+  /** Temperature for response randomness (0.0 - 2.0) */
+  temperature?: number;
+  /** Maximum tokens to generate */
+  maxTokens?: number;
+  /** Whether to stream the response */
+  stream?: boolean;
+  /** Request timeout in milliseconds */
+  timeout?: number;
+}
+
+/**
  * Token usage statistics
  */
 export interface TokenUsage {

@@ -54,11 +54,12 @@ export class ModelPairingService {
    *
    * Algorithm:
    * 1. Get models within cost threshold
-   * 2. Group by tier, then by provider
-   * 3. Pick highest available tier with 2+ providers
-   * 4. Randomly select two different providers
-   * 5. Pick best model from each (by context length)
-   * 6. Return pairing
+   * 2. Filter out preview/experimental models (unreliable for long-form content)
+   * 3. Group by tier, then by provider
+   * 4. Pick highest available tier with 2+ providers
+   * 5. Randomly select two different providers
+   * 6. Pick best model from each (by context length)
+   * 7. Return pairing
    */
   async autoSelectPairing(threshold: CostThreshold = 'unlimited'): Promise<ModelPairing | null> {
     logger.info({ threshold }, 'Auto-selecting model pairing');
@@ -66,8 +67,26 @@ export class ModelPairingService {
     const allowedTiers = COST_THRESHOLD_TO_TIERS[threshold];
     const models = await this.openRouterClient.fetchModels();
 
-    // Filter to allowed tiers
-    const eligible = models.filter((m) => allowedTiers.includes(m.tier));
+    // Filter to allowed tiers and exclude preview/experimental models
+    // Preview models often produce truncated or unreliable long-form responses
+    const eligible = models.filter((m) => {
+      if (!allowedTiers.includes(m.tier)) return false;
+
+      // Exclude preview, experimental, and beta models
+      // These models often produce truncated or unreliable long-form responses
+      const modelIdLower = m.id.toLowerCase();
+      const modelNameLower = m.name.toLowerCase();
+      const excludePatterns = ['preview', 'experimental', 'beta', ':free'];
+
+      for (const pattern of excludePatterns) {
+        if (modelIdLower.includes(pattern) || modelNameLower.includes(pattern)) {
+          logger.debug({ modelId: m.id, pattern }, 'Excluding model from pairing (preview/experimental)');
+          return false;
+        }
+      }
+
+      return true;
+    });
 
     if (eligible.length < 2) {
       throw new Error(`Not enough models available for threshold: ${threshold}`);

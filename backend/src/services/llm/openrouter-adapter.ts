@@ -135,8 +135,11 @@ export class OpenRouterLLMClient extends LLMClient {
    * Override complete method to use OpenRouter
    * This is the main method used by agents
    * Includes rate limiting and smart retry logic
+   *
+   * Accepts both full LLMRequest and simplified SimpleLLMRequest since
+   * provider and model are managed internally by this client.
    */
-  async complete(request: import('../../types/llm.js').LLMRequest): Promise<import('../../types/llm.js').LLMResponse> {
+  async complete(request: import('../../types/llm.js').LLMRequest | import('../../types/llm.js').SimpleLLMRequest): Promise<import('../../types/llm.js').LLMResponse> {
     const rateLimiter = getRateLimiter();
     let lastError: Error | null = null;
 

@@ -12,9 +12,17 @@ import type {
   Interruption,
   CreateInterruptionInput,
 } from '../../types/lively.js';
-import { LLMClient } from '../llm/client.js';
+import type { SimpleLLMRequest, LLMResponse } from '../../types/llm.js';
 import * as livelyRepository from '../../db/repositories/lively-repository.js';
 import { createLogger } from '../../utils/logger.js';
+
+/**
+ * Interface for LLM client used by InterruptionEngine
+ * Accepts SimpleLLMRequest since provider/model are managed by the client
+ */
+interface InterruptionLLMClient {
+  complete(request: SimpleLLMRequest): Promise<LLMResponse>;
+}
 
 const logger = createLogger({ module: 'InterruptionEngine' });
 
@@ -101,7 +109,7 @@ export interface EvaluationContext {
  */
 export class InterruptionEngine extends EventEmitter {
   private readonly settings: LivelySettings;
-  private readonly llmClient: LLMClient;
+  private readonly llmClient: InterruptionLLMClient;
   private readonly debateId: string;
 
   /** Pending interrupt candidate (not yet fired) */
@@ -118,11 +126,11 @@ export class InterruptionEngine extends EventEmitter {
   /** Lock to prevent concurrent evaluations */
   private isEvaluating: boolean = false;
 
-  constructor(debateId: string, settings: LivelySettings, llmClient?: LLMClient) {
+  constructor(debateId: string, settings: LivelySettings, llmClient: InterruptionLLMClient) {
     super();
     this.debateId = debateId;
     this.settings = settings;
-    this.llmClient = llmClient ?? new LLMClient();
+    this.llmClient = llmClient;
     this.minuteStartMs = Date.now();
 
     logger.info(
@@ -161,10 +169,8 @@ export class InterruptionEngine extends EventEmitter {
         .replace('{content}', context.recentContent)
         .replace('{otherParticipants}', context.otherParticipants.map(this.formatSpeaker).join(', '));
 
-      // Call LLM for evaluation
+      // Call LLM for evaluation (model is determined by the client passed to constructor)
       const response = await this.llmClient.complete({
-        provider: 'openai',
-        model: 'gpt-4o-mini', // Fast model for evaluations
         messages: [
           { role: 'system', content: 'You are analyzing debate content for interruption opportunities. Respond only in JSON.' },
           { role: 'user', content: prompt },
@@ -425,8 +431,6 @@ export class InterruptionEngine extends EventEmitter {
       .replace('{triggerPhrase}', candidate.triggerPhrase);
 
     const response = await this.llmClient.complete({
-      provider: 'openai',
-      model: 'gpt-4o-mini',
       messages: [
         { role: 'user', content: prompt },
       ],
@@ -554,11 +558,14 @@ export class InterruptionEngine extends EventEmitter {
 
 /**
  * Create a new InterruptionEngine instance
+ * @param debateId - The debate ID
+ * @param settings - Lively debate settings
+ * @param llmClient - LLM client for interrupt evaluation (required)
  */
 export function createInterruptionEngine(
   debateId: string,
   settings: LivelySettings,
-  llmClient?: LLMClient
+  llmClient: InterruptionLLMClient
 ): InterruptionEngine {
   return new InterruptionEngine(debateId, settings, llmClient);
 }

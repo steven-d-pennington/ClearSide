@@ -6,3 +6,4 @@ export { AdminDebatesPage } from './AdminDebatesPage';
 export { AdminExportsPage } from './AdminExportsPage';
 export { AdminSystemPage } from './AdminSystemPage';
 export { AdminConfigPage } from './AdminConfigPage';
+export { AdminEventsPage } from './AdminEventsPage';

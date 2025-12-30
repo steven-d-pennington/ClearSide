@@ -21,7 +21,21 @@
       "Bash(docker ps:*)",
       "Bash(docker-compose up:*)",
       "Bash(curl:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(node -e:*)",
+      "Bash(ls:*)",
+      "Bash(Get-Content:*)",
+      "Bash(Select-String -Pattern \"retry|empty response|contentLength:0|retrying\" -CaseSensitive:$false)",
+      "Bash(powershell -Command:*)",
+      "Bash(cmd /c \"powershell -Command \"\"Get-Content ''c:\\\\projects\\\\ClearSide\\\\backend\\\\logs\\\\combined.log'' -Tail 1000 | Select-String -Pattern ''retry|retrying|contentLength:0|d402bd87''\"\"\")",
+      "Bash(cmd /c \"powershell -Command \"\"Get-ChildItem ''c:\\\\projects\\\\ClearSide\\\\backend\\\\logs\\\\'' | Select-Object Name, Length, LastWriteTime\"\"\")",
+      "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\backend && npm run build\")",
+      "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\backend && npm run build 2>&1\")",
+      "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\frontend && npm run build 2>&1\")",
+      "Bash(find:*)"
     ]
   }
 }

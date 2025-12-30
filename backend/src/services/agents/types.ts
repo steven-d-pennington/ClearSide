@@ -48,6 +48,15 @@ export interface AgentContext {
 
   /** Optional persona for this agent (Pro or Con side) */
   persona?: Persona | null;
+
+  /** Resumption prompt if speaker was interrupted (lively mode) */
+  resumptionPrompt?: string;
+
+  /** Whether this speaker was previously interrupted */
+  wasInterrupted?: boolean;
+
+  /** Partial content from before interruption */
+  partialContent?: string;
 }
 
 /**

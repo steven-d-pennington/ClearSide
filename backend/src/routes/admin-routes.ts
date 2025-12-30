@@ -7,10 +7,11 @@ import express, { type Request, type Response } from 'express';
 import { sseManager } from '../services/sse/index.js';
 import * as debateRepository from '../db/repositories/debate-repository.js';
 import * as exportJobRepository from '../db/repositories/export-job-repository.js';
+import * as eventRepository from '../db/repositories/event-repository.js';
 import { orchestratorRegistry } from '../services/debate/index.js';
 import { createLogger } from '../utils/logger.js';
 import { getRateLimiter } from '../services/llm/rate-limiter.js';
-import type { DebateStatus } from '../types/database.js';
+import type { DebateStatus, SystemEventType, EventSeverity } from '../types/database.js';
 
 const router = express.Router();
 const logger = createLogger({ module: 'AdminRoutes' });
@@ -490,5 +491,154 @@ function formatUptime(seconds: number): string {
 
   return parts.join(' ');
 }
+
+// =============================================================================
+// System Events Endpoints
+// =============================================================================
+
+/**
+ * GET /admin/events
+ * List system events with filtering
+ */
+router.get('/admin/events', async (req: Request, res: Response) => {
+  try {
+    const debateId = req.query.debateId as string | undefined;
+    const eventType = req.query.eventType as SystemEventType | undefined;
+    const severity = req.query.severity as EventSeverity | undefined;
+    const limit = parseInt(req.query.limit as string) || 100;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    // Parse multiple event types or severities if provided as comma-separated
+    const eventTypes = req.query.eventTypes
+      ? (req.query.eventTypes as string).split(',') as SystemEventType[]
+      : undefined;
+    const severities = req.query.severities
+      ? (req.query.severities as string).split(',') as EventSeverity[]
+      : undefined;
+
+    const events = await eventRepository.findWithFilters({
+      debateId,
+      eventType: eventTypes || eventType,
+      severity: severities || severity,
+      limit,
+      offset,
+    });
+
+    res.json({
+      events,
+      count: events.length,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error listing events');
+    res.status(500).json({
+      error: 'Failed to list events',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/events/debate/:debateId
+ * Get events for a specific debate
+ */
+router.get('/admin/events/debate/:debateId', async (req: Request, res: Response) => {
+  try {
+    const { debateId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 100;
+
+    const events = await eventRepository.findByDebateId(debateId, limit);
+
+    res.json({
+      debateId,
+      events,
+      count: events.length,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error listing debate events');
+    res.status(500).json({
+      error: 'Failed to list debate events',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/events/debate/:debateId/stats
+ * Get event statistics for a specific debate
+ */
+router.get('/admin/events/debate/:debateId/stats', async (req: Request, res: Response) => {
+  try {
+    const { debateId } = req.params;
+    const stats = await eventRepository.getDebateStats(debateId);
+
+    res.json({
+      debateId,
+      ...stats,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error getting debate event stats');
+    res.status(500).json({
+      error: 'Failed to get debate event stats',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/events/issues
+ * Get recent warnings and errors
+ */
+router.get('/admin/events/issues', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const events = await eventRepository.findIssues(limit);
+
+    res.json({
+      events,
+      count: events.length,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error listing issue events');
+    res.status(500).json({
+      error: 'Failed to list issue events',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * DELETE /admin/events/cleanup
+ * Delete old events (default: older than 7 days)
+ */
+router.delete('/admin/events/cleanup', async (req: Request, res: Response) => {
+  const daysToKeep = parseInt(req.query.days as string) || 7;
+
+  logger.info({ daysToKeep }, 'Cleanup events request received');
+
+  try {
+    const deletedCount = await eventRepository.deleteOlderThan(daysToKeep);
+
+    logger.info({ deletedCount, daysToKeep }, 'Event cleanup completed');
+
+    res.json({
+      success: true,
+      deletedCount,
+      daysToKeep,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error cleaning up events');
+    res.status(500).json({
+      error: 'Failed to cleanup events',
+      message: errorMessage,
+    });
+  }
+});
 
 export default router;

@@ -35,13 +35,15 @@ import * as livelyRepo from '../../db/repositories/lively-repository.js';
 import * as debateRepo from '../../db/repositories/debate-repository.js';
 import * as utteranceRepo from '../../db/repositories/utterance-repository.js';
 import * as interventionRepo from '../../db/repositories/intervention-repository.js';
-import { LLMClient } from '../llm/client.js';
+import * as eventRepo from '../../db/repositories/event-repository.js';
+import { createOpenRouterClient } from '../llm/openrouter-adapter.js';
 import type { CreateUtteranceInput } from '../../types/database.js';
 import type { DebatePhase as DbDebatePhase, Speaker as DbSpeaker } from '../../types/database.js';
 import { PRO_ADVOCATE_PROMPTS, PRO_PROMPT_BUILDERS } from '../agents/prompts/pro-advocate-prompts.js';
 import { CON_ADVOCATE_PROMPTS, CON_PROMPT_BUILDERS } from '../agents/prompts/con-advocate-prompts.js';
 import { MODERATOR_PROMPTS, MODERATOR_PROMPT_BUILDERS } from '../agents/prompts/moderator-prompts.js';
 import type { PromptBuilderContext } from '../agents/prompts/types.js';
+import type { DebateConfiguration, PresetMode, BrevityLevel } from '../../types/configuration.js';
 
 const logger = pino({
   name: 'lively-orchestrator',
@@ -124,7 +126,6 @@ export class LivelyDebateOrchestrator {
   private readonly sseManager: SSEManager;
   private readonly stateMachine: DebateStateMachine;
   private readonly turnManager: TurnManager;
-  private readonly llmClient: LLMClient;
   private readonly agents: {
     pro: ProAdvocateAgent;
     con: ConAdvocateAgent;
@@ -143,6 +144,17 @@ export class LivelyDebateOrchestrator {
   // Track last interruption context for passing to saveUtterance
   private lastInterruptionContext: InterruptionContext | null = null;
 
+  // Track completed turns to prevent re-execution (fixes duplicate content)
+  private completedTurns: Set<string> = new Set();
+
+  // Track interrupted speakers for resumption
+  private interruptedSpeakers: Map<Speaker, {
+    phase: DebatePhase;
+    partialContent: string;
+    promptType: string;
+    turnNumber: number;
+  }> = new Map();
+
   constructor(
     config: LivelyOrchestratorConfig,
     sseManager: SSEManager,
@@ -153,8 +165,7 @@ export class LivelyDebateOrchestrator {
       con: ConAdvocateAgent;
       moderator: ModeratorAgent;
       orchestrator: OrchestratorAgent;
-    },
-    llmClient?: LLMClient
+    }
   ) {
     this.debateId = config.debateId;
     this.proposition = config.proposition;
@@ -163,19 +174,19 @@ export class LivelyDebateOrchestrator {
     this.stateMachine = stateMachine;
     this.turnManager = turnManager;
     this.agents = agents;
-    // Use the moderator's LLM client for interruption evaluation (neutral task)
-    // This ensures we use the same provider/model the user selected for moderator
-    this.llmClient = llmClient ?? agents.moderator.getLLMClient();
 
     this.broadcastEvents = config.broadcastEvents ?? true;
     this.evaluationIntervalMs = config.evaluationIntervalMs ?? 1000;
 
     // Create lively components
     this.scheduler = createLivelyScheduler(config.settings);
+    // Use Gemini 3 Flash via OpenRouter for fast interrupt evaluations
+    // This model is optimized for speed while maintaining good reasoning
+    const interruptEvalClient = createOpenRouterClient('google/gemini-3-flash-preview');
     this.interruptionEngine = createInterruptionEngine(
       config.debateId,
       config.settings,
-      this.llmClient
+      interruptEvalClient
     );
 
     // Wire up scheduler events
@@ -319,9 +330,31 @@ export class LivelyDebateOrchestrator {
    * Execute a single phase with interruption support
    */
   private async executePhaseLively(phase: DebatePhase): Promise<void> {
-    logger.info({ debateId: this.debateId, phase }, 'Starting lively phase');
-
     const plan = this.turnManager.getPhaseExecutionPlan(phase);
+
+    logger.info(
+      {
+        debateId: this.debateId,
+        phase,
+        turnCount: plan.turns.length,
+        turns: plan.turns.map(t => ({
+          turnNumber: t.turnNumber,
+          speaker: t.speaker,
+          promptType: t.promptType,
+          turnId: this.getTurnId(phase, t),
+        })),
+        completedTurnsCount: this.completedTurns.size,
+        completedTurnIds: Array.from(this.completedTurns).slice(-10), // Last 10
+      },
+      'Starting lively phase'
+    );
+
+    // Log phase transition to database
+    eventRepo.logInfo('phase_transition', `Starting phase: ${phase}`, {
+      debateId: this.debateId,
+      phase,
+      metadata: { turnCount: plan.turns.length },
+    });
 
     // Broadcast phase start
     if (this.broadcastEvents) {
@@ -341,7 +374,36 @@ export class LivelyDebateOrchestrator {
         await this.sleep(100);
       }
 
+      // Check if turn already completed (prevents duplicate content)
+      const turnId = this.getTurnId(phase, turn);
+      if (this.completedTurns.has(turnId)) {
+        logger.warn(
+          { turnId, speaker: turn.speaker, phase },
+          'Turn already completed, skipping to prevent duplicate'
+        );
+        continue;
+      }
+
+      logger.debug(
+        {
+          turnId,
+          speaker: turn.speaker,
+          turnNumber: turn.turnNumber,
+          promptType: turn.promptType,
+          phase,
+        },
+        'Executing turn'
+      );
+
       await this.executeTurnLively(turn, phase);
+
+      // Mark turn as completed after successful execution
+      this.completedTurns.add(turnId);
+
+      logger.debug(
+        { turnId, completedTurnsCount: this.completedTurns.size },
+        'Turn completed and marked'
+      );
     }
 
     // Broadcast phase complete
@@ -355,12 +417,23 @@ export class LivelyDebateOrchestrator {
 
   /**
    * Execute a turn with token streaming and interrupt evaluation
+   * Includes retry logic for empty responses from unreliable models
    */
   private async executeTurnLively(turn: Turn, phase: DebatePhase): Promise<void> {
     logger.debug({ turn, phase }, 'Executing lively turn');
 
     const speaker = turn.speaker;
     const startMs = this.getElapsedMs();
+
+    // Retry configuration for empty responses
+    const MAX_EMPTY_RETRIES = 3;
+    const RETRY_DELAY_MS = 2000;
+    const MIN_CONTENT_LENGTH = 10; // Minimum to be considered valid content
+    const MIN_EXPECTED_LENGTH = 200; // Expected length for quality warning
+
+    // Check if this speaker was previously interrupted (for resumption)
+    const interruptionData = this.interruptedSpeakers.get(speaker);
+    const isResumption = interruptionData && interruptionData.phase === phase;
 
     // Reset interruption context at start of turn
     this.lastInterruptionContext = null;
@@ -375,6 +448,7 @@ export class LivelyDebateOrchestrator {
         speaker: mapSpeakerToDb(speaker),
         phase: mapPhaseToDb(phase),
         timestampMs: startMs,
+        isResumption: isResumption ?? false,
       });
     }
 
@@ -382,17 +456,108 @@ export class LivelyDebateOrchestrator {
     await livelyRepo.updateActiveSpeaker(this.debateId, speaker, startMs);
 
     try {
-      // Build context and generate with streaming
-      const context = await this.buildAgentContext(speaker);
-      const fullContent = await this.generateWithInterrupts(speaker, turn, context, phase);
+      // Build context with explicit phase and optional resumption prompt
+      let resumptionPrompt: string | undefined;
+      if (isResumption && interruptionData) {
+        resumptionPrompt = this.buildResumptionPrompt(interruptionData.partialContent);
+        // Clear the interruption data after building prompt
+        this.interruptedSpeakers.delete(speaker);
+        logger.info({ speaker, phase }, 'Speaker resuming after interruption');
+      }
+
+      const context = await this.buildAgentContext(speaker, phase, resumptionPrompt);
+
+      // Retry loop for empty responses
+      let fullContent = '';
+      let wasInterrupted = false;
+      let interruptionContext: InterruptionContext | null = null;
+
+      for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+        // Reset interruption context for each attempt
+        this.lastInterruptionContext = null;
+
+        fullContent = await this.generateWithInterrupts(speaker, turn, context, phase);
+
+        // Capture interruption context
+        interruptionContext = this.lastInterruptionContext as InterruptionContext | null;
+        wasInterrupted = interruptionContext?.wasInterrupted ?? false;
+
+        // Check if we got valid content or was interrupted (interrupted content is valid even if short)
+        if (fullContent.trim().length >= MIN_CONTENT_LENGTH || wasInterrupted) {
+          // Got valid content, break out of retry loop
+          if (attempt > 1) {
+            logger.info({
+              speaker,
+              attempt,
+              contentLength: fullContent.length,
+              phase,
+            }, 'Got valid content after retry');
+
+            // Log retry success to database
+            eventRepo.logInfo('retry_success', `Retry ${attempt} succeeded for ${speaker}`, {
+              debateId: this.debateId,
+              speaker: mapSpeakerToDb(speaker),
+              phase: mapPhaseToDb(phase),
+              promptType: turn.promptType,
+              metadata: { attempt, contentLength: fullContent.length },
+            });
+          }
+          break;
+        }
+
+        // Empty response - retry if we have attempts left
+        if (attempt < MAX_EMPTY_RETRIES) {
+          logger.warn({
+            speaker,
+            attempt,
+            maxRetries: MAX_EMPTY_RETRIES,
+            contentLength: fullContent.length,
+            phase,
+            promptType: turn.promptType,
+            modelInfo: speaker === Speaker.PRO ? 'pro model' : speaker === Speaker.CON ? 'con model' : 'moderator model',
+          }, 'Empty response from model, retrying...');
+
+          // Log retry attempt to database
+          eventRepo.logWarn('retry_attempt', `Empty response from ${speaker}, attempt ${attempt}/${MAX_EMPTY_RETRIES}`, {
+            debateId: this.debateId,
+            speaker: mapSpeakerToDb(speaker),
+            phase: mapPhaseToDb(phase),
+            promptType: turn.promptType,
+            metadata: { attempt, maxRetries: MAX_EMPTY_RETRIES, contentLength: fullContent.length },
+          });
+
+          // Wait before retry with exponential backoff
+          await this.sleep(RETRY_DELAY_MS * attempt);
+        } else {
+          // Max retries exhausted
+          logger.error({
+            speaker,
+            attempts: MAX_EMPTY_RETRIES,
+            contentLength: fullContent.length,
+            phase,
+            promptType: turn.promptType,
+            modelInfo: speaker === Speaker.PRO ? 'pro model' : speaker === Speaker.CON ? 'con model' : 'moderator model',
+          }, 'Empty response from model after all retries - skipping utterance');
+
+          // Log exhausted retries to database
+          eventRepo.logError('retry_exhausted', `All ${MAX_EMPTY_RETRIES} retries exhausted for ${speaker}`, {
+            debateId: this.debateId,
+            speaker: mapSpeakerToDb(speaker),
+            phase: mapPhaseToDb(phase),
+            promptType: turn.promptType,
+            metadata: { attempts: MAX_EMPTY_RETRIES, contentLength: fullContent.length },
+          });
+        }
+      }
 
       // End speaker turn
       this.scheduler.endSpeaker();
 
-      // Capture interruption context before saving (for logging)
-      // Type assertion needed because TypeScript can't track async flow through fireInterrupt()
-      const interruptionContext = this.lastInterruptionContext as InterruptionContext | null;
-      const wasInterrupted = interruptionContext?.wasInterrupted ?? false;
+      // Skip saving if content is still empty after all retries
+      if (fullContent.trim().length < MIN_CONTENT_LENGTH && !wasInterrupted) {
+        this.lastInterruptionContext = null;
+        return;
+      }
 
       // Save utterance to database with interruption context if this speaker was interrupted
       await this.saveUtterance(speaker, phase, fullContent, turn, interruptionContext);
@@ -400,14 +565,53 @@ export class LivelyDebateOrchestrator {
       // Reset context after saving
       this.lastInterruptionContext = null;
 
+      // Warn about abnormally short responses (potential model issue)
+      if (!wasInterrupted && fullContent.length < MIN_EXPECTED_LENGTH) {
+        logger.warn({
+          speaker,
+          contentLength: fullContent.length,
+          phase,
+          promptType: turn.promptType,
+          modelInfo: speaker === Speaker.PRO ? 'pro model' : speaker === Speaker.CON ? 'con model' : 'moderator model',
+        }, 'Abnormally short response detected - possible model issue');
+
+        // Log truncated/short response to database
+        eventRepo.logWarn('truncated_response', `Short response from ${speaker}: ${fullContent.length} chars`, {
+          debateId: this.debateId,
+          speaker: mapSpeakerToDb(speaker),
+          phase: mapPhaseToDb(phase),
+          promptType: turn.promptType,
+          metadata: { contentLength: fullContent.length, expectedMin: MIN_EXPECTED_LENGTH },
+        });
+      }
+
       logger.debug({
         speaker,
         contentLength: fullContent.length,
         wasInterrupted,
       }, 'Turn complete');
 
+      // Log turn completion to database
+      eventRepo.logInfo('turn_completed', `Turn completed: ${speaker} in ${phase}`, {
+        debateId: this.debateId,
+        speaker: mapSpeakerToDb(speaker),
+        phase: mapPhaseToDb(phase),
+        promptType: turn.promptType,
+        metadata: { contentLength: fullContent.length, wasInterrupted },
+      });
+
     } catch (error) {
       logger.error({ speaker, error }, 'Turn execution failed');
+
+      // Log error to database
+      eventRepo.logError('error', `Turn execution failed for ${speaker}: ${error instanceof Error ? error.message : String(error)}`, {
+        debateId: this.debateId,
+        speaker: mapSpeakerToDb(speaker),
+        phase: mapPhaseToDb(phase),
+        promptType: turn.promptType,
+        metadata: { errorMessage: error instanceof Error ? error.message : String(error) },
+      });
+
       this.scheduler.endSpeaker();
       this.lastInterruptionContext = null;
       throw error;
@@ -634,6 +838,19 @@ export class LivelyDebateOrchestrator {
       interruptionEnergy,
     };
 
+    // Store interrupted speaker's partial content for resumption on their next turn
+    this.interruptedSpeakers.set(interruptedSpeaker, {
+      phase,
+      partialContent,
+      promptType: 'resumption',
+      turnNumber: atToken,
+    });
+
+    logger.info(
+      { speaker: interruptedSpeaker, phase, contentLength: partialContent.length },
+      'Stored interruption data for speaker resumption'
+    );
+
     // Broadcast speaker cutoff
     if (this.broadcastEvents) {
       this.sseManager.broadcastToDebate(this.debateId, 'speaker_cutoff', {
@@ -810,7 +1027,7 @@ export class LivelyDebateOrchestrator {
 
     // Get configuration
     const temperature = context.configuration?.llmSettings?.temperature || 0.7;
-    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 2048;
+    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 4096;
 
     // Stream from LLM
     for await (const chunk of llmClient.streamChat(messages, {
@@ -832,7 +1049,7 @@ export class LivelyDebateOrchestrator {
     const messages = this.buildAgentMessages(Speaker.CON, promptType, context);
 
     const temperature = context.configuration?.llmSettings?.temperature || 0.7;
-    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 2048;
+    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 4096;
 
     for await (const chunk of llmClient.streamChat(messages, {
       temperature,
@@ -853,7 +1070,7 @@ export class LivelyDebateOrchestrator {
     const messages = this.buildAgentMessages(Speaker.MODERATOR, promptType, context);
 
     const temperature = context.configuration?.llmSettings?.temperature || 0.7;
-    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 2048;
+    const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 4096;
 
     for await (const chunk of llmClient.streamChat(messages, {
       temperature,
@@ -876,7 +1093,13 @@ export class LivelyDebateOrchestrator {
     const systemPrompt = this.getSystemPrompt(speaker, promptType, context);
 
     // Get user message (the actual prompt for this turn)
-    const userMessage = this.getUserPrompt(speaker, promptType, context);
+    let userMessage = this.getUserPrompt(speaker, promptType, context);
+
+    // If this is a resumption (speaker was interrupted), prepend the resumption prompt
+    if (context.resumptionPrompt) {
+      userMessage = `${context.resumptionPrompt}\n\n---\n\nNow continue with your ${promptType.replace('_', ' ')}:\n\n${userMessage}`;
+      logger.debug({ speaker, promptType }, 'Added resumption prompt to user message');
+    }
 
     return [
       { role: 'system', content: systemPrompt },
@@ -911,13 +1134,18 @@ export class LivelyDebateOrchestrator {
       case 'constructive':
       case 'constructive_argument':
         return PRO_ADVOCATE_PROMPTS.constructive.economic.template;
+      case 'cross_exam_question':
+        return PRO_ADVOCATE_PROMPTS.crossExam.questioner.template;
+      case 'cross_exam_response':
+        return PRO_ADVOCATE_PROMPTS.crossExam.respondent.template;
       case 'rebuttal':
         return PRO_ADVOCATE_PROMPTS.rebuttal.template;
       case 'closing':
       case 'closing_statement':
         return PRO_ADVOCATE_PROMPTS.closing.template;
       default:
-        return PRO_ADVOCATE_PROMPTS.opening.template;
+        logger.warn({ promptType }, 'Unknown Pro prompt type, using constructive as fallback');
+        return PRO_ADVOCATE_PROMPTS.constructive.economic.template;
     }
   }
 
@@ -932,13 +1160,18 @@ export class LivelyDebateOrchestrator {
       case 'constructive':
       case 'constructive_argument':
         return CON_ADVOCATE_PROMPTS.constructive.economic.template;
+      case 'cross_exam_question':
+        return CON_ADVOCATE_PROMPTS.crossExam.questioner.template;
+      case 'cross_exam_response':
+        return CON_ADVOCATE_PROMPTS.crossExam.respondent.template;
       case 'rebuttal':
         return CON_ADVOCATE_PROMPTS.rebuttal.template;
       case 'closing':
       case 'closing_statement':
         return CON_ADVOCATE_PROMPTS.closing.template;
       default:
-        return CON_ADVOCATE_PROMPTS.opening.template;
+        logger.warn({ promptType }, 'Unknown Con prompt type, using constructive as fallback');
+        return CON_ADVOCATE_PROMPTS.constructive.economic.template;
     }
   }
 
@@ -965,12 +1198,25 @@ export class LivelyDebateOrchestrator {
    * Get user prompt for speaker and phase using proper prompt builders
    */
   private getUserPrompt(speaker: Speaker, promptType: string, context: AgentContext): string {
+    // Determine opponent speaker
+    const opponentSpeaker = speaker === Speaker.PRO ? Speaker.CON : Speaker.PRO;
+
+    // Extract opponent's arguments for rebuttals and cross-exam questioning
+    const opponentArguments = this.extractOpponentArguments(context.previousUtterances, opponentSpeaker);
+
+    // Extract recent questions for cross-exam responses
+    const interventionContent = promptType === 'cross_exam_response'
+      ? this.extractRecentQuestions(context.previousUtterances, opponentSpeaker)
+      : undefined;
+
     // Build the prompt context with proper typing
     const promptContext: PromptBuilderContext = {
       proposition: context.proposition,
       propositionContext: context.propositionContext as PromptBuilderContext['propositionContext'],
       previousUtterances: this.formatPreviousUtterances(context.previousUtterances),
       phase: context.currentPhase,
+      opponentArguments,
+      interventionContent,
     };
 
     switch (speaker) {
@@ -986,6 +1232,56 @@ export class LivelyDebateOrchestrator {
   }
 
   /**
+   * Extract opponent's arguments from previous utterances
+   * Used for rebuttals and cross-exam questioning
+   */
+  private extractOpponentArguments(
+    utterances: Array<{ speaker: string; content: string; phase?: string }> | undefined,
+    opponentSpeaker: Speaker
+  ): string | undefined {
+    if (!utterances || utterances.length === 0) return undefined;
+
+    const opponentSpeakerStr = mapSpeakerToDb(opponentSpeaker);
+    const opponentUtterances = utterances
+      .filter(u => u.speaker === opponentSpeakerStr && u.content && u.content.length > 50)
+      .slice(-3); // Get last 3 substantial opponent utterances
+
+    if (opponentUtterances.length === 0) return undefined;
+
+    return opponentUtterances
+      .map(u => `[${u.phase || 'Unknown Phase'}] ${u.content}`)
+      .join('\n\n---\n\n');
+  }
+
+  /**
+   * Extract recent questions from opponent for cross-exam response
+   * Looks for the most recent cross_exam_question from opponent
+   */
+  private extractRecentQuestions(
+    utterances: Array<{ speaker: string; content: string; phase?: string; promptType?: string }> | undefined,
+    opponentSpeaker: Speaker
+  ): string | undefined {
+    if (!utterances || utterances.length === 0) return undefined;
+
+    const opponentSpeakerStr = mapSpeakerToDb(opponentSpeaker);
+
+    // Find the most recent utterance from opponent that looks like questions
+    // (contains question marks or is in cross-exam phase)
+    const recentOpponentUtterances = utterances
+      .filter(u => u.speaker === opponentSpeakerStr)
+      .slice(-2); // Get last 2 opponent utterances
+
+    for (const u of recentOpponentUtterances.reverse()) {
+      // Check if it contains questions (has question marks)
+      if (u.content && (u.content.includes('?') || u.phase?.includes('CROSSEXAM'))) {
+        return u.content;
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
    * Get Pro advocate user prompt
    */
   private getProUserPrompt(promptType: string, context: PromptBuilderContext): string {
@@ -996,13 +1292,18 @@ export class LivelyDebateOrchestrator {
       case 'constructive':
       case 'constructive_argument':
         return PRO_PROMPT_BUILDERS.constructive(context);
+      case 'cross_exam_question':
+        return PRO_PROMPT_BUILDERS.crossExam({ ...context, crossExamRole: 'questioner' });
+      case 'cross_exam_response':
+        return PRO_PROMPT_BUILDERS.crossExam({ ...context, crossExamRole: 'respondent' });
       case 'rebuttal':
         return PRO_PROMPT_BUILDERS.rebuttal(context);
       case 'closing':
       case 'closing_statement':
         return PRO_PROMPT_BUILDERS.closing(context);
       default:
-        return PRO_PROMPT_BUILDERS.opening(context);
+        logger.warn({ promptType }, 'Unknown Pro user prompt type, using constructive as fallback');
+        return PRO_PROMPT_BUILDERS.constructive(context);
     }
   }
 
@@ -1017,13 +1318,18 @@ export class LivelyDebateOrchestrator {
       case 'constructive':
       case 'constructive_argument':
         return CON_PROMPT_BUILDERS.constructive(context);
+      case 'cross_exam_question':
+        return CON_PROMPT_BUILDERS.crossExam({ ...context, crossExamRole: 'questioner' });
+      case 'cross_exam_response':
+        return CON_PROMPT_BUILDERS.crossExam({ ...context, crossExamRole: 'respondent' });
       case 'rebuttal':
         return CON_PROMPT_BUILDERS.rebuttal(context);
       case 'closing':
       case 'closing_statement':
         return CON_PROMPT_BUILDERS.closing(context);
       default:
-        return CON_PROMPT_BUILDERS.opening(context);
+        logger.warn({ promptType }, 'Unknown Con user prompt type, using constructive as fallback');
+        return CON_PROMPT_BUILDERS.constructive(context);
     }
   }
 
@@ -1168,21 +1474,44 @@ export class LivelyDebateOrchestrator {
   }
 
   /**
-   * Build agent context
+   * Build agent context with explicit phase parameter
+   * This ensures consistency even if state machine hasn't been updated
    */
-  private async buildAgentContext(speaker: Speaker): Promise<AgentContext> {
+  private async buildAgentContext(
+    speaker: Speaker,
+    explicitPhase?: DebatePhase,
+    resumptionPrompt?: string
+  ): Promise<AgentContext> {
     // Get debate data
     const debate = await debateRepo.findById(this.debateId);
     const utterances = await utteranceRepo.findByDebateId(this.debateId);
+
+    // Use explicit phase if provided, otherwise fall back to state machine
+    const currentPhase = explicitPhase ?? this.stateMachine.getCurrentPhase();
+
+    // Build configuration from debate settings
+    // This ensures temperature and maxTokens are passed to the LLM
+    const configuration: DebateConfiguration | undefined = debate ? {
+      presetMode: (debate.presetMode || 'balanced') as PresetMode,
+      brevityLevel: (debate.brevityLevel || 3) as BrevityLevel,
+      llmSettings: {
+        temperature: debate.llmTemperature ?? 0.7,
+        maxTokensPerResponse: debate.maxTokensPerResponse ?? 4096,
+      },
+      requireCitations: false,
+    } : undefined;
 
     // Build context matching AgentContext interface
     const context: AgentContext = {
       debateId: this.debateId,
       proposition: this.proposition,
-      currentPhase: this.stateMachine.getCurrentPhase(),
+      currentPhase,
       previousUtterances: utterances, // Already Utterance[] type
       speaker,
       propositionContext: debate?.propositionContext,
+      configuration,
+      // Resumption support
+      resumptionPrompt,
     };
 
     return context;
@@ -1203,6 +1532,57 @@ export class LivelyDebateOrchestrator {
     turn: Turn,
     interruptionContext?: InterruptionContext | null
   ): Promise<void> {
+    const turnId = this.getTurnId(phase, turn);
+
+    // Check for duplicate utterance using multiple criteria
+    const existingUtterances = await utteranceRepo.findByDebateId(this.debateId);
+
+    // 1. Check for exact turnId match (excluding interrupted utterances that were partial)
+    const turnIdDuplicate = existingUtterances.find(u => {
+      const existingTurnId = u.metadata?.turnId as string;
+      return existingTurnId === turnId && !u.metadata?.wasInterrupted;
+    });
+
+    if (turnIdDuplicate) {
+      logger.warn(
+        { turnId, existingId: turnIdDuplicate.id, speaker: mapSpeakerToDb(speaker) },
+        'Duplicate utterance detected (same turnId), skipping save'
+      );
+      return;
+    }
+
+    // 2. Check for content-based duplicate (same speaker, phase, and similar content)
+    // This catches cases where turnId might differ but content is essentially the same
+    const contentHash = this.hashContent(content);
+    const contentDuplicate = existingUtterances.find(u => {
+      // Same speaker and phase
+      if (u.speaker !== mapSpeakerToDb(speaker) || u.phase !== mapPhaseToDb(phase)) {
+        return false;
+      }
+      // Skip if this is an interjection (those can have similar content)
+      if (u.metadata?.isInterjection) {
+        return false;
+      }
+      // Check content similarity (using first 200 chars as fingerprint)
+      const existingHash = this.hashContent(u.content);
+      return existingHash === contentHash;
+    });
+
+    if (contentDuplicate) {
+      logger.warn(
+        {
+          turnId,
+          existingId: contentDuplicate.id,
+          existingTurnId: contentDuplicate.metadata?.turnId,
+          speaker: mapSpeakerToDb(speaker),
+          phase: mapPhaseToDb(phase),
+          contentPreview: content.substring(0, 100),
+        },
+        'Content-based duplicate detected, skipping save'
+      );
+      return;
+    }
+
     // Get model attribution from the agent
     const agentKey = speaker === Speaker.PRO ? 'pro' : speaker === Speaker.CON ? 'con' : 'moderator';
     const agent = this.agents[agentKey];
@@ -1218,6 +1598,7 @@ export class LivelyDebateOrchestrator {
       metadata: {
         promptType: turn.promptType,
         turnNumber: turn.turnNumber,
+        turnId: this.getTurnId(phase, turn),  // For deduplication and crash recovery
         debateMode: 'lively',
         // Model attribution
         model: modelName,
@@ -1338,6 +1719,29 @@ export class LivelyDebateOrchestrator {
   }
 
   /**
+   * Generate a unique identifier for a turn
+   * Format: "{phase}:{speaker}:{turnNumber}:{promptType}"
+   */
+  private getTurnId(phase: DebatePhase, turn: Turn): string {
+    return `${phase}:${turn.speaker}:${turn.turnNumber}:${turn.promptType}`;
+  }
+
+  /**
+   * Build a resumption prompt for an interrupted speaker
+   */
+  private buildResumptionPrompt(partialContent: string): string {
+    return `You were interrupted while speaking. Here is what you said before being cut off:
+
+---
+${partialContent}
+---
+
+Please CONTINUE your argument from where you left off. Do NOT repeat what you already said.
+Pick up mid-thought and complete your point naturally. If you were mid-sentence, continue that sentence.
+Your continuation should flow seamlessly from the interrupted content above.`;
+  }
+
+  /**
    * Get other participants (for interrupt evaluation)
    */
   private getOtherParticipants(currentSpeaker: Speaker): Speaker[] {
@@ -1364,6 +1768,22 @@ export class LivelyDebateOrchestrator {
    */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Generate a simple hash of content for duplicate detection
+   * Uses the first 200 characters normalized (lowercased, whitespace collapsed)
+   */
+  private hashContent(content: string): string {
+    // Normalize: lowercase, collapse whitespace, trim
+    const normalized = content
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 200);
+    // Simple hash: just use the normalized string as the "hash"
+    // For more robust hashing, could use crypto.createHash('md5')
+    return normalized;
   }
 
   // ===========================================================================
