@@ -9,6 +9,7 @@ import * as debateRepository from '../db/repositories/debate-repository.js';
 import * as exportJobRepository from '../db/repositories/export-job-repository.js';
 import { orchestratorRegistry } from '../services/debate/index.js';
 import { createLogger } from '../utils/logger.js';
+import { getRateLimiter } from '../services/llm/rate-limiter.js';
 import type { DebateStatus } from '../types/database.js';
 
 const router = express.Router();
@@ -395,5 +396,99 @@ router.delete('/admin/debates/bulk', async (req: Request, res: Response) => {
     });
   }
 });
+
+/**
+ * GET /admin/system
+ * Get detailed system monitoring stats
+ */
+router.get('/admin/system', async (_req: Request, res: Response) => {
+  try {
+    // Get memory usage
+    const memoryUsage = process.memoryUsage();
+
+    // Get rate limiter stats
+    const rateLimiter = getRateLimiter();
+    const rateLimitStats = rateLimiter.getStats();
+
+    // Get uptime
+    const uptime = Math.floor((Date.now() - serverStartTime) / 1000);
+
+    // Get SSE connection stats
+    const connectionStats = {
+      total: sseManager.getClientCount(),
+      // Get per-debate viewer counts
+      byDebate: {} as Record<string, number>,
+    };
+
+    // Get active orchestrator info
+    const activeOrchestrators = orchestratorRegistry.getRunningDebateIds();
+
+    // Get debate counts for quick reference
+    const debates = await debateRepository.list({ limit: 1000 });
+    const debateStats = {
+      total: debates.length,
+      live: debates.filter(d => d.status === 'live').length,
+      paused: debates.filter(d => d.status === 'paused').length,
+      completed: debates.filter(d => d.status === 'completed').length,
+      failed: debates.filter(d => d.status === 'failed').length,
+    };
+
+    // Get export job counts
+    const exportCounts = await exportJobRepository.countByStatus();
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      uptime: {
+        seconds: uptime,
+        formatted: formatUptime(uptime),
+      },
+      memory: {
+        heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+        heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
+        rss: Math.round(memoryUsage.rss / 1024 / 1024),
+        external: Math.round(memoryUsage.external / 1024 / 1024),
+        heapUsedPercent: Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100),
+      },
+      connections: connectionStats,
+      orchestrators: {
+        active: activeOrchestrators.length,
+        debateIds: activeOrchestrators,
+      },
+      rateLimiter: rateLimitStats,
+      debates: debateStats,
+      exports: exportCounts,
+      node: {
+        version: process.version,
+        platform: process.platform,
+        pid: process.pid,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error getting system stats');
+    res.status(500).json({
+      error: 'Failed to get system stats',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * Format uptime in human-readable format
+ */
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  parts.push(`${secs}s`);
+
+  return parts.join(' ');
+}
 
 export default router;

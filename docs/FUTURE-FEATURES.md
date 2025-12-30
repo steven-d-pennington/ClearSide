@@ -99,40 +99,51 @@ interface DebateTurn {
 
 **Priority:** P1
 **Complexity:** High
+**Status:** IMPLEMENTED
 
 Centralized administration interface for managing all aspects of ClearSide.
 
-### Features
+### Routes
+- `/admin` - Dashboard with stats, quick actions, recent debates
+- `/admin/debates` - Debate management with filtering, search, bulk actions
+- `/admin/exports` - Export center with job tracking and downloads
+- `/admin/system` - System monitoring with memory, rate limits, connections
+- `/admin/config` - Configuration viewer for presets, personas, providers
+
+### Features Implemented
 
 #### 4.1 Debate Management
-- View all debates (active, completed, failed)
-- Filter by status, date, topic, models used
-- Stop/pause running debates
-- Delete debates
-- View detailed debate analytics
+- [x] View all debates (active, completed, failed)
+- [x] Filter by status
+- [x] Search by proposition text
+- [x] Stop running debates
+- [x] Delete debates (single and bulk)
+- [ ] View detailed debate analytics (future)
 
 #### 4.2 Export Center
-- Export debates to multiple formats from one place:
-  - Markdown
-  - PDF
-  - Audio (podcast)
-  - Video
-- Batch export multiple debates
-- Track export job status
-- Download completed exports
+- [x] Export debates to Markdown
+- [x] Export debates to Audio (podcast)
+- [x] Track export job status with progress
+- [x] Download completed exports
+- [ ] PDF export (future)
+- [ ] Video export (future)
+- [ ] Batch export multiple debates (future)
 
 #### 4.3 System Monitoring
-- Real-time debate activity dashboard
-- Model usage statistics
-- Cost tracking per model/debate
-- Rate limit status across models
-- Error logs and debugging info
+- [x] Real-time dashboard with auto-refresh
+- [x] Memory usage (heap, RSS)
+- [x] Rate limit status per model
+- [x] Active connections and orchestrators
+- [x] Uptime and Node.js info
+- [ ] Cost tracking per model/debate (future)
+- [ ] Error logs viewer (future)
 
 #### 4.4 Configuration Management
-- Manage presets (CRUD)
-- Manage personas (CRUD)
-- System settings
-- API key management
+- [x] View presets
+- [x] View personas
+- [x] View TTS providers and availability
+- [ ] CRUD operations for presets/personas (future)
+- [ ] API key management (future)
 
 ### Technical Approach
 - New `/admin` route with protected access

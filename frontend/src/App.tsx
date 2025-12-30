@@ -5,7 +5,7 @@
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { HomePage, HistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage } from './pages';
+import { HomePage, HistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage } from './pages';
 import './styles/tokens.css';
 import './App.css';
 
@@ -25,6 +25,9 @@ function App() {
             <Route path="/debates/:debateId" element={<DebateViewPage />} />
             <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/debates" element={<AdminDebatesPage />} />
+            <Route path="/admin/exports" element={<AdminExportsPage />} />
+            <Route path="/admin/system" element={<AdminSystemPage />} />
+            <Route path="/admin/config" element={<AdminConfigPage />} />
           </Routes>
         </main>
       </div>

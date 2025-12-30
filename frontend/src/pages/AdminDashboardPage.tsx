@@ -258,6 +258,24 @@ export function AdminDashboardPage() {
             </Button>
           </Link>
 
+          <Link to="/admin/exports" className={styles.actionLink}>
+            <Button variant="secondary" className={styles.actionButton}>
+              Export Center
+            </Button>
+          </Link>
+
+          <Link to="/admin/system" className={styles.actionLink}>
+            <Button variant="ghost" className={styles.actionButton}>
+              System Monitor
+            </Button>
+          </Link>
+
+          <Link to="/admin/config" className={styles.actionLink}>
+            <Button variant="ghost" className={styles.actionButton}>
+              Configuration
+            </Button>
+          </Link>
+
           <Button
             variant="ghost"
             onClick={handleCleanup}

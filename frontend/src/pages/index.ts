@@ -3,3 +3,6 @@ export { HistoryPage } from './HistoryPage';
 export { DebateViewPage } from './DebateViewPage';
 export { AdminDashboardPage } from './AdminDashboardPage';
 export { AdminDebatesPage } from './AdminDebatesPage';
+export { AdminExportsPage } from './AdminExportsPage';
+export { AdminSystemPage } from './AdminSystemPage';
+export { AdminConfigPage } from './AdminConfigPage';
