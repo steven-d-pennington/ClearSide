@@ -10,12 +10,13 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import pino from 'pino';
-import { v4 as uuidv4 } from 'uuid';
 import type { DebateTranscript } from '../transcript/transcript-recorder.js';
 import { ScriptGenerator, createScriptGenerator } from './script-generator.js';
 import { AudioProcessor, createAudioProcessor } from './audio-processor.js';
 import { ID3Manager, createID3Manager } from './id3-manager.js';
 import { getTTSService, getDefaultProvider } from './tts-provider-factory.js';
+import * as exportJobRepository from '../../db/repositories/export-job-repository.js';
+import type { ExportJob } from '../../types/export-job.js';
 import type {
   AudioExportJob,
   AudioExportOptions,
@@ -37,11 +38,6 @@ const logger = pino({
  * Current exporter version
  */
 const EXPORTER_VERSION = '1.0.0';
-
-/**
- * In-memory job store (replace with Redis/database in production)
- */
-const jobStore = new Map<string, AudioExportJob>();
 
 /**
  * Orchestrator Configuration
@@ -102,20 +98,15 @@ export class AudioExportOrchestrator {
     transcript: DebateTranscript,
     options: Partial<AudioExportOptions> = {}
   ): Promise<string> {
-    const jobId = uuidv4();
-
-    // Create job record
-    const job: AudioExportJob = {
-      id: jobId,
+    // Create job record in database
+    const job = await exportJobRepository.create({
       debateId: transcript.meta.debate_id,
-      status: 'pending',
-      progress: 0,
-      stage: 'Initializing',
+      jobType: 'audio',
       options: { ...options },
-      createdAt: new Date().toISOString(),
-    };
+      provider: this.provider,
+    });
 
-    jobStore.set(jobId, job);
+    const jobId = job.id;
 
     logger.info(
       { jobId, debateId: transcript.meta.debate_id },
@@ -123,12 +114,12 @@ export class AudioExportOrchestrator {
     );
 
     // Start async export process
-    this.runExport(jobId, transcript, options).catch((error) => {
+    this.runExport(jobId, transcript, options).catch(async (error) => {
       logger.error({ jobId, error }, 'Audio export failed');
-      this.updateJob(jobId, {
-        status: 'failed',
-        error: error instanceof Error ? error.message : String(error),
-      });
+      await exportJobRepository.markFailed(
+        jobId,
+        error instanceof Error ? error.message : String(error)
+      );
     });
 
     return jobId;
@@ -140,8 +131,26 @@ export class AudioExportOrchestrator {
    * @param jobId - Job ID
    * @returns Job status or null if not found
    */
-  getJobStatus(jobId: string): AudioExportJob | null {
-    return jobStore.get(jobId) || null;
+  async getJobStatus(jobId: string): Promise<AudioExportJob | null> {
+    const job = await exportJobRepository.findById(jobId);
+    if (!job) return null;
+
+    // Convert ExportJob to AudioExportJob format for backwards compatibility
+    return {
+      id: job.id,
+      debateId: job.debateId,
+      status: job.status as AudioExportJob['status'],
+      progress: job.progress,
+      stage: job.stage || undefined,
+      options: job.options as Partial<AudioExportOptions>,
+      outputPath: job.outputPath || undefined,
+      outputUrl: job.outputUrl || undefined,
+      fileSizeBytes: job.fileSizeBytes || undefined,
+      durationSeconds: job.durationSeconds || undefined,
+      error: job.error || undefined,
+      createdAt: job.createdAt.toISOString(),
+      completedAt: job.completedAt?.toISOString(),
+    };
   }
 
   /**
@@ -160,7 +169,7 @@ export class AudioExportOrchestrator {
 
     try {
       // Stage 1: Generate script
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         status: 'processing',
         stage: 'Generating script',
         progress: 5,
@@ -174,7 +183,7 @@ export class AudioExportOrchestrator {
       );
 
       // Stage 2: Generate TTS for each segment
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         stage: 'Generating speech',
         progress: 10,
       });
@@ -186,7 +195,7 @@ export class AudioExportOrchestrator {
       );
 
       // Stage 3: Add silence between segments
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         stage: 'Processing segments',
         progress: 60,
       });
@@ -198,7 +207,7 @@ export class AudioExportOrchestrator {
       );
 
       // Stage 4: Concatenate all segments
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         stage: 'Combining audio',
         progress: 70,
       });
@@ -211,7 +220,7 @@ export class AudioExportOrchestrator {
       );
 
       // Stage 5: Normalize audio
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         stage: 'Normalizing audio',
         progress: 80,
       });
@@ -226,7 +235,7 @@ export class AudioExportOrchestrator {
 
       // Stage 6: Add background music (if requested)
       if (options.includeBackgroundMusic) {
-        this.updateJob(jobId, {
+        await this.updateJob(jobId, {
           stage: 'Adding background music',
           progress: 85,
         });
@@ -250,7 +259,7 @@ export class AudioExportOrchestrator {
       }
 
       // Stage 7: Add ID3 tags and chapter markers
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         stage: 'Adding metadata',
         progress: 90,
       });
@@ -279,7 +288,7 @@ export class AudioExportOrchestrator {
       const audioInfo = await this.audioProcessor.getAudioInfo(outputPath);
 
       // Stage 9: Cleanup temp files
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         stage: 'Cleaning up',
         progress: 95,
       });
@@ -287,7 +296,7 @@ export class AudioExportOrchestrator {
       await this.audioProcessor.cleanup(jobDir);
 
       // Complete job
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         status: 'completed',
         stage: 'Complete',
         progress: 100,
@@ -330,7 +339,7 @@ export class AudioExportOrchestrator {
 
       // Update progress (10-60% range for TTS generation)
       const progress = 10 + Math.floor((i / totalSegments) * 50);
-      this.updateJob(jobId, {
+      await this.updateJob(jobId, {
         stage: `Generating speech (${i + 1}/${totalSegments})`,
         progress,
       });
@@ -404,24 +413,31 @@ export class AudioExportOrchestrator {
   /**
    * Update job status
    */
-  private updateJob(jobId: string, updates: Partial<AudioExportJob>): void {
-    const job = jobStore.get(jobId);
-    if (job) {
-      Object.assign(job, updates);
-      jobStore.set(jobId, job);
+  private async updateJob(jobId: string, updates: Partial<AudioExportJob>): Promise<void> {
+    await exportJobRepository.update(jobId, {
+      status: updates.status,
+      progress: updates.progress,
+      stage: updates.stage,
+      outputPath: updates.outputPath,
+      outputUrl: updates.outputUrl,
+      fileSizeBytes: updates.fileSizeBytes,
+      durationSeconds: updates.durationSeconds,
+      error: updates.error,
+      startedAt: updates.status === 'processing' ? new Date() : undefined,
+      completedAt: updates.status === 'completed' || updates.status === 'failed' ? new Date() : undefined,
+    });
 
-      logger.debug(
-        { jobId, stage: updates.stage, progress: updates.progress },
-        'Job updated'
-      );
-    }
+    logger.debug(
+      { jobId, stage: updates.stage, progress: updates.progress },
+      'Job updated'
+    );
   }
 
   /**
    * Get output file path for a job
    */
-  getOutputPath(jobId: string): string | null {
-    const job = jobStore.get(jobId);
+  async getOutputPath(jobId: string): Promise<string | null> {
+    const job = await exportJobRepository.findById(jobId);
     return job?.outputPath || null;
   }
 
@@ -429,7 +445,7 @@ export class AudioExportOrchestrator {
    * Delete a job and its output file
    */
   async deleteJob(jobId: string): Promise<boolean> {
-    const job = jobStore.get(jobId);
+    const job = await exportJobRepository.findById(jobId);
 
     if (!job) {
       return false;
@@ -440,8 +456,8 @@ export class AudioExportOrchestrator {
       await fs.unlink(job.outputPath).catch(() => {});
     }
 
-    // Remove from store
-    jobStore.delete(jobId);
+    // Remove from database
+    await exportJobRepository.deleteById(jobId);
 
     logger.info({ jobId }, 'Job deleted');
     return true;
@@ -450,8 +466,23 @@ export class AudioExportOrchestrator {
   /**
    * List all jobs
    */
-  listJobs(): AudioExportJob[] {
-    return Array.from(jobStore.values());
+  async listJobs(): Promise<AudioExportJob[]> {
+    const jobs = await exportJobRepository.list({ jobType: 'audio', orderBy: 'created_at', orderDir: 'desc' });
+    return jobs.map(job => ({
+      id: job.id,
+      debateId: job.debateId,
+      status: job.status as AudioExportJob['status'],
+      progress: job.progress,
+      stage: job.stage || undefined,
+      options: job.options as Partial<AudioExportOptions>,
+      outputPath: job.outputPath || undefined,
+      outputUrl: job.outputUrl || undefined,
+      fileSizeBytes: job.fileSizeBytes || undefined,
+      durationSeconds: job.durationSeconds || undefined,
+      error: job.error || undefined,
+      createdAt: job.createdAt.toISOString(),
+      completedAt: job.completedAt?.toISOString(),
+    }));
   }
 
   /**
@@ -460,20 +491,8 @@ export class AudioExportOrchestrator {
    * @param maxAgeMs - Maximum age in milliseconds
    */
   async cleanupOldJobs(maxAgeMs: number = 24 * 60 * 60 * 1000): Promise<number> {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const [jobId, job] of jobStore.entries()) {
-      const jobAge = now - new Date(job.createdAt).getTime();
-
-      if (
-        jobAge > maxAgeMs &&
-        (job.status === 'completed' || job.status === 'failed')
-      ) {
-        await this.deleteJob(jobId);
-        cleaned++;
-      }
-    }
+    const maxAgeHours = Math.floor(maxAgeMs / (60 * 60 * 1000));
+    const cleaned = await exportJobRepository.deleteOldCompleted(maxAgeHours);
 
     logger.info({ cleaned, maxAgeMs }, 'Cleaned up old jobs');
     return cleaned;
@@ -507,7 +526,7 @@ export async function exportAudioSync(
   const startTime = Date.now();
 
   while (Date.now() - startTime < maxWait) {
-    const job = orchestrator.getJobStatus(jobId);
+    const job = await orchestrator.getJobStatus(jobId);
 
     if (!job) {
       return {

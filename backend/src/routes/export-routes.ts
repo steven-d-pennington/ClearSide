@@ -449,7 +449,7 @@ router.get('/exports/audio/:jobId/status', async (req: Request, res: Response) =
 
   try {
     const orchestrator = getAudioOrchestrator();
-    const job = orchestrator.getJobStatus(jobId!);
+    const job = await orchestrator.getJobStatus(jobId!);
 
     if (!job) {
       res.status(404).json({
@@ -497,7 +497,7 @@ router.get('/exports/audio/:jobId/download', async (req: Request, res: Response)
 
   try {
     const orchestrator = getAudioOrchestrator();
-    const job = orchestrator.getJobStatus(jobId!);
+    const job = await orchestrator.getJobStatus(jobId!);
 
     if (!job) {
       res.status(404).json({
@@ -623,7 +623,7 @@ router.delete('/exports/audio/:jobId', async (req: Request, res: Response) => {
 router.get('/exports/audio/jobs', async (req: Request, res: Response) => {
   try {
     const orchestrator = getAudioOrchestrator();
-    let jobs = orchestrator.listJobs();
+    let jobs = await orchestrator.listJobs();
 
     // Filter by status
     if (req.query.status) {

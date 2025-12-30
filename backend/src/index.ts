@@ -16,6 +16,7 @@ import exportRoutes from './routes/export-routes.js';
 import personaRoutes from './routes/persona-routes.js';
 import livelyRoutes from './routes/lively-routes.js';
 import modelRoutes from './routes/model-routes.js';
+import adminRoutes from './routes/admin-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 import { runMigrationsOnStartup } from './db/runMigrations.js';
@@ -84,6 +85,7 @@ app.use('/api', exportRoutes);
 app.use('/api/personas', personaRoutes);
 app.use('/api', livelyRoutes);
 app.use('/api/models', modelRoutes);
+app.use('/api', adminRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
