@@ -291,11 +291,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               className={styles.select}
             >
               <option value="">Select a model...</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} - ${model.costPer1MTokens.toFixed(2)}/1M
-                </option>
-              ))}
+              <ModelOptionsByProvider models={models} />
             </select>
           </div>
 
@@ -311,11 +307,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               className={styles.select}
             >
               <option value="">Select a model...</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} - ${model.costPer1MTokens.toFixed(2)}/1M
-                </option>
-              ))}
+              <ModelOptionsByProvider models={models} />
             </select>
           </div>
 
@@ -331,11 +323,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               className={styles.select}
             >
               <option value="">Select a model...</option>
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} - ${model.costPer1MTokens.toFixed(2)}/1M
-                </option>
-              ))}
+              <ModelOptionsByProvider models={models} />
             </select>
           </div>
 
@@ -374,6 +362,40 @@ const TierWarning: React.FC<{
         {MODEL_TIER_INFO[conModel.tier].name}). This may affect debate balance.
       </span>
     </div>
+  );
+};
+
+// Sub-component to render models grouped by provider with reasoning indicator
+const ModelOptionsByProvider: React.FC<{ models: ModelInfo[] }> = ({ models }) => {
+  // Group models by provider (models are already sorted alphabetically from backend)
+  const groupedByProvider = models.reduce<Record<string, ModelInfo[]>>((acc, model) => {
+    if (!acc[model.provider]) {
+      acc[model.provider] = [];
+    }
+    acc[model.provider].push(model);
+    return acc;
+  }, {});
+
+  // Sort providers alphabetically
+  const sortedProviders = Object.keys(groupedByProvider).sort();
+
+  // Format provider name for display (capitalize first letter)
+  const formatProviderName = (provider: string): string => {
+    return provider.charAt(0).toUpperCase() + provider.slice(1);
+  };
+
+  return (
+    <>
+      {sortedProviders.map((provider) => (
+        <optgroup key={provider} label={formatProviderName(provider)}>
+          {groupedByProvider[provider].map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.supportsReasoning ? '🧠 ' : ''}{model.name} - ${model.costPer1MTokens.toFixed(2)}/1M
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </>
   );
 };
 

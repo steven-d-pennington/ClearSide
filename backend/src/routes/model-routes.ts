@@ -101,6 +101,7 @@ router.get('/', async (req: Request, res: Response) => {
         costPer1MTokens: m.costPer1MTokens,
         contextLength: m.context_length,
         description: m.description,
+        supportsReasoning: m.supportsReasoning,
       })),
       providers,
       tierCounts,
@@ -160,6 +161,7 @@ router.get('/pairings', async (req: Request, res: Response) => {
           tier: pairing.proModel.tier,
           costPer1MTokens: pairing.proModel.costPer1MTokens,
           contextLength: pairing.proModel.context_length,
+          supportsReasoning: pairing.proModel.supportsReasoning,
         },
         conModel: {
           id: pairing.conModel.id,
@@ -168,6 +170,7 @@ router.get('/pairings', async (req: Request, res: Response) => {
           tier: pairing.conModel.tier,
           costPer1MTokens: pairing.conModel.costPer1MTokens,
           contextLength: pairing.conModel.context_length,
+          supportsReasoning: pairing.conModel.supportsReasoning,
         },
         tier: pairing.tier,
         estimatedCostPerDebate: pairing.estimatedCostPerDebate,
@@ -210,6 +213,7 @@ router.get('/pairings/suggestions', async (_req: Request, res: Response) => {
           provider: p.proModel.provider,
           tier: p.proModel.tier,
           costPer1MTokens: p.proModel.costPer1MTokens,
+          supportsReasoning: p.proModel.supportsReasoning,
         },
         conModel: {
           id: p.conModel.id,
@@ -217,6 +221,7 @@ router.get('/pairings/suggestions', async (_req: Request, res: Response) => {
           provider: p.conModel.provider,
           tier: p.conModel.tier,
           costPer1MTokens: p.conModel.costPer1MTokens,
+          supportsReasoning: p.conModel.supportsReasoning,
         },
         tier: p.tier,
         estimatedCostPerDebate: p.estimatedCostPerDebate,
@@ -284,6 +289,7 @@ router.post('/validate', async (req: Request, res: Response) => {
             tier: validation.proModel.tier,
             costPer1MTokens: validation.proModel.costPer1MTokens,
             contextLength: validation.proModel.context_length,
+            supportsReasoning: validation.proModel.supportsReasoning,
           }
         : null,
       conModel: validation.conModel
@@ -294,6 +300,7 @@ router.post('/validate', async (req: Request, res: Response) => {
             tier: validation.conModel.tier,
             costPer1MTokens: validation.conModel.costPer1MTokens,
             contextLength: validation.conModel.context_length,
+            supportsReasoning: validation.conModel.supportsReasoning,
           }
         : null,
       estimatedCost:

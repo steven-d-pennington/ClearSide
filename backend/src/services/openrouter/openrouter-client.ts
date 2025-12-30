@@ -49,6 +49,32 @@ const TRUSTED_PROVIDERS = new Set([
 ]);
 
 /**
+ * Models known to support extended thinking/reasoning
+ * Based on OpenRouter documentation and model capabilities
+ */
+const REASONING_MODEL_PATTERNS = [
+  // Claude models with thinking support
+  'claude-3-7-sonnet',
+  'claude-3.7-sonnet',
+  'claude-sonnet-4',
+  'claude-opus-4',
+  'claude-haiku-4',
+  // OpenAI o1/o3 reasoning models
+  'o1-preview',
+  'o1-mini',
+  'o1',
+  'o3-mini',
+  'o3',
+  // DeepSeek reasoning
+  'deepseek-r1',
+  'deepseek-reasoner',
+  // Qwen with reasoning
+  'qwq',
+  // Generic :thinking variants
+  ':thinking',
+];
+
+/**
  * Mapping from cost threshold to allowed tiers
  */
 const COST_THRESHOLD_TO_TIERS_MAP: Record<CostThreshold, ModelTier[]> = {
@@ -127,7 +153,12 @@ export class OpenRouterClient {
       const tieredModels = data.data
         .filter(this.isDebateSuitableModel.bind(this))
         .map(this.classifyModel.bind(this))
-        .sort((a, b) => b.costPer1MTokens - a.costPer1MTokens); // Sort by cost desc
+        // Sort alphabetically by provider, then by model name
+        .sort((a, b) => {
+          const providerCompare = a.provider.localeCompare(b.provider);
+          if (providerCompare !== 0) return providerCompare;
+          return a.name.localeCompare(b.name);
+        });
 
       // Update cache
       this.modelCache = tieredModels;
@@ -263,12 +294,41 @@ export class OpenRouterClient {
     // Determine tier
     const tier = this.classifyTier(costPer1MTokens);
 
+    // Check if model supports reasoning/extended thinking
+    const supportsReasoning = this.checkReasoningSupport(model);
+
     return {
       ...model,
       provider,
       costPer1MTokens,
       tier,
+      supportsReasoning,
     };
+  }
+
+  /**
+   * Check if a model supports extended thinking/reasoning tokens
+   */
+  private checkReasoningSupport(model: OpenRouterModel): boolean {
+    const lowerId = model.id.toLowerCase();
+    const lowerName = model.name.toLowerCase();
+
+    // Check against known reasoning model patterns
+    for (const pattern of REASONING_MODEL_PATTERNS) {
+      if (lowerId.includes(pattern) || lowerName.includes(pattern)) {
+        return true;
+      }
+    }
+
+    // Also check supported_parameters if available
+    if (model.supported_parameters) {
+      if (model.supported_parameters.includes('reasoning') ||
+          model.supported_parameters.includes('reasoning_effort')) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

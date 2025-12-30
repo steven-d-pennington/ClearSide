@@ -320,6 +320,8 @@ export interface ModelInfo {
   tier: ModelTier;
   costPer1MTokens: number;
   contextLength: number;
+  /** Whether the model supports extended thinking/reasoning */
+  supportsReasoning: boolean;
 }
 
 /**

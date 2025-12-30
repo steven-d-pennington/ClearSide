@@ -9,9 +9,10 @@
  */
 
 import OpenAI from 'openai';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 import pino from 'pino';
 import { LLMClient } from './client.js';
-import type { DebateModelConfig } from '../../types/openrouter.js';
+import type { DebateModelConfig, ReasoningConfig } from '../../types/openrouter.js';
 import { getRateLimiter, parseRateLimitHeaders, type RateLimitHeaders } from './rate-limiter.js';
 
 const logger = pino({
@@ -42,11 +43,13 @@ const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export class OpenRouterLLMClient extends LLMClient {
   private openRouterClient: OpenAI;
   private modelId: string;
+  private reasoningConfig?: ReasoningConfig;
 
-  constructor(modelId: string, apiKey?: string) {
+  constructor(modelId: string, apiKey?: string, reasoningConfig?: ReasoningConfig) {
     super(); // Initialize base LLM client
 
     this.modelId = modelId;
+    this.reasoningConfig = reasoningConfig;
     const key = apiKey || process.env.OPENROUTER_API_KEY;
 
     if (!key) {
@@ -62,7 +65,56 @@ export class OpenRouterLLMClient extends LLMClient {
       },
     });
 
-    logger.info({ modelId }, 'OpenRouter LLM client created');
+    logger.info({ modelId, reasoning: reasoningConfig?.effort || 'default' }, 'OpenRouter LLM client created');
+  }
+
+  /**
+   * Set or update reasoning configuration
+   */
+  setReasoningConfig(config: ReasoningConfig): void {
+    this.reasoningConfig = config;
+    logger.debug({ modelId: this.modelId, reasoning: config }, 'Reasoning config updated');
+  }
+
+  /**
+   * Build reasoning parameter for OpenRouter API
+   * @see https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+   */
+  private buildReasoningParam(): Record<string, unknown> | undefined {
+    if (!this.reasoningConfig) {
+      return undefined;
+    }
+
+    const { enabled, effort, maxTokens, exclude } = this.reasoningConfig;
+
+    // If explicitly disabled, don't include reasoning
+    if (enabled === false) {
+      return undefined;
+    }
+
+    // Check if effort is 'none' (disabled)
+    if (effort === 'none') {
+      return undefined;
+    }
+
+    const reasoning: Record<string, unknown> = {};
+
+    if (enabled !== undefined) {
+      reasoning.enabled = enabled;
+    }
+
+    // Use effort OR maxTokens, not both
+    if (maxTokens !== undefined) {
+      reasoning.max_tokens = maxTokens;
+    } else if (effort !== undefined) {
+      reasoning.effort = effort;
+    }
+
+    if (exclude !== undefined) {
+      reasoning.exclude = exclude;
+    }
+
+    return Object.keys(reasoning).length > 0 ? reasoning : undefined;
   }
 
   /**
@@ -98,25 +150,36 @@ export class OpenRouterLLMClient extends LLMClient {
         // Record the request
         rateLimiter.recordRequest(this.modelId);
 
+        const reasoning = this.buildReasoningParam();
+
         logger.info({
           provider: 'openrouter',
           model: this.modelId,
           messageCount: request.messages.length,
           temperature: request.temperature,
           maxTokens: request.maxTokens,
+          reasoning: reasoning ? 'enabled' : 'disabled',
           attempt: attempt > 0 ? attempt + 1 : undefined,
         }, 'Starting OpenRouter completion request');
 
-        const completion = await this.openRouterClient.chat.completions.create({
+        // Build base request parameters
+        const baseRequest = {
           model: this.modelId,
           messages: request.messages.map(msg => ({
-            role: msg.role,
+            role: msg.role as 'system' | 'user' | 'assistant',
             content: msg.content,
           })),
           temperature: request.temperature ?? 0.7,
           max_tokens: request.maxTokens ?? 4096,
-          stream: false,
-        });
+          stream: false as const,
+        };
+
+        // Add reasoning if configured (OpenRouter extended thinking)
+        // This is passed as an extra body param for OpenRouter's non-standard extension
+        const completion = await this.openRouterClient.chat.completions.create({
+          ...baseRequest,
+          ...(reasoning && { reasoning }),
+        }) as ChatCompletion;
 
         const choice = completion.choices[0];
         const content = choice?.message?.content ?? '';
@@ -270,13 +333,19 @@ export class OpenRouterLLMClient extends LLMClient {
         // Record the request
         rateLimiter.recordRequest(this.modelId);
 
-        const response = await this.openRouterClient.chat.completions.create({
+        const reasoning = this.buildReasoningParam();
+        const baseRequest = {
           model: this.modelId,
           messages,
           temperature: options?.temperature ?? 0.7,
           max_tokens: options?.maxTokens ?? 1024,
-          stream: false,
-        });
+          stream: false as const,
+        };
+
+        const response = await this.openRouterClient.chat.completions.create({
+          ...baseRequest,
+          ...(reasoning && { reasoning }),
+        }) as ChatCompletion;
 
         return response.choices[0]?.message?.content || '';
       } catch (error) {
@@ -331,12 +400,18 @@ export class OpenRouterLLMClient extends LLMClient {
     rateLimiter.recordRequest(this.modelId);
 
     try {
-      const stream = await this.openRouterClient.chat.completions.create({
+      const reasoning = this.buildReasoningParam();
+      const baseRequest = {
         model: this.modelId,
         messages,
         temperature: options?.temperature ?? 0.7,
         max_tokens: options?.maxTokens ?? 1024,
-        stream: true,
+        stream: true as const,
+      };
+
+      const stream = await this.openRouterClient.chat.completions.create({
+        ...baseRequest,
+        ...(reasoning && { reasoning }),
       });
 
       for await (const chunk of stream) {
@@ -361,8 +436,8 @@ export class OpenRouterLLMClient extends LLMClient {
 /**
  * Create an OpenRouter LLM client for a specific model
  */
-export function createOpenRouterClient(modelId: string): OpenRouterLLMClient {
-  return new OpenRouterLLMClient(modelId);
+export function createOpenRouterClient(modelId: string, reasoningConfig?: ReasoningConfig): OpenRouterLLMClient {
+  return new OpenRouterLLMClient(modelId, undefined, reasoningConfig);
 }
 
 /**
@@ -404,18 +479,18 @@ export async function createDebateClients(config?: DebateModelConfig): Promise<{
     };
   }
 
-  // Create model-specific clients
+  // Create model-specific clients with optional reasoning config
   const proClient = config.proModelId
-    ? createOpenRouterClient(config.proModelId)
+    ? createOpenRouterClient(config.proModelId, config.reasoning)
     : defaultLLMClient;
 
   const conClient = config.conModelId
-    ? createOpenRouterClient(config.conModelId)
+    ? createOpenRouterClient(config.conModelId, config.reasoning)
     : defaultLLMClient;
 
   // Moderator uses specified model or default
   const moderatorClient = config.moderatorModelId
-    ? createOpenRouterClient(config.moderatorModelId)
+    ? createOpenRouterClient(config.moderatorModelId, config.reasoning)
     : defaultLLMClient;
 
   logger.info(
@@ -423,6 +498,7 @@ export async function createDebateClients(config?: DebateModelConfig): Promise<{
       proModel: config.proModelId || 'default',
       conModel: config.conModelId || 'default',
       moderatorModel: config.moderatorModelId || 'default',
+      reasoning: config.reasoning?.effort || 'disabled',
     },
     'Created debate clients with model config'
   );

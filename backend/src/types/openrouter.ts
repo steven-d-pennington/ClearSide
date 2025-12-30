@@ -73,6 +73,8 @@ export interface TieredModel extends OpenRouterModel {
   provider: string;
   /** Cost per 1M completion tokens in USD */
   costPer1MTokens: number;
+  /** Whether this model supports extended thinking/reasoning */
+  supportsReasoning: boolean;
 }
 
 /**
@@ -89,6 +91,8 @@ export interface DebateModelConfig {
   moderatorModelId?: string;
   /** Maximum cost tier allowed (auto mode) */
   costThreshold?: CostThreshold;
+  /** Reasoning/thinking configuration for extended reasoning */
+  reasoning?: ReasoningConfig;
 }
 
 /**
@@ -156,4 +160,55 @@ export const COST_THRESHOLD_DISPLAY_NAMES: Record<CostThreshold, string> = {
   medium: 'Medium ($0.50-$5/1M)',
   low: 'Low (<$0.50/1M)',
   free_only: 'Free Only',
+};
+
+/**
+ * Reasoning effort level for models that support extended thinking
+ * @see https://openrouter.ai/docs/guides/best-practices/reasoning-tokens
+ */
+export type ReasoningEffort = 'xhigh' | 'high' | 'medium' | 'low' | 'minimal' | 'none';
+
+/**
+ * Reasoning configuration for OpenRouter requests
+ * Controls extended thinking/reasoning tokens for supported models
+ */
+export interface ReasoningConfig {
+  /** Enable reasoning (defaults to true if effort is set) */
+  enabled?: boolean;
+  /** Reasoning effort level - controls token allocation for thinking */
+  effort?: ReasoningEffort;
+  /** Max tokens for reasoning (alternative to effort, 1024-32000 for Anthropic) */
+  maxTokens?: number;
+  /** Exclude reasoning from response (still processes internally) */
+  exclude?: boolean;
+}
+
+/**
+ * Default reasoning configurations
+ */
+export const REASONING_PRESETS: Record<string, ReasoningConfig> = {
+  /** Maximum reasoning for complex analysis */
+  deep: { enabled: true, effort: 'xhigh' },
+  /** High reasoning for thorough responses */
+  thorough: { enabled: true, effort: 'high' },
+  /** Balanced reasoning (default for debates) */
+  balanced: { enabled: true, effort: 'medium' },
+  /** Light reasoning for faster responses */
+  light: { enabled: true, effort: 'low' },
+  /** Minimal reasoning for quick responses */
+  quick: { enabled: true, effort: 'minimal' },
+  /** No extended reasoning */
+  disabled: { enabled: false, effort: 'none' },
+};
+
+/**
+ * Reasoning effort display names
+ */
+export const REASONING_EFFORT_DISPLAY_NAMES: Record<ReasoningEffort, string> = {
+  xhigh: 'Deep (~95% tokens)',
+  high: 'Thorough (~80% tokens)',
+  medium: 'Balanced (~50% tokens)',
+  low: 'Light (~20% tokens)',
+  minimal: 'Quick (~10% tokens)',
+  none: 'Disabled',
 };

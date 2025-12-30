@@ -6,7 +6,14 @@
       "Bash(git push)",
       "Bash(npm install)",
       "Bash(git commit:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker version:*)",
+      "Bash($env:DOCKER_API_VERSION=\"1.47\")",
+      "Bash(wsl --shutdown:*)",
+      "Bash(cat:*)",
+      "Bash(docker-compose logs:*)",
+      "Bash(docker-compose restart:*)"
     ]
   }
 }
