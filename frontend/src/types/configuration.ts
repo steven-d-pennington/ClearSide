@@ -157,6 +157,9 @@ export interface DebatePreset {
   maxTokensPerResponse: number;
   requireCitations: boolean;
   isSystemPreset: boolean;
+  proModelId?: string | null;
+  conModelId?: string | null;
+  moderatorModelId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -446,3 +449,17 @@ export const MODEL_TIER_INFO: Record<ModelTier, { name: string; description: str
     color: '#6b7280', // Gray
   },
 };
+
+// ============================================================================
+// Model Defaults
+// ============================================================================
+
+/**
+ * Default model settings for manual mode
+ */
+export interface ModelDefaults {
+  proModelId: string | null;
+  conModelId: string | null;
+  moderatorModelId: string | null;
+}
+

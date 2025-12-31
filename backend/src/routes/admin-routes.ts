@@ -8,6 +8,9 @@ import { sseManager } from '../services/sse/index.js';
 import * as debateRepository from '../db/repositories/debate-repository.js';
 import * as exportJobRepository from '../db/repositories/export-job-repository.js';
 import * as eventRepository from '../db/repositories/event-repository.js';
+import * as presetRepository from '../db/repositories/preset-repository.js';
+import * as personaRepository from '../db/repositories/persona-repository.js';
+import * as settingsRepository from '../db/repositories/settings-repository.js';
 import { orchestratorRegistry } from '../services/debate/index.js';
 import { createLogger } from '../utils/logger.js';
 import { getRateLimiter } from '../services/llm/rate-limiter.js';
@@ -546,7 +549,7 @@ router.get('/admin/events', async (req: Request, res: Response) => {
  */
 router.get('/admin/events/debate/:debateId', async (req: Request, res: Response) => {
   try {
-    const { debateId } = req.params;
+    const debateId = req.params.debateId as string;
     const limit = parseInt(req.query.limit as string) || 100;
 
     const events = await eventRepository.findByDebateId(debateId, limit);
@@ -572,7 +575,7 @@ router.get('/admin/events/debate/:debateId', async (req: Request, res: Response)
  */
 router.get('/admin/events/debate/:debateId/stats', async (req: Request, res: Response) => {
   try {
-    const { debateId } = req.params;
+    const debateId = req.params.debateId as string;
     const stats = await eventRepository.getDebateStats(debateId);
 
     res.json({
@@ -636,6 +639,269 @@ router.delete('/admin/events/cleanup', async (req: Request, res: Response) => {
     logger.error({ errorMessage }, 'Error cleaning up events');
     res.status(500).json({
       error: 'Failed to cleanup events',
+      message: errorMessage,
+    });
+  }
+});
+
+// =============================================================================
+// Presets Endpoints
+// =============================================================================
+
+/**
+ * GET /admin/presets
+ * List all debate presets (system and user-created)
+ */
+router.get('/admin/presets', async (_req: Request, res: Response) => {
+  try {
+    const presets = await presetRepository.listAll();
+    res.json({
+      success: true,
+      presets,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error listing presets');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to list presets',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/presets/system
+ * List only system presets
+ */
+router.get('/admin/presets/system', async (_req: Request, res: Response) => {
+  try {
+    const presets = await presetRepository.listSystemPresets();
+    res.json({
+      success: true,
+      presets,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error listing system presets');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to list system presets',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/presets/:id
+ * Get a specific preset by ID
+ */
+router.get('/admin/presets/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const preset = await presetRepository.findById(id);
+
+    if (!preset) {
+      res.status(404).json({
+        success: false,
+        error: 'Preset not found',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      preset,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error getting preset');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get preset',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * PUT /admin/presets/:id
+ * Update a preset
+ */
+router.put('/admin/presets/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const updateData = req.body as presetRepository.UpdatePresetInput;
+
+    logger.info({ presetId: id, updateData }, 'Updating preset');
+
+    const preset = await presetRepository.update(id, updateData);
+
+    if (!preset) {
+      res.status(404).json({
+        success: false,
+        error: 'Preset not found',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      preset,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error updating preset');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update preset',
+      message: errorMessage,
+    });
+  }
+});
+
+// =============================================================================
+// Personas Endpoints
+// =============================================================================
+
+/**
+ * GET /admin/personas
+ * List all personas
+ */
+router.get('/admin/personas', async (_req: Request, res: Response) => {
+  try {
+    const personas = await personaRepository.listAll();
+    res.json({
+      success: true,
+      personas,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error listing personas');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to list personas',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/personas/:id
+ * Get a specific persona by ID
+ */
+router.get('/admin/personas/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const persona = await personaRepository.findById(id);
+
+    if (!persona) {
+      res.status(404).json({
+        success: false,
+        error: 'Persona not found',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      persona,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error getting persona');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get persona',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * PUT /admin/personas/:id
+ * Update a persona
+ */
+router.put('/admin/personas/:id', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const updateData = req.body as personaRepository.UpdatePersonaInput;
+
+    logger.info({ personaId: id, updateData }, 'Updating persona');
+
+    const persona = await personaRepository.update(id, updateData);
+
+    if (!persona) {
+      res.status(404).json({
+        success: false,
+        error: 'Persona not found',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      persona,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error updating persona');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update persona',
+      message: errorMessage,
+    });
+  }
+});
+
+// =============================================================================
+// Settings Endpoints
+// =============================================================================
+
+/**
+ * GET /admin/settings/models
+ * Get default model settings
+ */
+router.get('/admin/settings/models', async (_req: Request, res: Response) => {
+  try {
+    const defaults = await settingsRepository.getDefaultModels();
+    res.json({
+      success: true,
+      defaults,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error getting model defaults');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get model defaults',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * PUT /admin/settings/models
+ * Update default model settings
+ */
+router.put('/admin/settings/models', async (req: Request, res: Response) => {
+  try {
+    const defaults = req.body as settingsRepository.ModelDefaults;
+
+    logger.info({ defaults }, 'Updating model defaults');
+
+    await settingsRepository.setDefaultModels(defaults);
+
+    res.json({
+      success: true,
+      defaults,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Error updating model defaults');
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update model defaults',
       message: errorMessage,
     });
   }

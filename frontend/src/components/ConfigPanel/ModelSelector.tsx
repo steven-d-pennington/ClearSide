@@ -21,10 +21,18 @@ import {
 } from '../../types/configuration';
 import styles from './ModelSelector.module.css';
 
+interface ModelDefaults {
+  proModelId: string | null;
+  conModelId: string | null;
+  moderatorModelId: string | null;
+}
+
 interface ModelSelectorProps {
   selection: ModelSelection;
   onChange: (selection: ModelSelection) => void;
   disabled?: boolean;
+  /** Current preset ID to load preset-specific defaults */
+  presetId?: string;
 }
 
 interface OpenRouterStatus {
@@ -36,14 +44,48 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   selection,
   onChange,
   disabled = false,
+  presetId,
 }) => {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [previewPairing, setPreviewPairing] = useState<ModelPairing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [defaultsLoaded, setDefaultsLoaded] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+  // Fetch model defaults - first from preset, then from system settings
+  const fetchModelDefaults = useCallback(async (): Promise<ModelDefaults | null> => {
+    try {
+      // Try preset-specific defaults first
+      if (presetId) {
+        const presetResponse = await fetch(`${API_BASE_URL}/api/admin/presets/${presetId}`);
+        if (presetResponse.ok) {
+          const preset = await presetResponse.json();
+          // Only use preset defaults if at least one model is set
+          if (preset.proModelId || preset.conModelId || preset.moderatorModelId) {
+            return {
+              proModelId: preset.proModelId || null,
+              conModelId: preset.conModelId || null,
+              moderatorModelId: preset.moderatorModelId || null,
+            };
+          }
+        }
+      }
+
+      // Fall back to system defaults
+      const systemResponse = await fetch(`${API_BASE_URL}/api/admin/settings/models`);
+      if (systemResponse.ok) {
+        return await systemResponse.json();
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Failed to fetch model defaults:', err);
+      return null;
+    }
+  }, [API_BASE_URL, presetId]);
 
   // Check if OpenRouter is configured
   useEffect(() => {
@@ -110,19 +152,47 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     loadPairing();
   }, [isConfigured, selection.mode, selection.costThreshold, API_BASE_URL]);
 
+  // Reset defaultsLoaded when preset changes so new defaults can be loaded
+  useEffect(() => {
+    setDefaultsLoaded(false);
+  }, [presetId]);
+
   // Handle mode toggle
   const handleModeChange = useCallback(
-    (mode: ModelSelectionMode) => {
-      onChange({
-        ...selection,
-        mode,
+    async (mode: ModelSelectionMode) => {
+      if (mode === 'auto') {
         // Clear manual selections when switching to auto
-        proModelId: mode === 'auto' ? null : selection.proModelId,
-        conModelId: mode === 'auto' ? null : selection.conModelId,
-        moderatorModelId: mode === 'auto' ? null : selection.moderatorModelId,
-      });
+        onChange({
+          ...selection,
+          mode,
+          proModelId: null,
+          conModelId: null,
+          moderatorModelId: null,
+        });
+        setDefaultsLoaded(false);
+      } else {
+        // Switching to manual - load defaults if no selections exist
+        if (!selection.proModelId && !selection.conModelId && !selection.moderatorModelId && !defaultsLoaded) {
+          const defaults = await fetchModelDefaults();
+          if (defaults) {
+            onChange({
+              ...selection,
+              mode,
+              proModelId: defaults.proModelId,
+              conModelId: defaults.conModelId,
+              moderatorModelId: defaults.moderatorModelId,
+            });
+            setDefaultsLoaded(true);
+            return;
+          }
+        }
+        onChange({
+          ...selection,
+          mode,
+        });
+      }
     },
-    [selection, onChange]
+    [selection, onChange, fetchModelDefaults, defaultsLoaded]
   );
 
   // Handle cost threshold change

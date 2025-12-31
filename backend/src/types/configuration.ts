@@ -132,8 +132,17 @@ export interface DebatePreset {
   /** Whether citations are required */
   requireCitations: boolean;
 
-  /** Whether this is a system preset (cannot be modified) */
+  /** Whether this is a system preset */
   isSystemPreset: boolean;
+
+  /** Default Pro model ID for manual mode */
+  proModelId?: string | null;
+
+  /** Default Con model ID for manual mode */
+  conModelId?: string | null;
+
+  /** Default Moderator model ID for manual mode */
+  moderatorModelId?: string | null;
 
   /** Creation timestamp */
   createdAt: Date;

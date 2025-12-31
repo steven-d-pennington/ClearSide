@@ -400,6 +400,7 @@ export const InputForm: React.FC<InputFormProps> = ({
         selection={formState.modelSelection}
         onChange={handleModelSelectionChange}
         disabled={isLoading}
+        presetId={formState.configuration.presetMode}
       />
 
       {/* Persona Selector */}
