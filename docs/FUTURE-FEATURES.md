@@ -210,6 +210,325 @@ Add default reasoning level and UI control for extended thinking.
 
 ---
 
+## 6. Reactive Listening / Cross-Talk Debates
+
+**Priority:** P2
+**Complexity:** High
+**Status:** Research
+
+Enable more natural debate flow where models can "hear" each other in real-time and interrupt organically, creating true cross-talk dynamics.
+
+### Current Architecture
+```
+Speaker A streams → Interruption Engine evaluates → May trigger Speaker B
+```
+The interruption engine is a separate evaluator that decides if B should jump in. A and B don't actually "hear" each other in real-time.
+
+### Proposed Approaches
+
+#### Option A: Reactive Listening (Recommended)
+Stream the current speaker's output into the opposing model's context in real-time:
+```
+Current Speaker (streaming) → UI (for display)
+                            → Opposing Model (for reaction evaluation)
+                            → Moderator (for fairness/rules)
+```
+
+The opposing model receives chunks as they stream and generates a "reaction score." When the score crosses a threshold, they get the floor.
+
+**Pros:** Natural feel, opposing model decides when to interrupt
+**Cons:** 1.5x token cost, latency per evaluation, API limitations
+
+#### Option B: Short-Burst Rapid Exchange
+Instead of long turns, use very short exchanges (1-2 sentences):
+```
+Pro: "The economic benefits are clear—"
+Con: "But at what cost to workers?"
+Pro: "Actually, studies show employment increases—"
+Con: "Those studies are funded by industry!"
+```
+
+**Pros:** Simple to implement, mimics real debate
+**Cons:** Less depth per point, may feel choppy
+
+#### Option C: Parallel Streams with Arbitration
+Both models stream simultaneously; an arbitrator decides who "has the floor":
+```
+┌─────────────┐     ┌─────────────┐
+│  Pro Model  │     │  Con Model  │
+│  (streaming)│     │  (streaming)│
+└──────┬──────┘     └──────┬──────┘
+       └───────┬───────────┘
+               ▼
+        ┌──────────────┐
+        │  Arbitrator  │
+        └──────────────┘
+```
+
+**Pros:** Most natural, true cross-talk
+**Cons:** 2-3x token cost, wasted generation, hard to keep coherent
+
+### Technical Challenges
+- **Latency**: Evaluating every chunk adds 200-500ms per evaluation
+- **API Limitations**: Most LLMs don't support bidirectional streaming
+- **Coherence**: Cross-talk can quickly become incoherent
+- **Token Waste**: Interrupted outputs mean wasted tokens
+- **Audio/TTS**: Overlapping speech is complex for podcast export
+
+### Recommended Path
+1. Start with **Short-Burst Exchange** (Option B) as proof of concept
+2. Validate user experience and identify issues
+3. Graduate to **Reactive Listening** (Option A) if needed
+
+### Data Model Addition
+```typescript
+interface CrossTalkConfig {
+  mode: 'sequential' | 'short-burst' | 'reactive' | 'parallel';
+  maxSentencesPerBurst?: number;  // For short-burst mode
+  reactionThreshold?: number;      // For reactive mode (0-1)
+  evaluationFrequency?: 'chunk' | 'sentence' | 'paragraph';
+}
+```
+
+---
+
+## 7. Human Participation Mode
+
+**Priority:** P1
+**Complexity:** Medium
+**Status:** Implementing (Core Complete)
+
+Allow a human user to take one side of the debate, arguing against an AI opponent.
+
+### Requirements
+- [x] **Side Selection**: User chooses to argue Pro or Con (via InputForm participation mode selector)
+- [x] **AI Opponent**: The other side is argued by an AI model
+- [x] **Turn-Based Input**: User types their arguments when it's their turn (HumanTurnInput component)
+- [x] **Time Limits**: Optional timer for user responses (backend support with frontend display)
+- [x] **AI Adaptation**: AI responds to user's actual arguments (human turns included in context)
+- [ ] **Coaching Mode**: Optional hints/suggestions for the human player (future enhancement)
+
+### User Experience Flow
+```
+1. User creates debate with proposition
+2. User selects: "I will argue [Pro/Con]"
+3. Debate begins with opening statements
+4. On user's turn:
+   - Timer starts (optional)
+   - Rich text editor appears
+   - User types and submits their argument
+5. AI opponent responds to user's actual points
+6. Continue through all phases
+7. Moderator provides synthesis as normal
+```
+
+### Game Modes
+
+#### Competitive Mode
+- Strict time limits
+- No hints or suggestions
+- AI moderator scores arguments
+- Leaderboard potential
+
+#### Practice Mode
+- No time limits
+- AI provides suggestions ("Consider addressing...")
+- Post-turn feedback on argument strength
+- Learning-focused
+
+#### Guided Mode
+- AI suggests key points to make
+- Templates for common argument structures
+- Best for beginners
+
+### UI Components Needed
+- Side selection screen
+- Human input editor with formatting
+- Turn timer (optional)
+- "Thinking..." indicator while AI responds
+- Hint/suggestion panel (for practice mode)
+
+### Technical Considerations
+- Modify orchestrator to wait for human input instead of calling LLM
+- Add WebSocket or polling for user input submission
+- Context building must include user's actual text
+- Consider rate limiting to prevent abuse
+- Store human turns differently (no model attribution)
+
+### Data Model Addition
+```typescript
+interface HumanParticipationConfig {
+  enabled: boolean;
+  humanSide: 'pro' | 'con';
+  gameMode: 'competitive' | 'practice' | 'guided';
+  timeLimitSeconds?: number;
+  allowHints: boolean;
+}
+
+interface DebateTurn {
+  // existing fields...
+  isHumanGenerated: boolean;
+  responseTimeMs?: number;  // How long human took to respond
+}
+```
+
+### Wireframe
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Debate: Should AI be regulated?                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  [AI - Con Advocate]                                        │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Regulation would stifle innovation and put us       │   │
+│  │ behind other nations in AI development...           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  [Your Turn - Pro Advocate]                    ⏱ 2:45      │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ Type your argument here...                          │   │
+│  │                                                     │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  💡 Hint: Consider addressing the innovation point         │
+│                                           [Submit Argument] │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Implementation Notes (2025-12-30)
+
+**Backend Changes:**
+- `HumanParticipationConfig` type added to `types/configuration.ts`
+- New SSE events: `awaiting_human_input`, `human_turn_received`, `human_turn_timeout`
+- `HumanTurnService` manages pending human input requests with promise-based waiting
+- POST `/api/debates/:debateId/human-turn` endpoint for submitting human arguments
+- `lively-orchestrator.ts` modified to check `isHumanSpeaker()` and wait for human input
+
+**Frontend Changes:**
+- `HumanParticipation` and `HumanSide` types in `types/debate.ts`
+- Participation mode selector in `InputForm` (Watch / Argue Pro / Argue Con)
+- `HumanTurnInput` component with character count, timer, and Ctrl+Enter submit
+- `debate-store.ts` updated with `submitHumanTurn` action and SSE event handlers
+- `DebateStream` shows human participation indicator and renders `HumanTurnInput`
+
+**Not Yet Implemented:**
+- Competitive/Practice/Guided game modes
+- Coaching hints and suggestions
+- Post-turn feedback on argument strength
+- Leaderboard/scoring
+
+---
+
+## 8. Informal Discussion Mode
+
+**Priority:** P2
+**Complexity:** Medium
+**Status:** Planned
+
+A freeform discussion mode where multiple AI models converse about a topic without structured debate roles or phases.
+
+### Concept
+
+Unlike the formal debate mode with Pro/Con advocates and a moderator following a 6-phase protocol, Informal Mode is an open-ended conversation between 2+ AI models. There are no assigned positions - models simply discuss and explore a topic together.
+
+### Requirements
+- **No roles**: Participants are just "Model A", "Model B", etc. - not advocates for positions
+- **No phases**: Conversation flows naturally without opening/constructive/rebuttal structure
+- **No moderator**: The conversation is self-directed
+- **Multi-model support**: Support 2+ models discussing together
+- **Topic flexibility**: Any topic, question, or prompt - not just binary propositions
+- **Turn-based or flowing**: Could be strict turn-taking or more organic (see Cross-Talk feature)
+
+### Use Cases
+- Exploring nuanced topics that don't fit a binary pro/con frame
+- Brainstorming sessions between multiple AI "perspectives"
+- Educational discussions where models build on each other's ideas
+- Comparing how different models approach the same topic
+- Casual exploration of philosophical or open-ended questions
+
+### Example Topics
+- "What makes a good life?"
+- "Discuss the implications of quantum computing"
+- "Explore the relationship between art and technology"
+- "What should humanity prioritize in the next 50 years?"
+
+### Technical Approach
+
+#### New Discussion Configuration
+```typescript
+interface InformalDiscussionConfig {
+  mode: 'informal';
+  topic: string;
+  participants: Array<{
+    name: string;      // e.g., "Participant A" or custom name
+    modelId: string;   // e.g., "anthropic/claude-sonnet-4"
+    persona?: string;  // Optional persona/perspective
+  }>;
+  turnOrder: 'round-robin' | 'dynamic';  // Who speaks next
+  maxTurns?: number;           // Optional limit
+  maxTokensPerTurn?: number;   // Keep responses conversational
+}
+```
+
+#### Simplified Orchestrator
+- No phase progression logic
+- No interruption engine (unless in "dynamic" turn order)
+- Simple turn-based generation
+- Each model receives full conversation history
+
+#### UI Changes
+- Different input form for informal mode (just topic + model selection)
+- Participant list instead of Pro/Con setup
+- Simpler transcript view without phase markers
+- No moderator synthesis at the end (or optional summary)
+
+### Wireframe
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Discussion: What makes a good life?                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  [Claude Sonnet]                                             │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ That's a profound question. I think it depends on   │    │
+│  │ what we mean by "good" - are we talking about       │    │
+│  │ happiness, meaning, virtue, or something else?      │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  [GPT-4]                                                     │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Great point. I'd argue those aren't mutually        │    │
+│  │ exclusive. Aristotle's concept of eudaimonia        │    │
+│  │ encompasses all of those aspects...                 │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  [Gemini]                                                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Building on that, modern psychology research on     │    │
+│  │ well-being seems to support a multi-dimensional     │    │
+│  │ view. PERMA theory, for example...                  │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Implementation Steps
+1. Add `InformalDiscussionConfig` type
+2. Create `InformalOrchestrator` (simplified version of `LivelyOrchestrator`)
+3. Update `/api/debates/start` to accept informal mode
+4. Create frontend form for informal discussions
+5. Update `DebateStream` to render informal transcripts
+6. Add export support for informal discussions
+
+### Relationship to Other Features
+- Could leverage **Team Debates** infrastructure (multiple participants)
+- Compatible with **Cross-Talk** for more organic turn-taking
+- Could use **Chain of Thought** display for transparency
+- **Human Participation** could join as one of the discussants
+
+---
+
 ## Future Considerations
 
 ### Multi-User Support
@@ -239,4 +558,4 @@ Add default reasoning level and UI control for extended thinking.
 
 ---
 
-*Last Updated: 2025-12-29*
+*Last Updated: 2025-12-31*

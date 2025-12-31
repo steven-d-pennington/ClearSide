@@ -404,6 +404,76 @@ export async function getFlowMode(id: string): Promise<FlowMode | null> {
   }
 }
 
+/**
+ * Update informal summary for a discussion
+ */
+export async function updateInformalSummary(
+  id: string,
+  summary: Record<string, unknown>
+): Promise<Debate | null> {
+  const query = `
+    UPDATE debates
+    SET informal_summary = $2
+    WHERE id = $1
+    RETURNING *
+  `;
+
+  try {
+    const result = await pool.query<DebateRow>(query, [id, JSON.stringify(summary)]);
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+    return rowToDebate(row);
+  } catch (error) {
+    console.error('Error updating informal summary:', error);
+    throw new Error(
+      `Failed to update informal summary: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
+ * Update discussion mode and related settings
+ */
+export async function updateDiscussionMode(
+  id: string,
+  mode: 'debate' | 'informal',
+  settings?: {
+    maxExchanges?: number;
+    participantConfig?: Record<string, unknown>;
+  }
+): Promise<Debate | null> {
+  const query = `
+    UPDATE debates
+    SET
+      discussion_mode = $2,
+      max_exchanges = COALESCE($3, max_exchanges),
+      participant_config = COALESCE($4, participant_config)
+    WHERE id = $1
+    RETURNING *
+  `;
+
+  try {
+    const result = await pool.query<DebateRow>(query, [
+      id,
+      mode,
+      settings?.maxExchanges ?? null,
+      settings?.participantConfig ? JSON.stringify(settings.participantConfig) : null,
+    ]);
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+    return rowToDebate(row);
+  } catch (error) {
+    console.error('Error updating discussion mode:', error);
+    throw new Error(
+      `Failed to update discussion mode: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 // Export all functions as default object for convenience
 export default {
   create,
@@ -417,4 +487,6 @@ export default {
   deleteById,
   setAwaitingContinue,
   getFlowMode,
+  updateInformalSummary,
+  updateDiscussionMode,
 };

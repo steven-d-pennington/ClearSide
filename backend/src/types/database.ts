@@ -13,7 +13,7 @@ export type DebateStatus = 'initializing' | 'live' | 'paused' | 'completed' | 'e
 
 /**
  * Current debate phase
- * Maps to the 6-phase debate protocol
+ * Maps to the 6-phase debate protocol or informal discussion phases
  */
 export type DebatePhase =
   | 'opening_statements'
@@ -21,13 +21,25 @@ export type DebatePhase =
   | 'evidence_presentation'
   | 'rebuttals'
   | 'synthesis'
-  | 'closing_statements';
+  | 'closing_statements'
+  // Informal discussion phases
+  | 'informal'
+  | 'wrapup';
 
 /**
  * Speaker identifier
- * Identifies who is currently speaking in the debate
+ * Identifies who is currently speaking in the debate or discussion
  */
-export type Speaker = 'moderator' | 'pro_advocate' | 'con_advocate' | 'user';
+export type Speaker =
+  | 'moderator'
+  | 'pro_advocate'
+  | 'con_advocate'
+  | 'user'
+  // Informal discussion participants
+  | 'participant_1'
+  | 'participant_2'
+  | 'participant_3'
+  | 'participant_4';
 
 /**
  * Flow mode for debate progression

@@ -43,7 +43,8 @@ import { PRO_ADVOCATE_PROMPTS, PRO_PROMPT_BUILDERS } from '../agents/prompts/pro
 import { CON_ADVOCATE_PROMPTS, CON_PROMPT_BUILDERS } from '../agents/prompts/con-advocate-prompts.js';
 import { MODERATOR_PROMPTS, MODERATOR_PROMPT_BUILDERS } from '../agents/prompts/moderator-prompts.js';
 import type { PromptBuilderContext } from '../agents/prompts/types.js';
-import type { DebateConfiguration, PresetMode, BrevityLevel } from '../../types/configuration.js';
+import type { DebateConfiguration, PresetMode, BrevityLevel, HumanParticipationConfig } from '../../types/configuration.js';
+import { humanTurnService } from '../human-turn/index.js';
 
 const logger = pino({
   name: 'lively-orchestrator',
@@ -84,6 +85,8 @@ export interface LivelyOrchestratorConfig {
   evaluationIntervalMs?: number;
   /** Whether to broadcast SSE events */
   broadcastEvents?: boolean;
+  /** Human participation configuration */
+  humanParticipation?: HumanParticipationConfig;
 }
 
 /**
@@ -135,6 +138,7 @@ export class LivelyDebateOrchestrator {
 
   private readonly broadcastEvents: boolean;
   private readonly evaluationIntervalMs: number;
+  private readonly humanParticipation?: HumanParticipationConfig;
 
   private startTimeMs: number = 0;
   private isRunning: boolean = false;
@@ -177,6 +181,7 @@ export class LivelyDebateOrchestrator {
 
     this.broadcastEvents = config.broadcastEvents ?? true;
     this.evaluationIntervalMs = config.evaluationIntervalMs ?? 1000;
+    this.humanParticipation = config.humanParticipation;
 
     // Create lively components
     this.scheduler = createLivelyScheduler(config.settings);
@@ -224,6 +229,12 @@ export class LivelyDebateOrchestrator {
 
     // Update database
     await livelyRepo.updateDebateMode(this.debateId, 'lively');
+
+    // Set debate status to 'live' before executing phases
+    // This is required for human turn submissions to be accepted
+    await debateRepo.updateStatus(this.debateId, { status: 'live' });
+
+    logger.info({ debateId: this.debateId }, 'Debate status set to live');
 
     // Execute all phases in lively mode
     await this.executeAllPhasesLively();
@@ -456,6 +467,43 @@ export class LivelyDebateOrchestrator {
     await livelyRepo.updateActiveSpeaker(this.debateId, speaker, startMs);
 
     try {
+      // Check if this is a human speaker
+      logger.info({
+        speaker,
+        humanParticipationEnabled: this.humanParticipation?.enabled,
+        humanSide: this.humanParticipation?.humanSide,
+        isHumanSpeaker: this.isHumanSpeaker(speaker),
+      }, 'Checking if speaker is human');
+
+      if (this.isHumanSpeaker(speaker)) {
+        // Human turn - wait for input from frontend
+        const humanContent = await this.waitForHumanTurn(speaker, turn, phase);
+
+        // End speaker turn
+        this.scheduler.endSpeaker();
+
+        // Save human's utterance with special metadata
+        await this.saveHumanUtterance(speaker, phase, humanContent, turn);
+
+        logger.debug({
+          speaker,
+          contentLength: humanContent.length,
+          isHuman: true,
+        }, 'Human turn complete');
+
+        // Log turn completion to database
+        eventRepo.logInfo('turn_completed', `Human turn completed: ${speaker} in ${phase}`, {
+          debateId: this.debateId,
+          speaker: mapSpeakerToDb(speaker),
+          phase: mapPhaseToDb(phase),
+          promptType: turn.promptType,
+          metadata: { contentLength: humanContent.length, isHumanGenerated: true },
+        });
+
+        return; // Exit early for human turns
+      }
+
+      // AI turn - standard flow
       // Build context with explicit phase and optional resumption prompt
       let resumptionPrompt: string | undefined;
       if (isResumption && interruptionData) {
@@ -671,10 +719,13 @@ export class LivelyDebateOrchestrator {
         });
       }
 
-      // Evaluate for interrupts periodically
+      // Evaluate for interrupts periodically (non-blocking to avoid slowing down streaming)
       const now = Date.now();
       if (now - this.lastEvaluationMs >= this.evaluationIntervalMs) {
-        await this.evaluateForInterrupt(speaker, fullContent, phase);
+        // Fire-and-forget: don't await - let evaluation run in background
+        this.evaluateForInterrupt(speaker, fullContent, phase).catch((err) => {
+          logger.warn({ err, speaker }, 'Background interrupt evaluation failed');
+        });
         this.lastEvaluationMs = now;
       }
 
@@ -728,10 +779,13 @@ export class LivelyDebateOrchestrator {
         });
       }
 
-      // Evaluate for interrupts periodically
+      // Evaluate for interrupts periodically (non-blocking to avoid slowing down streaming)
       const now = Date.now();
       if (now - this.lastEvaluationMs >= this.evaluationIntervalMs) {
-        await this.evaluateForInterrupt(speaker, fullContent, phase);
+        // Fire-and-forget: don't await - let evaluation run in background
+        this.evaluateForInterrupt(speaker, fullContent, phase).catch((err) => {
+          logger.warn({ err, speaker }, 'Background interrupt evaluation failed');
+        });
         this.lastEvaluationMs = now;
       }
 
@@ -1631,6 +1685,66 @@ export class LivelyDebateOrchestrator {
   }
 
   /**
+   * Save human-generated utterance
+   * Similar to saveUtterance but with isHumanGenerated metadata
+   */
+  private async saveHumanUtterance(
+    speaker: Speaker,
+    phase: DebatePhase,
+    content: string,
+    turn: Turn
+  ): Promise<void> {
+    const turnId = this.getTurnId(phase, turn);
+
+    // Check for duplicate (same logic as AI utterances)
+    const existingUtterances = await utteranceRepo.findByDebateId(this.debateId);
+    const turnIdDuplicate = existingUtterances.find(u => {
+      const existingTurnId = u.metadata?.turnId as string;
+      return existingTurnId === turnId;
+    });
+
+    if (turnIdDuplicate) {
+      logger.warn(
+        { turnId, existingId: turnIdDuplicate.id },
+        'Duplicate human utterance detected, skipping save'
+      );
+      return;
+    }
+
+    const input: CreateUtteranceInput = {
+      debateId: this.debateId,
+      phase: mapPhaseToDb(phase),
+      speaker: mapSpeakerToDb(speaker),
+      content,
+      timestampMs: this.getElapsedMs(),
+      metadata: {
+        promptType: turn.promptType,
+        turnNumber: turn.turnNumber,
+        turnId,
+        debateMode: 'lively',
+        // Human-specific metadata
+        isHumanGenerated: true,
+        model: 'human',
+      },
+    };
+
+    await utteranceRepo.create(input);
+
+    // Broadcast utterance
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'utterance', {
+        debateId: this.debateId,
+        phase: mapPhaseToDb(phase),
+        speaker: mapSpeakerToDb(speaker),
+        content,
+        timestampMs: this.getElapsedMs(),
+        model: 'human',
+        isHumanGenerated: true,
+      });
+    }
+  }
+
+  /**
    * Save interjection as a special utterance
    * @param interruptionContext - Context linking interjection to the interrupted speaker
    */
@@ -1771,6 +1885,112 @@ Your continuation should flow seamlessly from the interrupted content above.`;
   }
 
   /**
+   * Check if the given speaker is the human participant
+   */
+  private isHumanSpeaker(speaker: Speaker): boolean {
+    if (!this.humanParticipation?.enabled) {
+      return false;
+    }
+
+    const humanSide = this.humanParticipation.humanSide;
+    return (
+      (speaker === Speaker.PRO && humanSide === 'pro') ||
+      (speaker === Speaker.CON && humanSide === 'con')
+    );
+  }
+
+  /**
+   * Get the prompt type description for UI display
+   */
+  private getPromptTypeDescription(promptType: string, phase: DebatePhase): string {
+    const descriptions: Record<string, string> = {
+      'opening': 'Opening Statement',
+      'opening_statement': 'Opening Statement',
+      'constructive': 'Constructive Argument',
+      'constructive_argument': 'Constructive Argument',
+      'cross_exam_question': 'Cross-Examination Question',
+      'cross_exam_response': 'Cross-Examination Response',
+      'rebuttal': 'Rebuttal',
+      'closing': 'Closing Statement',
+      'closing_statement': 'Closing Statement',
+    };
+    return descriptions[promptType] || `${phase} Response`;
+  }
+
+  /**
+   * Wait for human input during their turn
+   * Broadcasts awaiting_human_input event and waits for API submission
+   */
+  private async waitForHumanTurn(
+    speaker: Speaker,
+    turn: Turn,
+    phase: DebatePhase
+  ): Promise<string> {
+    const humanSide = this.humanParticipation!.humanSide;
+    const timeoutMs = this.humanParticipation!.timeLimitSeconds
+      ? this.humanParticipation!.timeLimitSeconds * 1000
+      : null;
+    const promptType = this.getPromptTypeDescription(turn.promptType, phase);
+
+    logger.info(
+      { debateId: this.debateId, speaker, phase, promptType, timeoutMs },
+      'Waiting for human turn input'
+    );
+
+    // Broadcast awaiting_human_input event
+    if (this.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'awaiting_human_input', {
+        debateId: this.debateId,
+        speaker: humanSide,
+        phase: mapPhaseToDb(phase),
+        turnNumber: turn.turnNumber,
+        promptType,
+        timeoutMs,
+        timestampMs: this.getElapsedMs(),
+      });
+    }
+
+    try {
+      // Wait for human input via the service
+      const content = await humanTurnService.waitForHumanInput(
+        this.debateId,
+        humanSide,
+        mapPhaseToDb(phase),
+        turn.turnNumber,
+        promptType,
+        timeoutMs
+      );
+
+      logger.info(
+        { debateId: this.debateId, speaker, contentLength: content.length },
+        'Human turn received'
+      );
+
+      return content;
+    } catch (error) {
+      // Handle timeout
+      if (error instanceof Error && error.message.includes('timed out')) {
+        logger.warn(
+          { debateId: this.debateId, speaker, timeoutMs },
+          'Human turn timed out'
+        );
+
+        // Broadcast timeout event
+        if (this.broadcastEvents) {
+          this.sseManager.broadcastToDebate(this.debateId, 'human_turn_timeout', {
+            debateId: this.debateId,
+            speaker: humanSide,
+            phase: mapPhaseToDb(phase),
+            waitedMs: timeoutMs || 0,
+            timestampMs: this.getElapsedMs(),
+          });
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Generate a simple hash of content for duplicate detection
    * Uses the first 200 characters normalized (lowercased, whitespace collapsed)
    */
@@ -1893,7 +2113,8 @@ export async function createLivelyOrchestrator(
     moderator: ModeratorAgent;
     orchestrator: OrchestratorAgent;
   },
-  settingsOverrides?: Partial<LivelySettings>
+  settingsOverrides?: Partial<LivelySettings>,
+  humanParticipation?: HumanParticipationConfig
 ): Promise<LivelyDebateOrchestrator> {
   // Get or create lively settings
   let settings = await livelyRepo.findLivelySettingsByDebateId(debateId);
@@ -1911,6 +2132,7 @@ export async function createLivelyOrchestrator(
     debateId,
     proposition,
     settings,
+    humanParticipation,
   };
 
   return new LivelyDebateOrchestrator(

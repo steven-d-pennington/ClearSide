@@ -499,6 +499,9 @@ export class TranscriptRecorder {
       rebuttals: 'phase_4_rebuttal',
       closing_statements: 'phase_5_closing',
       synthesis: 'phase_6_synthesis',
+      // Informal discussion phases
+      informal: 'informal_discussion',
+      wrapup: 'informal_wrapup',
     };
     return phaseMap[dbPhase] || dbPhase;
   }

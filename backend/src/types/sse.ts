@@ -41,7 +41,18 @@ export type SSEEventType =
   | 'interjection'           // Short 1-2 sentence interrupt content
   | 'speaking_resumed'       // Original speaker continues after interjection
   | 'lively_mode_started'    // Debate switched to lively mode
-  | 'pacing_change';         // Pacing parameter changed mid-debate
+  | 'pacing_change'          // Pacing parameter changed mid-debate
+  // Human participation mode events
+  | 'awaiting_human_input'   // Waiting for human to submit their turn
+  | 'human_turn_received'    // Human turn was submitted and accepted
+  | 'human_turn_timeout'     // Human took too long to respond
+  // Informal discussion mode events
+  | 'discussion_started'     // Informal discussion began
+  | 'exchange_complete'      // One round of all participants completed
+  | 'end_detection_result'   // AI evaluated ending conditions
+  | 'entering_wrapup'        // Discussion entering wrap-up phase
+  | 'discussion_summary'     // Auto-generated summary ready
+  | 'discussion_complete';   // Informal discussion fully ended
 
 /**
  * SSE Client
@@ -283,4 +294,126 @@ export interface CatchupCompleteEventData {
   utterancesSent: number;
   currentPhase: string;
   debateStatus: string;
+}
+
+// ============================================================================
+// Human Participation Mode Event Payloads
+// ============================================================================
+
+/** Awaiting human input event payload */
+export interface AwaitingHumanInputEventData {
+  debateId: string;
+  /** Which side needs to respond: 'pro' or 'con' */
+  speaker: 'pro' | 'con';
+  /** Current debate phase */
+  phase: string;
+  /** Turn number within the phase */
+  turnNumber: number;
+  /** Context prompt for the human (e.g., "Opening statement", "Respond to Con's rebuttal") */
+  promptType: string;
+  /** Time limit in milliseconds (null = no limit) */
+  timeoutMs: number | null;
+  /** Timestamp when the wait started */
+  timestampMs: number;
+}
+
+/** Human turn received event payload */
+export interface HumanTurnReceivedEventData {
+  debateId: string;
+  speaker: 'pro' | 'con';
+  /** Character count of submitted content */
+  contentLength: number;
+  /** Time taken to submit in milliseconds */
+  responseTimeMs: number;
+  timestampMs: number;
+}
+
+/** Human turn timeout event payload */
+export interface HumanTurnTimeoutEventData {
+  debateId: string;
+  speaker: 'pro' | 'con';
+  phase: string;
+  /** How long we waited before timing out */
+  waitedMs: number;
+  timestampMs: number;
+}
+
+// ============================================================================
+// Informal Discussion Mode Event Payloads
+// ============================================================================
+
+/** Discussion started event payload */
+export interface DiscussionStartedEventData {
+  discussionId: string;
+  topic: string;
+  participants: Array<{
+    id: string;
+    name: string;
+    modelId: string;
+  }>;
+  maxExchanges: number;
+  timestampMs: number;
+}
+
+/** Exchange complete event payload */
+export interface ExchangeCompleteEventData {
+  discussionId: string;
+  exchangeNumber: number;
+  maxExchanges: number;
+  timestampMs: number;
+}
+
+/** End detection result event payload */
+export interface EndDetectionResultEventData {
+  discussionId: string;
+  result: {
+    shouldEnd: boolean;
+    confidence: number;
+    reasons: string[];
+  };
+  timestampMs: number;
+}
+
+/** Entering wrap-up event payload */
+export interface EnteringWrapupEventData {
+  discussionId: string;
+  endTrigger: 'max_exchanges' | 'user_wrapup' | 'ai_detected';
+  timestampMs: number;
+}
+
+/** Discussion summary event payload */
+export interface DiscussionSummaryEventData {
+  discussionId: string;
+  summary: {
+    topicsCovered: string[];
+    keyInsights: string[];
+    areasOfAgreement: string[];
+    areasOfDisagreement: string[];
+    participantHighlights: Array<{
+      participant: string;
+      highlight: string;
+    }>;
+    generatedAt: string;
+  };
+  timestampMs: number;
+}
+
+/** Discussion complete event payload */
+export interface DiscussionCompleteEventData {
+  discussionId: string;
+  completedAt: string;
+  totalDurationMs: number;
+  totalExchanges: number;
+  endTrigger: 'max_exchanges' | 'user_wrapup' | 'ai_detected';
+  summary: {
+    topicsCovered: string[];
+    keyInsights: string[];
+    areasOfAgreement: string[];
+    areasOfDisagreement: string[];
+    participantHighlights: Array<{
+      participant: string;
+      highlight: string;
+    }>;
+    generatedAt: string;
+  };
 }
