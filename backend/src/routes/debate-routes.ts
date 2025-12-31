@@ -577,6 +577,15 @@ router.post('/debates', async (req: Request, res: Response) => {
       return;
     }
 
+    // Build model configuration FIRST (handles auto and manual modes)
+    // This resolves actual model IDs before creating the debate
+    const modelConfig = await buildModelConfig(configInput);
+
+    // Extract resolved model IDs for storage
+    const resolvedProModelId = modelConfig?.proModelId ?? (configInput.proModelId as string | undefined) ?? null;
+    const resolvedConModelId = modelConfig?.conModelId ?? (configInput.conModelId as string | undefined) ?? null;
+    const resolvedModeratorModelId = modelConfig?.moderatorModelId ?? (configInput.moderatorModelId as string | undefined) ?? null;
+
     // Build CreateDebateInput with optional config fields
     const input: CreateDebateInput = {
       propositionText: req.body.propositionText,
@@ -605,6 +614,10 @@ router.post('/debates', async (req: Request, res: Response) => {
       ...(conPersonaId !== undefined && {
         conPersonaId: conPersonaId ?? null,
       }),
+      // Model selections (resolved from auto or manual mode)
+      proModelId: resolvedProModelId,
+      conModelId: resolvedConModelId,
+      moderatorModelId: resolvedModeratorModelId,
     };
 
     // Validate required input
@@ -626,6 +639,9 @@ router.post('/debates', async (req: Request, res: Response) => {
         flowMode,
         presetMode: debate.presetMode,
         brevityLevel: debate.brevityLevel,
+        proModelId: debate.proModelId,
+        conModelId: debate.conModelId,
+        moderatorModelId: debate.moderatorModelId,
       },
       'Debate created'
     );
@@ -638,9 +654,6 @@ router.post('/debates', async (req: Request, res: Response) => {
     const livelySettings = debateMode === 'lively'
       ? (configInput.livelySettings as LivelySettingsInput | undefined)
       : undefined;
-
-    // Build model configuration (handles auto and manual modes)
-    const modelConfig = await buildModelConfig(configInput);
 
     // Start orchestrator in background (fire and forget)
     // The .catch() ensures errors don't crash the server

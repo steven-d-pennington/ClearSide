@@ -1640,6 +1640,12 @@ export class LivelyDebateOrchestrator {
     content: string,
     interruptionContext: InterruptionContext
   ): Promise<void> {
+    // Get model attribution from the agent
+    const agentKey = speaker === Speaker.PRO ? 'pro' : speaker === Speaker.CON ? 'con' : 'moderator';
+    const agent = this.agents[agentKey];
+    const agentMetadata = agent.getMetadata();
+    const modelName = agentMetadata.model || 'unknown';
+
     const input: CreateUtteranceInput = {
       debateId: this.debateId,
       phase: mapPhaseToDb(phase),
@@ -1649,6 +1655,8 @@ export class LivelyDebateOrchestrator {
       metadata: {
         isInterjection: true,
         debateMode: 'lively',
+        // Model attribution
+        model: modelName,
         // TTS-friendly interjection metadata
         interruptionId: interruptionContext.interruptionId,
         interruptedSpeaker: interruptionContext.interruptedSpeaker

@@ -270,10 +270,14 @@ export interface Debate {
   proModelId?: string;
   /** Model ID used for Con advocate */
   conModelId?: string;
+  /** Model ID used for Moderator */
+  moderatorModelId?: string;
   /** Display name for Pro model */
   proModelName?: string;
   /** Display name for Con model */
   conModelName?: string;
+  /** Display name for Moderator model */
+  moderatorModelName?: string;
 }
 
 /**

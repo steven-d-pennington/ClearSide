@@ -198,7 +198,10 @@ export class MarkdownExporter {
     const meta = transcript.meta;
     const generatedDate = new Date(meta.generated_at);
 
-    return `# Debate Analysis
+    // Extract model info from utterances
+    const modelInfo = this.extractModelInfo(transcript.transcript);
+
+    let metadata = `# Debate Analysis
 
 **Generated:** ${generatedDate.toLocaleString('en-US', {
       dateStyle: 'medium',
@@ -209,6 +212,65 @@ export class MarkdownExporter {
 **Duration:** ${this.formatDuration(meta.total_duration_seconds)}
 **Status:** ${meta.status}
 **Schema Version:** ${meta.schema_version}`;
+
+    // Add model info if available
+    if (modelInfo.proModel || modelInfo.conModel || modelInfo.moderatorModel) {
+      metadata += '\n\n### Models Used\n';
+      if (modelInfo.proModel) {
+        metadata += `**Pro Advocate:** ${this.formatModelName(modelInfo.proModel)}\n`;
+      }
+      if (modelInfo.conModel) {
+        metadata += `**Con Advocate:** ${this.formatModelName(modelInfo.conModel)}\n`;
+      }
+      if (modelInfo.moderatorModel) {
+        metadata += `**Moderator:** ${this.formatModelName(modelInfo.moderatorModel)}`;
+      }
+    }
+
+    return metadata;
+  }
+
+  /**
+   * Extract model info from transcript utterances
+   */
+  private extractModelInfo(utterances: TranscriptUtterance[]): {
+    proModel: string | null;
+    conModel: string | null;
+    moderatorModel: string | null;
+  } {
+    let proModel: string | null = null;
+    let conModel: string | null = null;
+    let moderatorModel: string | null = null;
+
+    for (const utterance of utterances) {
+      const model = utterance.metadata?.model as string | undefined;
+      if (!model) continue;
+
+      if (utterance.speaker === 'pro' || utterance.speaker === 'pro_advocate') {
+        if (!proModel) proModel = model;
+      } else if (utterance.speaker === 'con' || utterance.speaker === 'con_advocate') {
+        if (!conModel) conModel = model;
+      } else if (utterance.speaker === 'moderator') {
+        if (!moderatorModel) moderatorModel = model;
+      }
+
+      // Exit early if we have all three
+      if (proModel && conModel && moderatorModel) break;
+    }
+
+    return { proModel, conModel, moderatorModel };
+  }
+
+  /**
+   * Format model name for display (extract friendly name from full ID)
+   */
+  private formatModelName(modelId: string): string {
+    // Extract just the model name from ID like "anthropic/claude-3.5-sonnet"
+    const parts = modelId.split('/');
+    if (parts.length > 1) {
+      return parts[parts.length - 1] || modelId;
+    }
+    return modelId;
   }
 
   /**
@@ -402,9 +464,14 @@ ${arg.content}`;
       const timestamp = this.formatTimestamp(utterance.timestamp_ms);
       const speaker = this.formatSpeaker(utterance.speaker);
       const metadata = utterance.metadata || {};
+      const model = metadata.model as string | undefined;
 
-      // Build header with interruption markers
-      let header = `**[${timestamp}] ${speaker}:**`;
+      // Build header with model attribution and interruption markers
+      let header = `**[${timestamp}] ${speaker}`;
+      if (model) {
+        header += ` (${this.formatModelName(model)})`;
+      }
+      header += ':**';
 
       // Add [INTERRUPTED] marker if this speaker was cut off
       if (metadata.wasInterrupted) {
