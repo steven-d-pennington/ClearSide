@@ -39,6 +39,10 @@ function rowToDebate(row: DebateRow): Debate {
     // Persona fields
     proPersonaId: row.pro_persona_id ?? null,
     conPersonaId: row.con_persona_id ?? null,
+    // Model fields
+    proModelId: row.pro_model_id ?? null,
+    conModelId: row.con_model_id ?? null,
+    moderatorModelId: row.moderator_model_id ?? null,
     // Timestamp fields
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -72,9 +76,12 @@ export async function create(input: CreateDebateInput): Promise<Debate> {
       max_tokens_per_response,
       require_citations,
       pro_persona_id,
-      con_persona_id
+      con_persona_id,
+      pro_model_id,
+      con_model_id,
+      moderator_model_id
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING *
   `;
 
@@ -89,6 +96,9 @@ export async function create(input: CreateDebateInput): Promise<Debate> {
     requireCitations,
     input.proPersonaId ?? null,
     input.conPersonaId ?? null,
+    input.proModelId ?? null,
+    input.conModelId ?? null,
+    input.moderatorModelId ?? null,
   ];
 
   try {

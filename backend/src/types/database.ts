@@ -96,6 +96,15 @@ export interface Debate {
   /** Optional persona for Con advocate */
   conPersonaId: string | null;
 
+  /** Model ID used for Pro advocate (e.g., anthropic/claude-3.5-sonnet) */
+  proModelId: string | null;
+
+  /** Model ID used for Con advocate (e.g., openai/gpt-4o) */
+  conModelId: string | null;
+
+  /** Model ID used for Moderator */
+  moderatorModelId: string | null;
+
   /** Timestamp when debate started (ISO 8601) */
   startedAt: Date | null;
 
@@ -203,6 +212,9 @@ export interface DebateRow {
   require_citations: boolean;
   pro_persona_id: string | null;
   con_persona_id: string | null;
+  pro_model_id: string | null;
+  con_model_id: string | null;
+  moderator_model_id: string | null;
   started_at: Date | null;
   completed_at: Date | null;
   total_duration_ms: number | null;
@@ -253,6 +265,10 @@ export interface CreateDebateInput {
   /** Persona selections */
   proPersonaId?: string | null;
   conPersonaId?: string | null;
+  /** Model selections (OpenRouter model IDs) */
+  proModelId?: string | null;
+  conModelId?: string | null;
+  moderatorModelId?: string | null;
 }
 
 /**
