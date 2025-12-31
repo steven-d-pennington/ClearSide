@@ -22,6 +22,9 @@ import {
   MODERATOR_PROMPTS,
   MODERATOR_PROMPT_BUILDERS,
 } from './prompts/moderator-prompts.js';
+import { createFullyConfiguredPrompt } from './prompts/prompt-modifiers.js';
+import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
+import type { DebateConfiguration } from '../../types/configuration.js';
 
 /**
  * Logger for moderator operations
@@ -122,21 +125,41 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
     );
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
+      // Apply configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        MODERATOR_PROMPTS.introduction.template,
+        config,
+        context.persona
+      );
+
+      // Moderator uses lower temperature for consistency (0.4 instead of config default)
+      const moderatorTemperature = 0.4;
+
+      logger.info({
+        configuredTemperature: config.llmSettings.temperature,
+        actualTemperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
+        brevityLevel: config.brevityLevel,
+      }, 'Using moderator-specific temperature for neutrality');
+
       const llmRequest: LLMRequest = {
         provider: this.provider,
         model: this.modelName,
         messages: [
           {
             role: 'system',
-            content: MODERATOR_PROMPTS.introduction.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        temperature: 0.4,
-        maxTokens: 1000,
+        temperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -191,11 +214,30 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
     }
 
     try {
-      const systemPrompt = MODERATOR_PROMPTS.introduction.template;
+      // Get configuration
+      const config = this.getConfiguration(context);
+
+      // Apply configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        MODERATOR_PROMPTS.introduction.template,
+        config,
+        context.persona
+      );
+
       const userPrompt = MODERATOR_PROMPT_BUILDERS.introduction({
         proposition,
         propositionContext: context.propositionContext as any,
       });
+
+      // Moderator uses lower temperature for consistency
+      const moderatorTemperature = 0.4;
+
+      logger.info({
+        configuredTemperature: config.llmSettings.temperature,
+        actualTemperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
+        brevityLevel: config.brevityLevel,
+      }, 'Using moderator-specific temperature for introduction');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -203,15 +245,15 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
         messages: [
           {
             role: 'system',
-            content: systemPrompt,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.4,
-        maxTokens: 800,
+        temperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -268,7 +310,15 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
     );
 
     try {
-      const systemPrompt = MODERATOR_PROMPTS.transition.template;
+      // Get configuration
+      const config = this.getConfiguration(context);
+
+      // Apply configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        MODERATOR_PROMPTS.transition.template,
+        config,
+        context.persona
+      );
 
       // Format recent utterances for context
       const recentUtterances = this.formatRecentUtterances(context.previousUtterances, 3);
@@ -279,21 +329,31 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
         previousUtterances: recentUtterances,
       });
 
+      // Moderator uses very low temperature for phase transitions (consistency)
+      const moderatorTemperature = 0.3;
+
+      logger.info({
+        configuredTemperature: config.llmSettings.temperature,
+        actualTemperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
+        brevityLevel: config.brevityLevel,
+      }, 'Using moderator-specific low temperature for phase transition');
+
       const llmRequest: LLMRequest = {
         provider: this.provider,
         model: this.modelName,
         messages: [
           {
             role: 'system',
-            content: systemPrompt,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.3, // Low temperature for consistency
-        maxTokens: 400,
+        temperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -347,7 +407,15 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
     );
 
     try {
-      const systemPrompt = MODERATOR_PROMPTS.synthesis.template;
+      // Get configuration
+      const config = this.getConfiguration(context);
+
+      // Apply configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        MODERATOR_PROMPTS.synthesis.template,
+        config,
+        context.persona
+      );
 
       // Build full transcript for synthesis
       const fullTranscript = this.formatFullTranscript(context.previousUtterances);
@@ -357,21 +425,31 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
         fullTranscript,
       });
 
+      // Moderator uses moderate temperature for thoughtful synthesis
+      const moderatorTemperature = 0.5;
+
+      logger.info({
+        configuredTemperature: config.llmSettings.temperature,
+        actualTemperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
+        brevityLevel: config.brevityLevel,
+      }, 'Using moderator-specific temperature for synthesis');
+
       const llmRequest: LLMRequest = {
         provider: this.provider,
         model: this.modelName,
         messages: [
           {
             role: 'system',
-            content: systemPrompt,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.5, // Moderate temperature for thoughtful synthesis
-        maxTokens: 2000, // Longer output for comprehensive synthesis
+        temperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -437,7 +515,15 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
     }
 
     try {
-      const systemPrompt = MODERATOR_PROMPTS.intervention.template;
+      // Get configuration
+      const config = this.getConfiguration(context);
+
+      // Apply configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        MODERATOR_PROMPTS.intervention.template,
+        config,
+        context.persona
+      );
 
       // Format recent utterances for context
       const recentUtterances = this.formatRecentUtterances(context.previousUtterances, 5);
@@ -449,21 +535,31 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
         previousUtterances: recentUtterances,
       });
 
+      // Moderator uses lower temperature for interventions
+      const moderatorTemperature = 0.4;
+
+      logger.info({
+        configuredTemperature: config.llmSettings.temperature,
+        actualTemperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
+        brevityLevel: config.brevityLevel,
+      }, 'Using moderator-specific temperature for intervention');
+
       const llmRequest: LLMRequest = {
         provider: this.provider,
         model: this.modelName,
         messages: [
           {
             role: 'system',
-            content: systemPrompt,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.4,
-        maxTokens: 600,
+        temperature: moderatorTemperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -499,6 +595,13 @@ export class ModeratorAgent implements BaseAgent, IModeratorAgent {
       );
       throw error;
     }
+  }
+
+  /**
+   * Get configuration from context with fallback to defaults
+   */
+  private getConfiguration(context: AgentContext): DebateConfiguration {
+    return context.configuration ?? DEFAULT_CONFIGURATION;
   }
 
   /**

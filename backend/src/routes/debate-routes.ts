@@ -15,9 +15,13 @@ import type { CreateDebateInput, FlowMode } from '../types/database.js';
 import {
   isPresetMode,
   isBrevityLevel,
+  isHumanSide,
   type PresetMode,
   type BrevityLevel,
+  type HumanSide,
+  type HumanParticipationConfig,
 } from '../types/configuration.js';
+import { humanTurnService } from '../services/human-turn/index.js';
 import type { DebateMode, LivelySettingsInput } from '../types/lively.js';
 import type { DebateModelConfig, ModelSelectionMode, CostThreshold, ReasoningEffort, ReasoningConfig } from '../types/openrouter.js';
 import { createDebateClients } from '../services/llm/openrouter-adapter.js';
@@ -59,6 +63,8 @@ interface ConfigInput {
   costThreshold?: unknown;
   // Reasoning configuration
   reasoningEffort?: unknown;
+  // Human participation
+  humanParticipation?: unknown;
 }
 
 function validateConfigInput(config: ConfigInput): string[] {
@@ -141,6 +147,30 @@ function validateConfigInput(config: ConfigInput): string[] {
     const validEfforts = ['xhigh', 'high', 'medium', 'low', 'minimal', 'none'];
     if (!validEfforts.includes(String(config.reasoningEffort))) {
       errors.push(`Invalid reasoningEffort: must be one of ${validEfforts.join(', ')}`);
+    }
+  }
+
+  // Human participation validation
+  if (config.humanParticipation !== undefined) {
+    if (typeof config.humanParticipation !== 'object' || config.humanParticipation === null) {
+      errors.push(`Invalid humanParticipation: must be an object`);
+    } else {
+      const hp = config.humanParticipation as Record<string, unknown>;
+
+      if (hp.enabled !== undefined && typeof hp.enabled !== 'boolean') {
+        errors.push(`Invalid humanParticipation.enabled: must be a boolean`);
+      }
+
+      if (hp.humanSide !== undefined && !isHumanSide(hp.humanSide)) {
+        errors.push(`Invalid humanParticipation.humanSide: must be 'pro' or 'con'`);
+      }
+
+      if (hp.timeLimitSeconds !== undefined && hp.timeLimitSeconds !== null) {
+        const limit = Number(hp.timeLimitSeconds);
+        if (isNaN(limit) || !Number.isInteger(limit) || limit < 30 || limit > 600) {
+          errors.push(`Invalid humanParticipation.timeLimitSeconds: must be an integer between 30 and 600, or null`);
+        }
+      }
     }
   }
 
@@ -267,7 +297,8 @@ async function startDebateOrchestrator(
   flowMode: FlowMode = 'auto',
   debateMode: DebateMode = 'turn_based',
   livelySettings?: LivelySettingsInput,
-  modelConfig?: DebateModelConfig
+  modelConfig?: DebateModelConfig,
+  humanParticipation?: HumanParticipationConfig
 ): Promise<void> {
   logger.info({
     debateId,
@@ -275,6 +306,7 @@ async function startDebateOrchestrator(
     flowMode,
     debateMode,
     modelConfig,
+    humanParticipation,
   }, 'Starting debate orchestrator');
 
   try {
@@ -322,7 +354,8 @@ async function startDebateOrchestrator(
         stateMachine,
         turnManager,
         agents,
-        livelySettings
+        livelySettings,
+        humanParticipation
       );
 
       // Register lively orchestrator so it can be accessed for stop/pause
@@ -554,6 +587,8 @@ router.post('/debates', async (req: Request, res: Response) => {
       costThreshold: req.body.costThreshold,
       // Reasoning configuration
       reasoningEffort: req.body.reasoningEffort,
+      // Human participation
+      humanParticipation: req.body.humanParticipation,
     };
 
     const configErrors = validateConfigInput(configInput);
@@ -642,6 +677,9 @@ router.post('/debates', async (req: Request, res: Response) => {
     // Build model configuration (handles auto and manual modes)
     const modelConfig = await buildModelConfig(configInput);
 
+    // Extract human participation config if enabled
+    const humanParticipation = configInput.humanParticipation as HumanParticipationConfig | undefined;
+
     // Start orchestrator in background (fire and forget)
     // The .catch() ensures errors don't crash the server
     startDebateOrchestrator(
@@ -651,7 +689,8 @@ router.post('/debates', async (req: Request, res: Response) => {
       flowMode,
       debateMode,
       livelySettings,
-      modelConfig
+      modelConfig,
+      humanParticipation
     ).catch((error) => {
       // This catch is a safety net - startDebateOrchestrator has its own error handling
       logger.error({ debateId: debate.id, error }, 'Unhandled orchestrator error');
@@ -936,6 +975,138 @@ router.post('/debates/:debateId/continue', async (req: Request, res: Response) =
     logger.error({ debateId, error }, 'Error continuing debate');
     res.status(500).json({
       error: 'Failed to continue debate',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * POST /debates/:debateId/human-turn
+ * Submit a human turn during human participation mode
+ *
+ * Request body:
+ * - content (required): The human's argument text
+ * - speaker (required): Which side the human is playing ('pro' or 'con')
+ */
+router.post('/debates/:debateId/human-turn', async (req: Request, res: Response) => {
+  const { debateId } = req.params;
+  const { content, speaker } = req.body;
+
+  logger.info(
+    { debateId, speaker, contentLength: content?.length },
+    'Human turn submission received'
+  );
+
+  try {
+    // Validate required fields
+    if (!content || typeof content !== 'string') {
+      res.status(400).json({
+        error: 'Invalid input',
+        message: 'content is required and must be a string',
+      });
+      return;
+    }
+
+    if (!speaker || !isHumanSide(speaker)) {
+      res.status(400).json({
+        error: 'Invalid input',
+        message: "speaker is required and must be 'pro' or 'con'",
+      });
+      return;
+    }
+
+    // Validate content length
+    const trimmedContent = content.trim();
+    if (trimmedContent.length < 50) {
+      res.status(400).json({
+        error: 'Content too short',
+        message: 'Your argument must be at least 50 characters',
+        length: trimmedContent.length,
+        minimum: 50,
+      });
+      return;
+    }
+
+    if (trimmedContent.length > 5000) {
+      res.status(400).json({
+        error: 'Content too long',
+        message: 'Your argument must be at most 5000 characters',
+        length: trimmedContent.length,
+        maximum: 5000,
+      });
+      return;
+    }
+
+    // Verify debate exists and is live
+    const debate = await debateRepository.findById(debateId!);
+
+    if (!debate) {
+      res.status(404).json({
+        error: 'Debate not found',
+        debateId,
+      });
+      return;
+    }
+
+    if (debate.status !== 'live') {
+      res.status(400).json({
+        error: 'Invalid debate status',
+        message: `Cannot submit human turn for debate with status: ${debate.status}`,
+        currentStatus: debate.status,
+      });
+      return;
+    }
+
+    // Check if there's a pending human turn for this debate
+    if (!humanTurnService.hasPendingTurn(debateId!)) {
+      res.status(400).json({
+        error: 'Not awaiting human input',
+        message: 'The debate is not currently waiting for human input',
+      });
+      return;
+    }
+
+    // Submit the human turn
+    const result = humanTurnService.submitHumanTurn({
+      debateId: debateId!,
+      content: trimmedContent,
+      speaker: speaker as HumanSide,
+    });
+
+    if (!result.success) {
+      res.status(400).json({
+        error: 'Submission failed',
+        message: 'Could not submit human turn. It may not be your turn or the speaker does not match.',
+      });
+      return;
+    }
+
+    // Broadcast human turn received event
+    sseManager.broadcastToDebate(debateId!, 'human_turn_received', {
+      debateId: debateId!,
+      speaker,
+      contentLength: trimmedContent.length,
+      responseTimeMs: result.responseTimeMs,
+      timestampMs: Date.now(),
+    });
+
+    logger.info(
+      { debateId, speaker, contentLength: trimmedContent.length, responseTimeMs: result.responseTimeMs },
+      'Human turn accepted'
+    );
+
+    res.status(201).json({
+      success: true,
+      debateId: debateId!,
+      speaker,
+      contentLength: trimmedContent.length,
+      responseTimeMs: result.responseTimeMs,
+      message: 'Human turn submitted successfully',
+    });
+  } catch (error) {
+    logger.error({ debateId, error }, 'Error submitting human turn');
+    res.status(500).json({
+      error: 'Failed to submit human turn',
       message: error instanceof Error ? error.message : String(error),
     });
   }

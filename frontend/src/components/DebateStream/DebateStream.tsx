@@ -5,10 +5,14 @@ import {
   selectIsStepMode,
   selectIsCatchingUp,
   selectCatchupState,
+  selectIsAwaitingHumanInput,
+  selectIsHumanParticipationMode,
+  selectHumanSide,
 } from '../../stores/debate-store';
 import { PhaseIndicator } from './PhaseIndicator';
 import { TurnCard } from './TurnCard';
 import { StreamingTurn } from './StreamingTurn';
+import { HumanTurnInput } from './HumanTurnInput';
 import { InterventionPanel } from '../InterventionPanel';
 import { Button } from '../ui/Button';
 import { Alert } from '../ui/Alert';
@@ -42,6 +46,18 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
   const isStepMode = useDebateStore(selectIsStepMode);
   const isCatchingUp = useDebateStore(selectIsCatchingUp);
   const catchupState = useDebateStore(selectCatchupState);
+  const isAwaitingHumanInput = useDebateStore(selectIsAwaitingHumanInput);
+  const isHumanParticipationMode = useDebateStore(selectIsHumanParticipationMode);
+  const humanSide = useDebateStore(selectHumanSide);
+
+  // Debug human participation state
+  console.log('👤 RENDER DEBUG:', {
+    isHumanParticipationMode,
+    isAwaitingHumanInput,
+    humanSide,
+    debateHumanParticipation: debate?.humanParticipation,
+    streamingTurn: !!streamingTurn,
+  });
 
   // State for intervention panel visibility
   const [isInterventionPanelOpen, setIsInterventionPanelOpen] = useState(false);
@@ -107,6 +123,15 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
           </span>
         </div>
 
+        {/* Human Participation Mode Indicator */}
+        {isHumanParticipationMode && humanSide && (
+          <div className={styles.humanModeInfo}>
+            <Badge variant="primary">
+              You are arguing {humanSide === 'pro' ? 'FOR' : 'AGAINST'} the proposition
+            </Badge>
+          </div>
+        )}
+
         {/* Model Info (when using OpenRouter) */}
         {(debate.proModelName || debate.conModelName) && (
           <div className={styles.modelInfo}>
@@ -115,6 +140,7 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
               {debate.proModelName && (
                 <span className={styles.modelBadge} data-role="pro">
                   <span className={styles.modelRole}>Pro:</span> {debate.proModelName}
+                  {isHumanParticipationMode && humanSide === 'pro' && ' (You)'}
                 </span>
               )}
               {debate.proModelName && debate.conModelName && (
@@ -123,6 +149,7 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
               {debate.conModelName && (
                 <span className={styles.modelBadge} data-role="con">
                   <span className={styles.modelRole}>Con:</span> {debate.conModelName}
+                  {isHumanParticipationMode && humanSide === 'con' && ' (You)'}
                 </span>
               )}
             </div>
@@ -236,6 +263,11 @@ export const DebateStream: React.FC<DebateStreamProps> = ({
               phase={streamingTurn.phase}
               content={streamingTurn.content}
             />
+          )}
+
+          {/* Human Turn Input (when it's the human's turn) */}
+          {isHumanParticipationMode && isAwaitingHumanInput && (
+            <HumanTurnInput />
           )}
 
           {/* Step Mode Continue Prompt */}

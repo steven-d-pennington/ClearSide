@@ -95,6 +95,29 @@
   margin: 0;
 }
 
+.historicalBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-bg-tertiary, #f3f4f6);
+  border-radius: 9999px;
+}
+
+.modelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  background-color: var(--color-bg-tertiary, #f3f4f6);
+  border-radius: 9999px;
+}
+
 /* Content area */
 .content {
   flex: 1;
@@ -111,6 +134,33 @@
   color: var(--color-text-primary, #111827);
   margin: 0;
   white-space: pre-wrap;
+}
+
+.markdown {
+  font-size: 1.125rem;
+  line-height: 1.75;
+  color: var(--color-text-primary, #111827);
+}
+
+.markdown p {
+  margin: 0.5rem 0;
+}
+
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.markdown li {
+  margin: 0.25rem 0;
 }
 
 .cursor {

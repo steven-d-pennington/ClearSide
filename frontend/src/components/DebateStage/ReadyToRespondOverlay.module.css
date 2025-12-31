@@ -1,0 +1,103 @@
+/**
+ * ReadyToRespondOverlay Styles
+ *
+ * Inline prompt that shows at the bottom of the center stage
+ * Non-blocking design so users can still see AI content
+ */
+
+.readyPrompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  margin-top: 1rem;
+  background: linear-gradient(135deg, var(--color-primary-50, #eff6ff) 0%, var(--color-primary-100, #dbeafe) 100%);
+  border: 2px solid var(--color-primary, #3b82f6);
+  border-radius: 0.75rem;
+  animation: slideIn 0.3s ease;
+}
+
+.promptContent {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.promptText {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text-primary, #111827);
+}
+
+.readyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.arrow {
+  transition: transform 0.2s ease;
+}
+
+.readyButton:hover .arrow {
+  transform: translateX(4px);
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .readyPrompt {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .promptContent {
+    justify-content: center;
+  }
+
+  .readyButton {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .readyPrompt {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.2) 100%);
+  }
+
+  .promptText {
+    color: var(--color-text-primary, #f9fafb);
+  }
+}

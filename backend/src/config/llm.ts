@@ -88,7 +88,7 @@ function validateProvider(provider: string): DefaultLLMProvider {
  * - ANTHROPIC_API_KEY: Anthropic API key (required if using Anthropic)
  * - ANTHROPIC_BASE_URL: Custom Anthropic API base URL (optional)
  * - LLM_PROVIDER: Default provider ('openai' | 'anthropic', default: 'anthropic')
- * - LLM_DEFAULT_MODEL_OPENAI: Default OpenAI model (default: 'gpt-4-turbo-preview')
+ * - LLM_DEFAULT_MODEL_OPENAI: Default OpenAI model (default: 'gpt-4o')
  * - LLM_DEFAULT_MODEL_ANTHROPIC: Default Anthropic model (default: 'claude-3-5-sonnet-20241022')
  * - LLM_TIMEOUT_MS: Request timeout in milliseconds (default: 30000)
  * - LLM_MAX_RETRIES: Maximum retry attempts (default: 3)
@@ -106,7 +106,7 @@ export const llmConfig: LLMConfig = {
   },
   defaultProvider: validateProvider(getEnvVar('LLM_PROVIDER', false, 'anthropic')),
   defaultModels: {
-    openai: getEnvVar('LLM_DEFAULT_MODEL_OPENAI', false, 'gpt-4-turbo-preview'),
+    openai: getEnvVar('LLM_DEFAULT_MODEL_OPENAI', false, 'gpt-4o'),
     anthropic: getEnvVar('LLM_DEFAULT_MODEL_ANTHROPIC', false, 'claude-3-5-sonnet-20241022'),
   },
   timeoutMs: getEnvInt('LLM_TIMEOUT_MS', 30000),

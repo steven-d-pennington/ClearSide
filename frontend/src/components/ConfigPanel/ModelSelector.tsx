@@ -14,6 +14,7 @@ import type {
   ModelPairing,
   ReasoningEffort,
 } from '../../types/configuration';
+import type { HumanSide } from '../../types/debate';
 import {
   COST_THRESHOLD_INFO,
   MODEL_TIER_INFO,
@@ -33,6 +34,8 @@ interface ModelSelectorProps {
   disabled?: boolean;
   /** Current preset ID to load preset-specific defaults */
   presetId?: string;
+  /** If set, the user is participating on this side (hide that model selector) */
+  humanSide?: HumanSide;
 }
 
 interface OpenRouterStatus {
@@ -45,6 +48,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   onChange,
   disabled = false,
   presetId,
+  humanSide,
 }) => {
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -388,38 +392,45 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
       {/* Manual Mode: Model Dropdowns */}
       {selection.mode === 'manual' && (
         <div className={styles.manualMode}>
-          <div className={styles.modelSelect}>
-            <label className={styles.selectLabel}>
-              <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-pro)' }} />
-              Pro Advocate
-            </label>
-            <select
-              value={selection.proModelId || ''}
-              onChange={(e) => handleModelChange('pro', e.target.value)}
-              disabled={disabled}
-              className={styles.select}
-            >
-              <option value="">Select a model...</option>
-              <ModelOptionsByProvider models={models} />
-            </select>
-          </div>
+          {/* Pro Advocate - hidden when human is arguing Pro */}
+          {humanSide !== 'pro' && (
+            <div className={styles.modelSelect}>
+              <label className={styles.selectLabel}>
+                <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-pro)' }} />
+                Pro Advocate
+              </label>
+              <select
+                value={selection.proModelId || ''}
+                onChange={(e) => handleModelChange('pro', e.target.value)}
+                disabled={disabled}
+                className={styles.select}
+              >
+                <option value="">Select a model...</option>
+                <ModelOptionsByProvider models={models} />
+              </select>
+            </div>
+          )}
 
-          <div className={styles.modelSelect}>
-            <label className={styles.selectLabel}>
-              <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-con)' }} />
-              Con Advocate
-            </label>
-            <select
-              value={selection.conModelId || ''}
-              onChange={(e) => handleModelChange('con', e.target.value)}
-              disabled={disabled}
-              className={styles.select}
-            >
-              <option value="">Select a model...</option>
-              <ModelOptionsByProvider models={models} />
-            </select>
-          </div>
+          {/* Con Advocate - hidden when human is arguing Con */}
+          {humanSide !== 'con' && (
+            <div className={styles.modelSelect}>
+              <label className={styles.selectLabel}>
+                <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-con)' }} />
+                Con Advocate
+              </label>
+              <select
+                value={selection.conModelId || ''}
+                onChange={(e) => handleModelChange('con', e.target.value)}
+                disabled={disabled}
+                className={styles.select}
+              >
+                <option value="">Select a model...</option>
+                <ModelOptionsByProvider models={models} />
+              </select>
+            </div>
+          )}
 
+          {/* Moderator - always shown */}
           <div className={styles.modelSelect}>
             <label className={styles.selectLabel}>
               <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-moderator, #8b5cf6)' }} />
@@ -436,8 +447,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             </select>
           </div>
 
-          {/* Tier mismatch warning */}
-          {selection.proModelId && selection.conModelId && (
+          {/* Tier mismatch warning - only when both AI models are selected */}
+          {!humanSide && selection.proModelId && selection.conModelId && (
             <TierWarning
               models={models}
               proModelId={selection.proModelId}

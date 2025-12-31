@@ -15,3 +15,6 @@ export { InterjectionOverlay } from './InterjectionOverlay';
 export { InterruptPulse } from './InterruptPulse';
 export { SpeakerCutoff } from './SpeakerCutoff';
 export { TokenStream } from './TokenStream';
+
+// Human participation components
+export { ReadyToRespondOverlay } from './ReadyToRespondOverlay';

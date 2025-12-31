@@ -69,6 +69,12 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* Human Participation Mode Indicator */
+.humanModeInfo {
+  margin-bottom: var(--spacing-md);
+  text-align: center;
+}
+
 /* Model Info Display */
 .modelInfo {
   display: flex;

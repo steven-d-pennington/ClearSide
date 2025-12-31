@@ -146,6 +146,74 @@
   line-height: var(--line-height-normal);
 }
 
+/* Participation Mode Selector */
+.participationModeSelector {
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.participationModeLabel {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.participationModeOptions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.participationModeOption {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-bg-primary);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.participationModeOption:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.participationModeOption.participationModeActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+
+.participationModeOption input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+}
+
+.participationModeText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.participationModeText strong {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.participationModeText small {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  line-height: var(--line-height-normal);
+}
+
 .apiError {
   margin-bottom: var(--spacing-lg);
 }
@@ -187,6 +255,10 @@
   }
 
   .flowModeOptions {
+    flex-direction: column;
+  }
+
+  .participationModeOptions {
     flex-direction: column;
   }
 

@@ -118,6 +118,21 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
     }, 'Generating generic response');
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        PRO_ADVOCATE_PROMPTS.intervention.template,
+        config,
+        context.persona
+      );
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for generic response');
+
       // Build LLM request with intervention prompt
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -125,15 +140,15 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
         messages: [
           {
             role: 'system',
-            content: PRO_ADVOCATE_PROMPTS.intervention.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        temperature: 0.7, // Slightly higher for responsive dialogue
-        maxTokens: 500,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -342,6 +357,9 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
     }, 'Generating cross-examination question');
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
       // Extract opponent arguments from previous utterances
       const opponentArguments = this.extractOpponentArguments(context);
 
@@ -359,6 +377,18 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.crossExam(promptContext);
 
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        PRO_ADVOCATE_PROMPTS.crossExam.questioner.template,
+        config,
+        context.persona
+      );
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for cross-exam question');
+
       // Build LLM request
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -366,15 +396,15 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
         messages: [
           {
             role: 'system',
-            content: PRO_ADVOCATE_PROMPTS.crossExam.questioner.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 500,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -414,6 +444,9 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
     }, 'Responding to cross-examination question');
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
       // Build prompt context
       const promptContext: PromptBuilderContext = {
         proposition: context.proposition,
@@ -428,6 +461,18 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.crossExam(promptContext);
 
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        PRO_ADVOCATE_PROMPTS.crossExam.respondent.template,
+        config,
+        context.persona
+      );
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for cross-exam response');
+
       // Build LLM request
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -435,15 +480,15 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
         messages: [
           {
             role: 'system',
-            content: PRO_ADVOCATE_PROMPTS.crossExam.respondent.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 600,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -483,6 +528,9 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
     }, 'Generating rebuttal');
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
       // Extract opponent arguments from previous utterances
       const opponentArguments = this.extractOpponentArguments(context);
 
@@ -499,6 +547,18 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.rebuttal(promptContext);
 
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        PRO_ADVOCATE_PROMPTS.rebuttal.template,
+        config,
+        context.persona
+      );
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for rebuttal');
+
       // Build LLM request
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -506,15 +566,15 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
         messages: [
           {
             role: 'system',
-            content: PRO_ADVOCATE_PROMPTS.rebuttal.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 800,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -554,6 +614,9 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
     }, 'Generating closing statement');
 
     try {
+      // Get configuration
+      const config = this.getConfiguration(context);
+
       // Build full transcript summary
       const fullTranscript = this.buildContextSummary(context);
 
@@ -570,6 +633,18 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
       // Build user prompt
       const userPrompt = PRO_PROMPT_BUILDERS.closing(promptContext);
 
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        PRO_ADVOCATE_PROMPTS.closing.template,
+        config,
+        context.persona
+      );
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for closing statement');
+
       // Build LLM request
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -577,15 +652,15 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
         messages: [
           {
             role: 'system',
-            content: PRO_ADVOCATE_PROMPTS.closing.template,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 800,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);

@@ -9,6 +9,7 @@ import React from 'react';
 import { Speaker, SPEAKER_INFO, PHASE_INFO, DebatePhase } from '../../types/debate';
 import type { ActiveSpeakerState } from '../../types/lively';
 import { StateIndicator } from './StateIndicator';
+import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import styles from './CenterStage.module.css';
 
 interface CenterStageProps {
@@ -16,6 +17,12 @@ interface CenterStageProps {
   currentPhase: DebatePhase;
   interruptWindowOpen?: boolean;
   pendingInterrupter?: Speaker | null;
+  /** When true, shows this as a completed response (no cursor, different state) */
+  isHistorical?: boolean;
+  /** Model name for Pro advocate */
+  proModelName?: string;
+  /** Model name for Con advocate */
+  conModelName?: string;
 }
 
 export const CenterStage: React.FC<CenterStageProps> = ({
@@ -23,6 +30,9 @@ export const CenterStage: React.FC<CenterStageProps> = ({
   currentPhase,
   interruptWindowOpen = false,
   pendingInterrupter = null,
+  isHistorical = false,
+  proModelName,
+  conModelName,
 }) => {
   const phaseInfo = PHASE_INFO[currentPhase];
 
@@ -40,6 +50,20 @@ export const CenterStage: React.FC<CenterStageProps> = ({
   }
 
   const speakerInfo = SPEAKER_INFO[activeSpeaker.speaker];
+
+  // Get model name for current speaker
+  const getModelName = () => {
+    switch (activeSpeaker.speaker) {
+      case Speaker.PRO:
+        return proModelName;
+      case Speaker.CON:
+        return conModelName;
+      default:
+        return undefined;
+    }
+  };
+
+  const modelName = getModelName();
 
   // Get speaker-specific styling class
   const getSpeakerClass = () => {
@@ -72,16 +96,26 @@ export const CenterStage: React.FC<CenterStageProps> = ({
         </div>
         <div className={styles.speakerInfo}>
           <h2 className={styles.speakerName}>{speakerInfo.name}</h2>
-          <StateIndicator state="speaking" size="lg" />
+          {modelName && (
+            <span className={styles.modelBadge} title={modelName}>
+              🤖 {modelName}
+            </span>
+          )}
+          {isHistorical ? (
+            <span className={styles.historicalBadge}>Last Response</span>
+          ) : (
+            <StateIndicator state="speaking" size="lg" />
+          )}
         </div>
       </div>
 
       {/* Content area */}
       <div className={styles.content}>
-        <p className={styles.text}>
-          {activeSpeaker.partialContent || 'Starting...'}
-          <span className={styles.cursor}>|</span>
-        </p>
+        <MarkdownRenderer
+          content={activeSpeaker.partialContent || 'Starting...'}
+          className={styles.markdown}
+        />
+        {!isHistorical && <span className={styles.cursor}>|</span>}
       </div>
 
       {/* Token progress */}

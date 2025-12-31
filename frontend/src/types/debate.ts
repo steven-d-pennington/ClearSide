@@ -205,6 +205,8 @@ export interface DebateTurn {
     isInterjection?: boolean;
     interruptedBy?: Speaker;
     interruptionEnergy?: 'low' | 'medium' | 'high';
+    // Human participation mode
+    isHumanGenerated?: boolean;
   };
 }
 
@@ -232,6 +234,36 @@ export type FlowMode = 'auto' | 'step';
  * Preset mode for debate configuration
  */
 export type PresetMode = 'quick' | 'balanced' | 'deep_dive' | 'research' | 'custom';
+
+/**
+ * Human side selection for participation mode
+ */
+export type HumanSide = 'pro' | 'con';
+
+/**
+ * Human participation configuration
+ */
+export interface HumanParticipation {
+  /** Whether human participation is enabled */
+  enabled: boolean;
+  /** Which side the human is arguing */
+  humanSide: HumanSide;
+  /** Optional time limit per turn in seconds */
+  timeLimitSeconds: number | null;
+}
+
+/**
+ * Awaiting human input event data
+ */
+export interface AwaitingHumanInputData {
+  debateId: string;
+  speaker: HumanSide;
+  phase: string;
+  turnNumber: number;
+  promptType: string;
+  timeoutMs: number | null;
+  timestampMs: number;
+}
 
 /**
  * Complete debate data
@@ -274,6 +306,10 @@ export interface Debate {
   proModelName?: string;
   /** Display name for Con model */
   conModelName?: string;
+
+  // Human participation mode
+  /** Human participation configuration (if enabled) */
+  humanParticipation?: HumanParticipation;
 }
 
 /**
@@ -316,7 +352,11 @@ export type SSEEventType =
   | 'interjection'         // Short 1-2 sentence interrupt content
   | 'speaking_resumed'     // Original speaker continues
   | 'lively_mode_started'  // Lively mode activated for debate
-  | 'pacing_change';       // Pacing mode changed
+  | 'pacing_change'        // Pacing mode changed
+  // Human participation mode events
+  | 'awaiting_human_input' // Waiting for human to submit their turn
+  | 'human_turn_received'  // Human turn was submitted
+  | 'human_turn_timeout';  // Human took too long to respond
 
 /**
  * SSE message structure

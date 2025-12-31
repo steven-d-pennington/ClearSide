@@ -35,7 +35,22 @@
       "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\backend && npm run build\")",
       "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\backend && npm run build 2>&1\")",
       "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\frontend && npm run build 2>&1\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run docker:logs:*)",
+      "Bash(backend/src/types/informal.ts )",
+      "Bash(backend/src/db/migrations/009_add_informal_discussion.sql )",
+      "Bash(backend/src/db/repositories/informal-repository.ts )",
+      "Bash(backend/src/db/repositories/debate-repository.ts )",
+      "Bash(backend/src/services/debate/end-detector.ts )",
+      "Bash(backend/src/services/debate/informal-orchestrator.ts )",
+      "Bash(backend/src/services/debate/lively-orchestrator.ts )",
+      "Bash(backend/src/services/transcript/transcript-recorder.ts )",
+      "Bash(backend/src/types/database.ts )",
+      "Bash(backend/src/types/sse.ts )",
+      "Bash(docs/FUTURE-FEATURES.md )",
+      "Bash(frontend/src/components/DebateStage/DebateStage.tsx )",
+      "Bash(frontend/src/components/ui/MarkdownRenderer.tsx)"
     ]
   }
 }

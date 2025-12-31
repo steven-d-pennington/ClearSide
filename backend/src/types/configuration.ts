@@ -396,3 +396,57 @@ export const ARCHETYPE_INFO: Record<PersonaArchetype, { name: string; descriptio
     description: 'Ethics and values focused approach',
   },
 };
+
+// ============================================================================
+// Human Participation Types
+// ============================================================================
+
+/**
+ * Human side selection
+ */
+export type HumanSide = 'pro' | 'con';
+
+/**
+ * Human participation configuration
+ * Allows a human user to take one side of the debate
+ */
+export interface HumanParticipationConfig {
+  /** Whether human participation is enabled */
+  enabled: boolean;
+
+  /** Which side the human is arguing (pro or con) */
+  humanSide: HumanSide;
+
+  /** Optional time limit per turn in seconds (null = no limit) */
+  timeLimitSeconds: number | null;
+}
+
+/**
+ * Default human participation settings (disabled)
+ */
+export const DEFAULT_HUMAN_PARTICIPATION: HumanParticipationConfig = {
+  enabled: false,
+  humanSide: 'pro',
+  timeLimitSeconds: null,
+};
+
+/**
+ * Human participation display info
+ */
+export const HUMAN_SIDE_INFO: Record<HumanSide, { name: string; description: string }> = {
+  pro: {
+    name: 'Pro (For)',
+    description: 'Argue in favor of the proposition',
+  },
+  con: {
+    name: 'Con (Against)',
+    description: 'Argue against the proposition',
+  },
+};
+
+/**
+ * Type guard for HumanSide
+ */
+export function isHumanSide(value: unknown): value is HumanSide {
+  return typeof value === 'string' && ['pro', 'con'].includes(value);
+}

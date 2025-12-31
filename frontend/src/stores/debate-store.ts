@@ -15,6 +15,9 @@ import type {
   SSEMessage,
   FlowMode,
   PresetMode,
+  HumanSide,
+  HumanParticipation,
+  AwaitingHumanInputData,
 } from '../types/debate';
 import { DebatePhase, Speaker } from '../types/debate';
 import type { BrevityLevel } from '../types/configuration';
@@ -65,6 +68,8 @@ export interface StartDebateOptions {
   debateMode?: DebateMode;
   /** Lively mode settings (only used if debateMode is 'lively') */
   livelySettings?: LivelySettingsInput;
+  /** Human participation configuration */
+  humanParticipation?: HumanParticipation;
 }
 
 /**
@@ -129,6 +134,14 @@ interface DebateState {
   // Catch-up state for reconnection
   catchup: CatchupState;
 
+  // Human participation state
+  /** Whether we're waiting for the human to submit their turn */
+  isAwaitingHumanInput: boolean;
+  /** Details about what input is expected */
+  humanInputRequest: AwaitingHumanInputData | null;
+  /** Whether the user has clicked "Ready to Respond" - controls when input form appears */
+  isReadyToRespond: boolean;
+
   // Actions
   startDebate: (proposition: string, options?: StartDebateOptions) => Promise<void>;
   pauseDebate: () => Promise<void>;
@@ -137,6 +150,8 @@ interface DebateState {
   closeDebate: (status?: 'completed' | 'failed', reason?: string) => Promise<void>;
   stopDebate: (reason?: string) => Promise<void>;
   submitIntervention: (intervention: Omit<Intervention, 'id' | 'debateId' | 'status' | 'timestamp'>) => Promise<void>;
+  submitHumanTurn: (content: string) => Promise<void>;
+  setReadyToRespond: (ready: boolean) => void;
 
   // SSE actions
   connectToDebate: (debateId: string) => void;
@@ -178,6 +193,10 @@ const initialState = {
   selectedTurnId: null,
   lively: initialLivelyState,
   catchup: initialCatchupState,
+  // Human participation state
+  isAwaitingHumanInput: false,
+  humanInputRequest: null as AwaitingHumanInputData | null,
+  isReadyToRespond: false,
 };
 
 /**
@@ -264,6 +283,11 @@ export const useDebateStore = create<DebateState>()(
             requestBody.reasoningEffort = options.reasoningEffort;
           }
 
+          // Add human participation config if provided
+          if (options.humanParticipation?.enabled) {
+            requestBody.humanParticipation = options.humanParticipation;
+          }
+
           console.log('🟢 Store: Fetching', `${API_BASE_URL}/api/debates`);
           const response = await fetch(`${API_BASE_URL}/api/debates`, {
             method: 'POST',
@@ -307,6 +331,8 @@ export const useDebateStore = create<DebateState>()(
               proModelName: options.proModelId?.split('/').pop() || undefined,
               conModelName: options.conModelId?.split('/').pop() || undefined,
               moderatorModelName: options.moderatorModelId?.split('/').pop() || undefined,
+              // Include human participation config if enabled
+              humanParticipation: options.humanParticipation?.enabled ? options.humanParticipation : undefined,
             },
             isLoading: false,
             // Set lively mode immediately if selected (don't wait for SSE event)
@@ -321,6 +347,13 @@ export const useDebateStore = create<DebateState>()(
           });
 
           console.log('🎭 Lively mode set:', isLively);
+          console.log('👤 Human participation in options:', options.humanParticipation);
+          console.log('👤 Human participation set on debate:', options.humanParticipation?.enabled ? options.humanParticipation : undefined);
+
+          // Debug: verify state was set correctly
+          const stateAfterSet = get().debate;
+          console.log('👤 DEBUG: debate.humanParticipation after set:', stateAfterSet?.humanParticipation);
+          console.log('👤 DEBUG: selectIsHumanParticipationMode would return:', stateAfterSet?.humanParticipation?.enabled ?? false);
 
           // Connect to SSE stream
           get().connectToDebate(debate.id);
@@ -505,6 +538,49 @@ export const useDebateStore = create<DebateState>()(
             error: error instanceof Error ? error.message : 'Failed to submit intervention',
           });
         }
+      },
+
+      /**
+       * Submit human turn content (human participation mode)
+       */
+      submitHumanTurn: async (content: string) => {
+        const { debate, humanInputRequest } = get();
+        if (!debate || !humanInputRequest) return;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/debates/${debate.id}/human-turn`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content,
+              speaker: humanInputRequest.speaker,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Failed to submit human turn: ${response.statusText}`);
+          }
+
+          // Clear the awaiting state - SSE will handle the rest
+          set({
+            isAwaitingHumanInput: false,
+            humanInputRequest: null,
+            isReadyToRespond: false,
+          });
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to submit human turn',
+          });
+        }
+      },
+
+      /**
+       * Set whether the user is ready to respond
+       * Called when user clicks "Ready to Respond" button
+       */
+      setReadyToRespond: (ready: boolean) => {
+        set({ isReadyToRespond: ready });
       },
 
       /**
@@ -978,6 +1054,7 @@ export const useDebateStore = create<DebateState>()(
           // Connection confirmation - just acknowledge
           case 'connected':
             console.log('📡 SSE connected to debate');
+            console.log('👤 DEBUG: humanParticipation at SSE connect:', get().debate?.humanParticipation);
             break;
 
           case 'debate_started':
@@ -1403,6 +1480,53 @@ export const useDebateStore = create<DebateState>()(
             break;
           }
 
+          // Human participation mode events
+          case 'awaiting_human_input': {
+            const data = message.data as AwaitingHumanInputData;
+            console.log('👤 Awaiting human input:', data);
+            set({
+              isAwaitingHumanInput: true,
+              humanInputRequest: data,
+              isReadyToRespond: false, // User must click "Ready" first
+            });
+            break;
+          }
+
+          case 'human_turn_received': {
+            const data = message.data as {
+              debateId: string;
+              speaker: HumanSide;
+              contentLength: number;
+              responseTimeMs: number;
+              timestampMs: number;
+            };
+            console.log('✅ Human turn received:', data);
+            set({
+              isAwaitingHumanInput: false,
+              humanInputRequest: null,
+              isReadyToRespond: false,
+            });
+            break;
+          }
+
+          case 'human_turn_timeout': {
+            const data = message.data as {
+              debateId: string;
+              speaker: HumanSide;
+              phase: string;
+              waitedMs: number;
+              timestampMs: number;
+            };
+            console.log('⏰ Human turn timed out:', data);
+            set({
+              isAwaitingHumanInput: false,
+              humanInputRequest: null,
+              isReadyToRespond: false,
+              error: 'Your turn timed out. The debate has ended.',
+            });
+            break;
+          }
+
           default:
             // Check if it's a lively mode event
             const livelyEvents = [
@@ -1540,6 +1664,36 @@ export const selectCanInterrupt = (state: DebateState) => {
 
 export const selectLivelyPacingMode = (state: DebateState) =>
   state.lively.settings?.pacingMode ?? 'medium';
+
+/**
+ * Human participation selectors
+ */
+export const selectIsHumanParticipationMode = (state: DebateState) =>
+  state.debate?.humanParticipation?.enabled ?? false;
+
+export const selectHumanSide = (state: DebateState) =>
+  state.debate?.humanParticipation?.humanSide ?? null;
+
+export const selectIsAwaitingHumanInput = (state: DebateState) =>
+  state.isAwaitingHumanInput;
+
+export const selectIsReadyToRespond = (state: DebateState) =>
+  state.isReadyToRespond;
+
+export const selectHumanInputRequest = (state: DebateState) =>
+  state.humanInputRequest;
+
+export const selectIsHumansTurn = (state: DebateState) => {
+  const debate = state.debate;
+  const humanSide = debate?.humanParticipation?.humanSide;
+  if (!humanSide || !debate?.humanParticipation?.enabled) return false;
+
+  const currentSpeaker = debate.currentSpeaker;
+  return (
+    (humanSide === 'pro' && currentSpeaker === Speaker.PRO) ||
+    (humanSide === 'con' && currentSpeaker === Speaker.CON)
+  );
+};
 
 /**
  * Catch-up selectors

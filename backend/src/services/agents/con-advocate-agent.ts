@@ -23,6 +23,7 @@ import { createFullyConfiguredPrompt } from './prompts/prompt-modifiers.js';
 import { DEFAULT_CONFIGURATION } from '../../types/configuration.js';
 import type { PromptBuilderContext, ConstructiveRound } from './prompts/types.js';
 import type { Utterance } from '../../types/database.js';
+import type { DebateConfiguration } from '../../types/configuration.js';
 
 /**
  * Logger for con advocate operations
@@ -115,8 +116,20 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
     }, 'Generating generic response');
 
     try {
-      // Use intervention prompt template for generic responses
-      const systemPrompt = CON_ADVOCATE_PROMPTS.intervention.template;
+      // Get configuration
+      const config = this.getConfiguration(context);
+
+      // Apply persona and configuration to system prompt
+      const modifiedSystemPrompt = createFullyConfiguredPrompt(
+        CON_ADVOCATE_PROMPTS.intervention.template,
+        config,
+        context.persona
+      );
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for generic response');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -124,15 +137,15 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         messages: [
           {
             role: 'system',
-            content: systemPrompt,
+            content: modifiedSystemPrompt,
           },
           {
             role: 'user',
             content: prompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 2000,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -163,13 +176,18 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
     }, 'Generating opening statement');
 
     try {
-      const config = context.configuration ?? DEFAULT_CONFIGURATION;
+      const config = this.getConfiguration(context);
       const systemPrompt = createFullyConfiguredPrompt(
         CON_ADVOCATE_PROMPTS.opening.template,
         config,
         context.persona
       );
       const userPrompt = CON_PROMPT_BUILDERS.opening(this.buildPromptContext(context));
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for opening statement');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -184,8 +202,8 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 1500,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -233,7 +251,7 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         promptTemplate = CON_ADVOCATE_PROMPTS.constructive.practical;
       }
 
-      const config = context.configuration ?? DEFAULT_CONFIGURATION;
+      const config = this.getConfiguration(context);
       const systemPrompt = createFullyConfiguredPrompt(
         promptTemplate.template,
         config,
@@ -243,6 +261,12 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         ...this.buildPromptContext(context),
         constructiveRound,
       });
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+        constructiveRound,
+      }, 'Using configuration settings for constructive argument');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -257,8 +281,8 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 1500,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -293,7 +317,12 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
     }, 'Generating cross-examination questions');
 
     try {
-      const systemPrompt = CON_ADVOCATE_PROMPTS.crossExam.questioner.template;
+      const config = this.getConfiguration(context);
+      const systemPrompt = createFullyConfiguredPrompt(
+        CON_ADVOCATE_PROMPTS.crossExam.questioner.template,
+        config,
+        context.persona
+      );
 
       // Extract Pro's arguments from previous utterances
       const proArguments = this.extractOpponentArguments(context.previousUtterances, 'pro');
@@ -303,6 +332,11 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         crossExamRole: 'questioner',
         opponentArguments: proArguments,
       });
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for cross-exam question');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -317,8 +351,8 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 800,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -351,12 +385,22 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
     }, 'Responding to cross-examination');
 
     try {
-      const systemPrompt = CON_ADVOCATE_PROMPTS.crossExam.respondent.template;
+      const config = this.getConfiguration(context);
+      const systemPrompt = createFullyConfiguredPrompt(
+        CON_ADVOCATE_PROMPTS.crossExam.respondent.template,
+        config,
+        context.persona
+      );
       const userPrompt = CON_PROMPT_BUILDERS.crossExam({
         ...this.buildPromptContext(context),
         crossExamRole: 'respondent',
         interventionContent: question,
       });
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for cross-exam response');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -371,8 +415,8 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 1000,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -405,7 +449,12 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
     }, 'Generating rebuttal');
 
     try {
-      const systemPrompt = CON_ADVOCATE_PROMPTS.rebuttal.template;
+      const config = this.getConfiguration(context);
+      const systemPrompt = createFullyConfiguredPrompt(
+        CON_ADVOCATE_PROMPTS.rebuttal.template,
+        config,
+        context.persona
+      );
 
       // Extract Pro's arguments from previous utterances
       const proArguments = this.extractOpponentArguments(context.previousUtterances, 'pro');
@@ -414,6 +463,11 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         ...this.buildPromptContext(context),
         opponentArguments: proArguments,
       });
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for rebuttal');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -428,8 +482,8 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 1500,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -463,7 +517,12 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
     }, 'Generating closing statement');
 
     try {
-      const systemPrompt = CON_ADVOCATE_PROMPTS.closing.template;
+      const config = this.getConfiguration(context);
+      const systemPrompt = createFullyConfiguredPrompt(
+        CON_ADVOCATE_PROMPTS.closing.template,
+        config,
+        context.persona
+      );
 
       // Build full transcript summary for closing
       const fullTranscript = this.buildTranscriptSummary(context.previousUtterances);
@@ -472,6 +531,11 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         ...this.buildPromptContext(context),
         fullTranscript,
       });
+
+      logger.info({
+        temperature: config.llmSettings.temperature,
+        brevityLevel: config.brevityLevel,
+      }, 'Using configuration settings for closing statement');
 
       const llmRequest: LLMRequest = {
         provider: this.provider,
@@ -486,8 +550,8 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
             content: userPrompt,
           },
         ],
-        temperature: 0.7,
-        maxTokens: 1500,
+        temperature: config.llmSettings.temperature,
+        maxTokens: config.llmSettings.maxTokensPerResponse,
       };
 
       const response = await this.llmClient.complete(llmRequest);
@@ -509,6 +573,13 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
       }, 'Failed to generate closing statement');
       throw error;
     }
+  }
+
+  /**
+   * Get configuration from context with fallback to defaults
+   */
+  private getConfiguration(context: AgentContext): DebateConfiguration {
+    return context.configuration ?? DEFAULT_CONFIGURATION;
   }
 
   /**

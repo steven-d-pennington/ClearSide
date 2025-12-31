@@ -9,7 +9,7 @@ import { ConfigPanel } from '../ConfigPanel/ConfigPanel';
 import { ModelSelector } from '../ConfigPanel/ModelSelector';
 import { PersonaSelector } from './PersonaSelector';
 import { DebateModeSelector } from './DebateModeSelector';
-import type { FlowMode } from '../../types/debate';
+import type { FlowMode, HumanParticipation, HumanSide } from '../../types/debate';
 import type { DebateConfiguration, PersonaSelection, ModelSelection } from '../../types/configuration';
 import { DEFAULT_CONFIGURATION, DEFAULT_PERSONA_SELECTION, DEFAULT_MODEL_SELECTION } from '../../types/configuration';
 import type { DebateMode, LivelySettingsInput } from '../../types/lively';
@@ -22,6 +22,11 @@ interface InputFormProps {
   className?: string;
 }
 
+/**
+ * Participation mode - who takes part in the debate
+ */
+type ParticipationMode = 'watch' | 'pro' | 'con';
+
 interface FormState {
   question: string;
   context: string;
@@ -31,6 +36,7 @@ interface FormState {
   modelSelection: ModelSelection;
   debateMode: DebateMode;
   livelySettings: LivelySettingsInput;
+  participationMode: ParticipationMode;
 }
 
 interface ValidationErrors {
@@ -53,6 +59,7 @@ export const InputForm: React.FC<InputFormProps> = ({
     modelSelection: DEFAULT_MODEL_SELECTION,
     debateMode: 'turn_based',
     livelySettings: DEFAULT_LIVELY_SETTINGS,
+    participationMode: 'watch',
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -218,7 +225,21 @@ export const InputForm: React.FC<InputFormProps> = ({
         console.log('🔵 Configuration:', formState.configuration);
 
         // Build start options including configuration, personas, model selection, and debate mode
-        const { configuration, personaSelection, modelSelection, debateMode, livelySettings } = formState;
+        const { configuration, personaSelection, modelSelection, debateMode, livelySettings, participationMode } = formState;
+
+        // Build human participation config
+        const humanParticipation: HumanParticipation | undefined =
+          participationMode !== 'watch'
+            ? {
+                enabled: true,
+                humanSide: participationMode as HumanSide,
+                timeLimitSeconds: null, // No time limit for now
+              }
+            : undefined;
+
+        console.log('🔵 Participation mode:', participationMode);
+        console.log('🔵 Human participation config:', humanParticipation);
+
         await startDebate(proposition, {
           flowMode: formState.flowMode,
           presetMode: configuration.presetMode,
@@ -238,6 +259,8 @@ export const InputForm: React.FC<InputFormProps> = ({
           reasoningEffort: modelSelection.reasoningEffort,
           debateMode,
           livelySettings: debateMode === 'lively' ? livelySettings : undefined,
+          // Human participation
+          humanParticipation,
         });
         console.log('🔵 startDebate returned');
 
@@ -351,6 +374,55 @@ export const InputForm: React.FC<InputFormProps> = ({
         disabled={isLoading}
       />
 
+      {/* Participation Mode Selector */}
+      <div className={styles.participationModeSelector}>
+        <span className={styles.participationModeLabel}>Participation:</span>
+        <div className={styles.participationModeOptions}>
+          <label className={`${styles.participationModeOption} ${formState.participationMode === 'watch' ? styles.participationModeActive : ''}`}>
+            <input
+              type="radio"
+              name="participationMode"
+              value="watch"
+              checked={formState.participationMode === 'watch'}
+              onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'watch' }))}
+              disabled={isLoading}
+            />
+            <span className={styles.participationModeText}>
+              <strong>Watch</strong>
+              <small>Watch AI debate both sides</small>
+            </span>
+          </label>
+          <label className={`${styles.participationModeOption} ${formState.participationMode === 'pro' ? styles.participationModeActive : ''}`}>
+            <input
+              type="radio"
+              name="participationMode"
+              value="pro"
+              checked={formState.participationMode === 'pro'}
+              onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'pro' }))}
+              disabled={isLoading}
+            />
+            <span className={styles.participationModeText}>
+              <strong>Argue Pro</strong>
+              <small>Argue for the proposition</small>
+            </span>
+          </label>
+          <label className={`${styles.participationModeOption} ${formState.participationMode === 'con' ? styles.participationModeActive : ''}`}>
+            <input
+              type="radio"
+              name="participationMode"
+              value="con"
+              checked={formState.participationMode === 'con'}
+              onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'con' }))}
+              disabled={isLoading}
+            />
+            <span className={styles.participationModeText}>
+              <strong>Argue Con</strong>
+              <small>Argue against the proposition</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
       {/* Flow Mode Selector (only for turn-based mode) */}
       {formState.debateMode === 'turn_based' && (
       <div className={styles.flowModeSelector}>
@@ -401,6 +473,7 @@ export const InputForm: React.FC<InputFormProps> = ({
         onChange={handleModelSelectionChange}
         disabled={isLoading}
         presetId={formState.configuration.presetMode}
+        humanSide={formState.participationMode !== 'watch' ? formState.participationMode : undefined}
       />
 
       {/* Persona Selector */}

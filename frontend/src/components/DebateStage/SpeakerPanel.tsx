@@ -5,10 +5,11 @@
  * and current/recent content. Used in the multi-panel debate stage.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Speaker, SPEAKER_INFO } from '../../types/debate';
 import type { LivelySpeakerState } from '../../types/lively';
 import { StateIndicator } from './StateIndicator';
+import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import styles from './SpeakerPanel.module.css';
 
 interface SpeakerPanelProps {
@@ -21,6 +22,12 @@ interface SpeakerPanelProps {
   isQueued?: boolean;
   isInterjecting?: boolean;
   wasCutoff?: boolean;
+  /** When true, shows expand/collapse toggle and full content when expanded */
+  collapsible?: boolean;
+  /** Default expanded state for collapsible panels */
+  defaultExpanded?: boolean;
+  /** Model name to display (e.g., "claude-3-opus") */
+  modelName?: string;
 }
 
 export const SpeakerPanel: React.FC<SpeakerPanelProps> = ({
@@ -33,7 +40,11 @@ export const SpeakerPanel: React.FC<SpeakerPanelProps> = ({
   isQueued = false,
   isInterjecting = false,
   wasCutoff = false,
+  collapsible = false,
+  defaultExpanded = true,
+  modelName,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const speakerInfo = SPEAKER_INFO[speaker];
 
   // Get speaker-specific color class
@@ -74,16 +85,53 @@ export const SpeakerPanel: React.FC<SpeakerPanelProps> = ({
         </div>
         <div className={styles.info}>
           <h4 className={styles.name}>{speakerInfo.name}</h4>
+          {modelName && (
+            <span className={styles.modelBadge} title={modelName}>
+              🤖 {modelName}
+            </span>
+          )}
           <StateIndicator state={state} size={size === 'lg' ? 'md' : 'sm'} />
         </div>
       </div>
 
       {/* Content area */}
       {content && (
-        <div className={styles.content}>
-          <p className={styles.text}>
-            {content.length > 200 ? `${content.slice(-200)}...` : content}
-          </p>
+        <div className={`${styles.content} ${collapsible ? (isExpanded ? styles.expanded : styles.collapsed) : ''}`}>
+          {collapsible && (
+            <button
+              className={styles.expandToggle}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? 'Collapse content' : 'Expand content'}
+            >
+              <svg
+                className={`${styles.chevron} ${isExpanded ? styles.chevronUp : ''}`}
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+              {isExpanded ? 'Collapse' : 'Expand'}
+            </button>
+          )}
+          {collapsible && !isExpanded ? (
+            // Collapsed - show truncated preview as plain text
+            <p className={styles.text}>
+              {content.length > 200 ? `${content.slice(-200)}...` : content}
+            </p>
+          ) : (
+            // Expanded or non-collapsible - render with markdown
+            <MarkdownRenderer content={content} className={styles.markdown} />
+          )}
           {state === 'speaking' && (
             <span className={styles.cursor}>|</span>
           )}
