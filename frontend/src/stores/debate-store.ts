@@ -323,14 +323,14 @@ export const useDebateStore = create<DebateState>()(
               llmTemperature: debate.llmTemperature || 0.7,
               maxTokensPerResponse: debate.maxTokensPerResponse || 1024,
               requireCitations: debate.requireCitations || false,
-              // Include model info if available
-              proModelId: options.proModelId || undefined,
-              conModelId: options.conModelId || undefined,
-              moderatorModelId: options.moderatorModelId || undefined,
+              // Include model info from response (backend resolves auto-selection)
+              proModelId: debate.proModelId || options.proModelId || undefined,
+              conModelId: debate.conModelId || options.conModelId || undefined,
+              moderatorModelId: debate.moderatorModelId || options.moderatorModelId || undefined,
               // Extract model names from IDs (format: "provider/model-name")
-              proModelName: options.proModelId?.split('/').pop() || undefined,
-              conModelName: options.conModelId?.split('/').pop() || undefined,
-              moderatorModelName: options.moderatorModelId?.split('/').pop() || undefined,
+              proModelName: (debate.proModelId || options.proModelId)?.split('/').pop() || undefined,
+              conModelName: (debate.conModelId || options.conModelId)?.split('/').pop() || undefined,
+              moderatorModelName: (debate.moderatorModelId || options.moderatorModelId)?.split('/').pop() || undefined,
               // Include human participation config if enabled
               humanParticipation: options.humanParticipation?.enabled ? options.humanParticipation : undefined,
             },
