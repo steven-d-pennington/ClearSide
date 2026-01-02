@@ -22,8 +22,12 @@ import {
   selectIsReadyToRespond,
   selectHumanSide,
   selectHumanInputRequest,
+  selectIsInformalMode,
+  selectInformalParticipants,
+  selectExchangeCount,
+  selectMaxExchanges,
 } from '../../stores/debate-store';
-import { Speaker } from '../../types/debate';
+import { Speaker, DebatePhase, PHASE_INFO } from '../../types/debate';
 import { SpeakerPanel } from './SpeakerPanel';
 import { CenterStage } from './CenterStage';
 import { HumanTurnInput } from '../DebateStream/HumanTurnInput';
@@ -49,6 +53,12 @@ export const DebateStage: React.FC<DebateStageProps> = ({ className }) => {
   const isReadyToRespond = useDebateStore(selectIsReadyToRespond);
   const humanSide = useDebateStore(selectHumanSide);
   const humanInputRequest = useDebateStore(selectHumanInputRequest);
+
+  // Informal discussion mode state
+  const isInformalMode = useDebateStore(selectIsInformalMode);
+  const informalParticipants = useDebateStore(selectInformalParticipants);
+  const exchangeCount = useDebateStore(selectExchangeCount);
+  const maxExchanges = useDebateStore(selectMaxExchanges);
 
   // Get speaker states from lively state
   const getSpeakerState = (speaker: Speaker) => {
@@ -161,6 +171,99 @@ export const DebateStage: React.FC<DebateStageProps> = ({ className }) => {
     );
   }
 
+  // For informal discussion mode, show participant-based view
+  if (isInformalMode) {
+    // Get content for a participant from turns, using metadata for speaker name
+    const getParticipantContent = (participantId: string): string => {
+      if (!debate) return '';
+      const turns = [...debate.turns].reverse();
+      const lastTurn = turns.find((t) => t.speaker === participantId);
+      return lastTurn?.content ?? '';
+    };
+
+    // Participant colors based on index
+    const getParticipantColor = (index: number): string => {
+      const colors = [
+        'var(--color-participant-1, #6366f1)',
+        'var(--color-participant-2, #ec4899)',
+        'var(--color-participant-3, #f59e0b)',
+        'var(--color-participant-4, #14b8a6)',
+      ];
+      return colors[index] ?? colors[0];
+    };
+
+    return (
+      <div className={`${styles.stage} ${styles.informal} ${className ?? ''}`}>
+        {/* Header with topic and exchange counter */}
+        <div className={styles.informalHeader}>
+          <div className={styles.topicLabel}>Topic</div>
+          <div className={styles.topic}>{debate.proposition}</div>
+          <div className={styles.exchangeCounter}>
+            <span className={styles.exchangeLabel}>Exchange</span>
+            <span className={styles.exchangeValue}>
+              {exchangeCount} / {maxExchanges}
+            </span>
+            <span className={styles.phaseLabel}>
+              {debate.currentPhase === DebatePhase.WRAPUP ? '(Wrap-up)' : ''}
+            </span>
+          </div>
+        </div>
+
+        {/* Participant panels */}
+        <div className={styles.informalGrid}>
+          {informalParticipants.map((participant, index) => (
+            <div
+              key={participant.id}
+              className={styles.participantPanel}
+              style={{ '--participant-color': getParticipantColor(index) } as React.CSSProperties}
+            >
+              <div className={styles.participantHeader}>
+                <span className={styles.participantName}>{participant.name}</span>
+                <span className={styles.participantModel}>
+                  {participant.modelId.split('/').pop()}
+                </span>
+              </div>
+              <div className={styles.participantContent}>
+                {getParticipantContent(participant.id)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Show summary if available */}
+        {debate.informalSummary && (
+          <div className={styles.summaryPanel}>
+            <h3>Discussion Summary</h3>
+            <div className={styles.summarySection}>
+              <h4>Key Insights</h4>
+              <ul>
+                {debate.informalSummary.keyInsights.map((insight, i) => (
+                  <li key={i}>{insight}</li>
+                ))}
+              </ul>
+            </div>
+            <div className={styles.summarySection}>
+              <h4>Areas of Agreement</h4>
+              <ul>
+                {debate.informalSummary.areasOfAgreement.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div className={styles.summarySection}>
+              <h4>Areas of Disagreement</h4>
+              <ul>
+                {debate.informalSummary.areasOfDisagreement.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // For non-lively mode, show simple view
   if (!lively.isLivelyMode) {
     return (
@@ -236,15 +339,15 @@ export const DebateStage: React.FC<DebateStageProps> = ({ className }) => {
       </div>
 
       {/* Bottom panel - Moderator */}
+      {/* Don't show content here - when moderator speaks, they appear in center stage */}
+      {/* This panel only shows avatar, name, and status to avoid duplicate content */}
       <div className={styles.bottomPanel}>
         <SpeakerPanel
           speaker={Speaker.MODERATOR}
           state={getSpeakerState(Speaker.MODERATOR)}
-          content={getSpeakerContent(Speaker.MODERATOR)}
+          content={undefined}
           isActive={activeSpeaker === Speaker.MODERATOR}
           size="md"
-          collapsible={true}
-          defaultExpanded={false}
         />
       </div>
 
@@ -278,8 +381,8 @@ export const DebateStage: React.FC<DebateStageProps> = ({ className }) => {
         </div>
       </div>
 
-      {/* Interjection overlay */}
-      {lively.streamingInterjection && (
+      {/* Interjection overlay - hide when debate is completed */}
+      {lively.streamingInterjection && debate.currentPhase !== DebatePhase.COMPLETED && (
         <InterjectionOverlay
           speaker={lively.streamingInterjection.speaker}
           content={lively.streamingInterjection.content}

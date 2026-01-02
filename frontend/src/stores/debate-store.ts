@@ -31,6 +31,7 @@ import type {
   PacingMode,
 } from '../types/lively';
 import { initialLivelyState } from '../types/lively';
+import type { InformalSettingsInput } from '../types/informal';
 
 /**
  * Options for starting a new debate
@@ -64,10 +65,12 @@ export interface StartDebateOptions {
   moderatorModelId?: string | null;
   /** Extended thinking effort level (for reasoning-capable models) */
   reasoningEffort?: 'xhigh' | 'high' | 'medium' | 'low' | 'minimal' | 'none';
-  /** Debate mode - turn_based or lively */
+  /** Debate mode - turn_based, lively, or informal */
   debateMode?: DebateMode;
   /** Lively mode settings (only used if debateMode is 'lively') */
   livelySettings?: LivelySettingsInput;
+  /** Informal discussion settings (only used if debateMode is 'informal') */
+  informalSettings?: InformalSettingsInput;
   /** Human participation configuration */
   humanParticipation?: HumanParticipation;
 }
@@ -261,6 +264,9 @@ export const useDebateStore = create<DebateState>()(
           if (options.debateMode === 'lively' && options.livelySettings) {
             requestBody.livelySettings = options.livelySettings;
           }
+          if (options.debateMode === 'informal' && options.informalSettings) {
+            requestBody.informalSettings = options.informalSettings;
+          }
 
           // Add model selection fields if provided
           if (options.modelSelectionMode !== undefined) {
@@ -307,13 +313,18 @@ export const useDebateStore = create<DebateState>()(
           // Check if this is a lively mode debate
           const isLively = options.debateMode === 'lively';
 
+          // Determine if this is informal mode
+          const isInformal = options.debateMode === 'informal';
+
           set({
             debate: {
               ...debate,
+              // Map backend 'propositionText' to frontend 'proposition'
+              proposition: debate.propositionText || debate.proposition,
               turns: [],
               interventions: [],
               flowMode: debate.flowMode || flowMode,
-              currentPhase: DebatePhase.INITIALIZING,
+              currentPhase: isInformal ? DebatePhase.INFORMAL : DebatePhase.INITIALIZING,
               currentSpeaker: Speaker.SYSTEM,
               totalElapsedMs: 0,
               createdAt: new Date(debate.createdAt),
@@ -333,6 +344,19 @@ export const useDebateStore = create<DebateState>()(
               moderatorModelName: (debate.moderatorModelId || options.moderatorModelId)?.split('/').pop() || undefined,
               // Include human participation config if enabled
               humanParticipation: options.humanParticipation?.enabled ? options.humanParticipation : undefined,
+              // Debate mode
+              debateMode: options.debateMode || 'turn_based',
+              // Informal mode: max exchanges and participants from settings
+              maxExchanges: isInformal && options.informalSettings?.maxExchanges ? options.informalSettings.maxExchanges : undefined,
+              // Add IDs to informal participants to match speaker IDs (participant_1, participant_2, etc.)
+              informalParticipants: isInformal && options.informalSettings?.participants
+                ? options.informalSettings.participants.map((p, idx) => ({
+                    id: `participant_${idx + 1}`,
+                    name: p.name || `Participant ${idx + 1}`,
+                    modelId: p.modelId,
+                    persona: p.persona,
+                  }))
+                : undefined,
             },
             isLoading: false,
             // Set lively mode immediately if selected (don't wait for SSE event)
@@ -1226,36 +1250,67 @@ export const useDebateStore = create<DebateState>()(
               speaker: string;
               content: string;
               metadata?: Record<string, unknown>;
+              // Informal mode specific fields
+              discussionId?: string;
+              speakerName?: string;
+              exchangeNumber?: number;
+              isWrapUp?: boolean;
+              model?: string;
+              timestampMs?: number;
             };
+
+            // Determine the actual timestamp
+            const timestamp = data.timestamp_ms ?? data.timestampMs ?? Date.now();
 
             console.log('🎤 Utterance received:', {
               id: data.id,
               speaker: data.speaker,
+              speakerName: data.speakerName,
               phase: data.phase,
+              isInformal: !!data.discussionId,
               speakerValues: Object.values(Speaker),
               isValidSpeaker: Object.values(Speaker).includes(data.speaker as Speaker)
             });
 
             // Backend sends same string values as our enums, so direct cast works
-            // Fallback to PHASE_1_OPENING/MODERATOR if unknown
+            // For informal mode, use 'informal' phase; otherwise fallback to PHASE_1_OPENING
             const phase = (Object.values(DebatePhase).includes(data.phase as DebatePhase)
               ? data.phase
-              : DebatePhase.PHASE_1_OPENING) as DebatePhase;
+              : data.discussionId ? DebatePhase.INFORMAL : DebatePhase.PHASE_1_OPENING) as DebatePhase;
 
+            // For informal mode, speaker will be 'participant_1', 'participant_2', etc.
             const speaker = (Object.values(Speaker).includes(data.speaker as Speaker)
               ? data.speaker
               : Speaker.MODERATOR) as Speaker;
 
             const currentDebate = get().debate;
+
+            // Build metadata including informal mode info
+            const turnMetadata: DebateTurn['metadata'] = {
+              ...(data.metadata as DebateTurn['metadata']),
+              model: data.model,
+            };
+
+            // For informal mode, store speaker name in metadata
+            if (data.speakerName) {
+              (turnMetadata as Record<string, unknown>).speakerName = data.speakerName;
+            }
+            if (data.exchangeNumber !== undefined) {
+              (turnMetadata as Record<string, unknown>).exchangeNumber = data.exchangeNumber;
+            }
+            if (data.isWrapUp !== undefined) {
+              (turnMetadata as Record<string, unknown>).isWrapUp = data.isWrapUp;
+            }
+
             const newTurn: DebateTurn = {
-              id: `${currentDebate?.id ?? 'unknown'}-${data.id}`,
+              id: `${currentDebate?.id ?? 'unknown'}-${data.id ?? currentDebate?.turns.length ?? 0}`,
               debateId: currentDebate?.id ?? '',
               phase,
               speaker,
               content: data.content,
               turnNumber: currentDebate?.turns.length ?? 0,
-              timestamp: new Date(data.timestamp_ms),
-              metadata: data.metadata as DebateTurn['metadata'],
+              timestamp: new Date(timestamp),
+              metadata: turnMetadata,
             };
 
             set((state) => ({
@@ -1527,6 +1582,147 @@ export const useDebateStore = create<DebateState>()(
             break;
           }
 
+          // ================================================================
+          // Informal Discussion Mode Events
+          // ================================================================
+
+          case 'discussion_started': {
+            const data = message.data as {
+              discussionId: string;
+              topic: string;
+              participants: Array<{
+                id: string;
+                name: string;
+                modelId: string;
+              }>;
+              maxExchanges: number;
+              timestampMs: number;
+            };
+            console.log('💬 Informal discussion started:', data);
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'live',
+                    currentPhase: DebatePhase.INFORMAL,
+                    debateMode: 'informal',
+                    informalParticipants: data.participants,
+                    maxExchanges: data.maxExchanges,
+                    exchangeCount: 0,
+                  }
+                : null,
+            }));
+            break;
+          }
+
+          case 'exchange_complete': {
+            const data = message.data as {
+              discussionId: string;
+              exchangeNumber: number;
+              maxExchanges: number;
+              timestampMs: number;
+            };
+            console.log('🔄 Exchange complete:', data);
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    exchangeCount: data.exchangeNumber,
+                  }
+                : null,
+            }));
+            break;
+          }
+
+          case 'entering_wrapup': {
+            const data = message.data as {
+              discussionId: string;
+              endTrigger: string;
+              timestampMs: number;
+            };
+            console.log('🏁 Entering wrap-up:', data);
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    currentPhase: DebatePhase.WRAPUP,
+                  }
+                : null,
+            }));
+            break;
+          }
+
+          case 'end_detection_result': {
+            const data = message.data as {
+              discussionId: string;
+              result: {
+                shouldEnd: boolean;
+                confidence: number;
+                reasons: string[];
+              };
+              timestampMs: number;
+            };
+            console.log('🤖 End detection result:', data);
+            // Just log it - the entering_wrapup event will handle the phase change
+            break;
+          }
+
+          case 'discussion_summary': {
+            const data = message.data as {
+              discussionId: string;
+              summary: {
+                topicsCovered: string[];
+                keyInsights: string[];
+                areasOfAgreement: string[];
+                areasOfDisagreement: string[];
+                participantHighlights: Array<{
+                  participant: string;
+                  highlight: string;
+                }>;
+              };
+              timestampMs: number;
+            };
+            console.log('📋 Discussion summary received:', data);
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    informalSummary: {
+                      ...data.summary,
+                      generatedAt: new Date().toISOString(),
+                    },
+                  }
+                : null,
+            }));
+            break;
+          }
+
+          case 'discussion_complete': {
+            const data = message.data as {
+              discussionId: string;
+              completedAt: string;
+              totalDurationMs: number;
+              totalExchanges: number;
+              endTrigger: string;
+            };
+            console.log('✅ Informal discussion completed:', data);
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'completed',
+                    currentPhase: DebatePhase.COMPLETED,
+                    completedAt: new Date(data.completedAt),
+                    totalElapsedMs: data.totalDurationMs,
+                    exchangeCount: data.totalExchanges,
+                  }
+                : null,
+              streamingTurn: null,
+            }));
+            get().disconnectFromDebate();
+            break;
+          }
+
           default:
             // Check if it's a lively mode event
             const livelyEvents = [
@@ -1703,5 +1899,40 @@ export const selectCatchupState = (state: DebateState) => state.catchup;
 export const selectIsCatchingUp = (state: DebateState) => state.catchup.isInProgress;
 
 export const selectMissedTurnCount = (state: DebateState) => state.catchup.missedTurnCount;
+
+/**
+ * Informal discussion mode selectors
+ */
+export const selectIsInformalMode = (state: DebateState) =>
+  state.debate?.debateMode === 'informal';
+
+export const selectDebateMode = (state: DebateState) =>
+  state.debate?.debateMode ?? 'turn_based';
+
+// Stable empty array to prevent infinite re-renders
+const EMPTY_PARTICIPANTS: Array<{ id: string; name: string; modelId: string }> = [];
+
+export const selectInformalParticipants = (state: DebateState) =>
+  state.debate?.informalParticipants ?? EMPTY_PARTICIPANTS;
+
+export const selectExchangeCount = (state: DebateState) =>
+  state.debate?.exchangeCount ?? 0;
+
+export const selectMaxExchanges = (state: DebateState) =>
+  state.debate?.maxExchanges ?? 15;
+
+export const selectInformalSummary = (state: DebateState) =>
+  state.debate?.informalSummary ?? null;
+
+/**
+ * Get participant name from speaker ID (for informal mode)
+ */
+export const selectParticipantName = (state: DebateState, speaker: Speaker): string => {
+  if (!state.debate?.informalParticipants) {
+    return speaker;
+  }
+  const participant = state.debate.informalParticipants.find((p) => p.id === speaker);
+  return participant?.name ?? speaker;
+};
 
 export default useDebateStore;

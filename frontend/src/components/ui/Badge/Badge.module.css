@@ -1,11 +1,15 @@
+/* Badge styles - Editorial Courtroom Theme */
+
 .badge {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
   font-family: var(--font-sans);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   border-radius: var(--radius-full);
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
 }
 
 /* Sizes */
@@ -16,23 +20,25 @@
 
 .md {
   padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
 }
 
 .lg {
   padding: var(--spacing-xs) var(--spacing-md);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
 }
 
 /* Variants */
 .default {
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
 }
 
 .primary {
   background: var(--color-primary-alpha);
   color: var(--color-primary);
+  border: 1px solid var(--color-primary-alpha);
 }
 
 .secondary {
@@ -44,44 +50,63 @@
 .success {
   background: var(--color-success-bg);
   color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .error {
   background: var(--color-error-bg);
   color: var(--color-error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .warning {
   background: var(--color-warning-bg);
   color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .info {
   background: var(--color-info-bg);
   color: var(--color-info);
+  border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
+/* Debate Role Badges - The Advocates */
 .pro {
   background: var(--color-pro-bg);
   color: var(--color-pro);
+  border: 1px solid var(--color-pro-light);
+  box-shadow: 0 2px 8px rgba(45, 106, 79, 0.15);
 }
 
 .con {
   background: var(--color-con-bg);
   color: var(--color-con);
+  border: 1px solid var(--color-con-light);
+  box-shadow: 0 2px 8px rgba(158, 42, 43, 0.15);
 }
 
 .moderator {
   background: var(--color-moderator-bg);
   color: var(--color-moderator);
+  border: 1px solid var(--color-moderator-light);
+  box-shadow: 0 2px 8px rgba(92, 77, 125, 0.15);
+}
+
+/* Accent badge for special callouts */
+.accent {
+  background: rgba(201, 162, 39, 0.1);
+  color: var(--color-accent-dark);
+  border: 1px solid rgba(201, 162, 39, 0.2);
 }
 
 /* Dot indicator */
 .dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: currentColor;
+  flex-shrink: 0;
 }
 
 .sm .dot {
@@ -92,4 +117,20 @@
 .lg .dot {
   width: 8px;
   height: 8px;
+}
+
+/* Animated dot for active states */
+.dotPulse {
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
 }

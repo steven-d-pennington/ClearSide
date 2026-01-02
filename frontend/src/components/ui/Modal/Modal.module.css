@@ -1,19 +1,23 @@
+/* Modal styles - Editorial Courtroom Theme */
+
 .overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(26, 29, 35, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-lg);
+  padding: var(--spacing-xl);
   z-index: var(--z-modal-backdrop);
-  animation: fadeIn var(--transition-base);
+  animation: overlayFadeIn 0.3s var(--ease-out-expo);
 }
 
-@keyframes fadeIn {
+@keyframes overlayFadeIn {
   from {
     opacity: 0;
   }
@@ -23,7 +27,7 @@
 }
 
 .modal {
-  background: var(--color-bg-primary);
+  background: var(--color-bg-elevated);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
   max-width: 100%;
@@ -31,21 +35,41 @@
   display: flex;
   flex-direction: column;
   z-index: var(--z-modal);
-  animation: slideUp var(--transition-base);
+  animation: modalSlideUp 0.4s var(--ease-out-expo);
   outline: none;
+  border: 1px solid var(--color-border);
+  position: relative;
+  overflow: hidden;
 }
 
-@keyframes slideUp {
+/* Decorative top accent */
+.modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--color-pro) 0%,
+    var(--color-accent) 50%,
+    var(--color-con) 100%
+  );
+}
+
+@keyframes modalSlideUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(24px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
+/* Size variants */
 .sm {
   width: 400px;
 }
@@ -68,20 +92,35 @@
   max-height: calc(100vh - var(--spacing-2xl));
 }
 
+/* Header */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-lg);
+  padding: var(--spacing-xl);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Gold accent bar under title */
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: var(--spacing-xl);
+  width: 40px;
+  height: 2px;
+  background: var(--color-accent);
 }
 
 .title {
+  font-family: var(--font-display);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   margin: 0;
   color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .closeButton {
@@ -89,21 +128,45 @@
   margin-left: auto;
 }
 
+/* Body */
 .body {
-  padding: var(--spacing-lg);
+  padding: var(--spacing-xl);
   overflow-y: auto;
   flex: 1;
+  font-family: var(--font-serif);
+  line-height: var(--line-height-relaxed);
 }
 
+/* Footer */
 .footer {
-  padding: var(--spacing-lg);
+  padding: var(--spacing-lg) var(--spacing-xl);
   border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
   display: flex;
   justify-content: flex-end;
   gap: var(--spacing-md);
   flex-shrink: 0;
 }
 
+/* Custom scrollbar for body */
+.body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.body::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .overlay {
     padding: 0;
@@ -115,10 +178,26 @@
     border-radius: 0;
   }
 
+  .modal::before {
+    display: none;
+  }
+
   .sm,
   .md,
   .lg,
   .xl {
     width: 100%;
+  }
+
+  .header {
+    padding: var(--spacing-lg);
+  }
+
+  .body {
+    padding: var(--spacing-lg);
+  }
+
+  .footer {
+    padding: var(--spacing-md) var(--spacing-lg);
   }
 }

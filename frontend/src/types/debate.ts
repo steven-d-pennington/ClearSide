@@ -30,6 +30,10 @@ export const DebatePhase = {
   PAUSED: 'PAUSED',
   /** Terminal state: Debate encountered an error */
   ERROR: 'ERROR',
+  /** Informal discussion mode - main discussion */
+  INFORMAL: 'informal',
+  /** Informal discussion mode - wrap-up phase */
+  WRAPUP: 'wrapup',
 } as const;
 
 export type DebatePhase = (typeof DebatePhase)[keyof typeof DebatePhase];
@@ -47,9 +51,21 @@ export const Speaker = {
   MODERATOR: 'MODERATOR',
   /** System (for automated transitions and errors) */
   SYSTEM: 'SYSTEM',
+  /** Informal discussion participants */
+  PARTICIPANT_1: 'participant_1',
+  PARTICIPANT_2: 'participant_2',
+  PARTICIPANT_3: 'participant_3',
+  PARTICIPANT_4: 'participant_4',
 } as const;
 
 export type Speaker = (typeof Speaker)[keyof typeof Speaker];
+
+/**
+ * Check if a speaker is an informal participant
+ */
+export function isInformalParticipant(speaker: Speaker): boolean {
+  return speaker.startsWith('participant_');
+}
 
 /**
  * Phase metadata for display purposes
@@ -136,6 +152,20 @@ export const PHASE_INFO: Record<DebatePhase, PhaseInfo> = {
     durationMinutes: 0,
     description: 'An error occurred',
   },
+  [DebatePhase.INFORMAL]: {
+    phase: DebatePhase.INFORMAL,
+    name: 'Discussion',
+    shortName: 'Discussion',
+    durationMinutes: 0,
+    description: 'Informal discussion in progress',
+  },
+  [DebatePhase.WRAPUP]: {
+    phase: DebatePhase.WRAPUP,
+    name: 'Wrap-up',
+    shortName: 'Wrap-up',
+    durationMinutes: 0,
+    description: 'Participants sharing final thoughts',
+  },
 };
 
 /**
@@ -180,6 +210,34 @@ export const SPEAKER_INFO: Record<Speaker, SpeakerInfo> = {
     shortName: 'Sys',
     color: 'var(--color-text-secondary)',
     bgColor: 'var(--color-bg-tertiary)',
+  },
+  [Speaker.PARTICIPANT_1]: {
+    speaker: Speaker.PARTICIPANT_1,
+    name: 'Participant 1',
+    shortName: 'P1',
+    color: 'var(--color-participant-1, #6366f1)',
+    bgColor: 'var(--color-participant-1-bg, rgba(99, 102, 241, 0.1))',
+  },
+  [Speaker.PARTICIPANT_2]: {
+    speaker: Speaker.PARTICIPANT_2,
+    name: 'Participant 2',
+    shortName: 'P2',
+    color: 'var(--color-participant-2, #ec4899)',
+    bgColor: 'var(--color-participant-2-bg, rgba(236, 72, 153, 0.1))',
+  },
+  [Speaker.PARTICIPANT_3]: {
+    speaker: Speaker.PARTICIPANT_3,
+    name: 'Participant 3',
+    shortName: 'P3',
+    color: 'var(--color-participant-3, #f59e0b)',
+    bgColor: 'var(--color-participant-3-bg, rgba(245, 158, 11, 0.1))',
+  },
+  [Speaker.PARTICIPANT_4]: {
+    speaker: Speaker.PARTICIPANT_4,
+    name: 'Participant 4',
+    shortName: 'P4',
+    color: 'var(--color-participant-4, #14b8a6)',
+    bgColor: 'var(--color-participant-4-bg, rgba(20, 184, 166, 0.1))',
   },
 };
 
@@ -314,6 +372,34 @@ export interface Debate {
   // Human participation mode
   /** Human participation configuration (if enabled) */
   humanParticipation?: HumanParticipation;
+
+  // Debate mode
+  /** Mode of debate: turn_based, lively, or informal */
+  debateMode?: 'turn_based' | 'lively' | 'informal';
+
+  // Informal discussion specific fields
+  /** Participant info for informal discussions */
+  informalParticipants?: Array<{
+    id: string;
+    name: string;
+    modelId: string;
+  }>;
+  /** Current exchange number (informal mode) */
+  exchangeCount?: number;
+  /** Maximum exchanges (informal mode) */
+  maxExchanges?: number;
+  /** Auto-generated discussion summary (informal mode) */
+  informalSummary?: {
+    topicsCovered: string[];
+    keyInsights: string[];
+    areasOfAgreement: string[];
+    areasOfDisagreement: string[];
+    participantHighlights: Array<{
+      participant: string;
+      highlight: string;
+    }>;
+    generatedAt: string;
+  };
 }
 
 /**
@@ -360,7 +446,14 @@ export type SSEEventType =
   // Human participation mode events
   | 'awaiting_human_input' // Waiting for human to submit their turn
   | 'human_turn_received'  // Human turn was submitted
-  | 'human_turn_timeout';  // Human took too long to respond
+  | 'human_turn_timeout'   // Human took too long to respond
+  // Informal discussion mode events
+  | 'discussion_started'   // Informal discussion has begun
+  | 'exchange_complete'    // One round where all participants spoke
+  | 'entering_wrapup'      // Discussion is wrapping up
+  | 'end_detection_result' // AI detected natural end point
+  | 'discussion_summary'   // Auto-generated summary
+  | 'discussion_complete'; // Informal discussion completed
 
 /**
  * SSE message structure

@@ -1,7 +1,9 @@
+/* Textarea styles - Editorial Courtroom Theme */
+
 .wrapper {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
 }
 
 .fullWidth {
@@ -9,32 +11,37 @@
 }
 
 .label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .required {
-  color: var(--color-error);
+  color: var(--color-con);
   margin-left: 2px;
 }
 
 .textarea {
   width: 100%;
-  min-height: 100px;
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-normal);
+  min-height: 120px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-relaxed);
   color: var(--color-text-primary);
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   transition: all var(--transition-base);
 }
 
 .textarea::placeholder {
-  color: var(--color-text-tertiary);
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--color-text-muted);
 }
 
 .textarea:hover:not(:disabled):not(:focus) {
@@ -44,21 +51,21 @@
 .textarea:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+  box-shadow: 0 0 0 4px var(--color-primary-alpha);
 }
 
 .textarea:disabled {
   background: var(--color-bg-tertiary);
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .textarea.error {
-  border-color: var(--color-error);
+  border-color: var(--color-con);
 }
 
 .textarea.error:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 4px var(--color-con-light);
 }
 
 .resize-none {
@@ -78,11 +85,13 @@
 }
 
 .errorText {
+  font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-error);
+  color: var(--color-con);
 }
 
 .helperText {
+  font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }

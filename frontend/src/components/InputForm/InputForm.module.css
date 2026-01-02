@@ -1,49 +1,107 @@
+/* InputForm styles - Editorial Courtroom Theme */
+
 .inputForm {
-  max-width: 720px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: var(--spacing-xl);
+  padding: var(--spacing-2xl) var(--spacing-xl);
+  animation: fadeIn 0.6s var(--ease-out-expo);
 }
 
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dramatic header section */
 .header {
   margin-bottom: var(--spacing-2xl);
   text-align: center;
+  position: relative;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: var(--color-accent);
 }
 
 .title {
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-display);
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-sm) 0;
+  margin: 0 0 var(--spacing-md) 0;
   line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .description {
+  font-family: var(--font-serif);
   font-size: var(--font-size-lg);
   color: var(--color-text-secondary);
   margin: 0;
-  line-height: var(--line-height-normal);
+  line-height: var(--line-height-relaxed);
+  font-style: italic;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
+/* Form fields */
 .field {
   margin-bottom: var(--spacing-xl);
+  animation: slideUp 0.5s var(--ease-out-expo);
+  animation-fill-mode: backwards;
+}
+
+.field:nth-child(1) { animation-delay: 0.1s; }
+.field:nth-child(2) { animation-delay: 0.15s; }
+.field:nth-child(3) { animation-delay: 0.2s; }
+.field:nth-child(4) { animation-delay: 0.25s; }
+.field:nth-child(5) { animation-delay: 0.3s; }
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .label {
   display: block;
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
   margin-bottom: var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .required {
-  color: var(--color-error);
+  color: var(--color-con);
 }
 
 .optional {
   font-weight: var(--font-weight-normal);
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: lowercase;
+  letter-spacing: normal;
 }
 
 .fieldMeta {
@@ -55,19 +113,37 @@
 
 .addContextButton,
 .removeContextButton {
+  font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-primary);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent-dark);
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-  transition: color var(--transition-fast);
+  padding: var(--spacing-xs) 0;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.addContextButton::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--color-accent);
+  transition: width var(--transition-base);
+}
+
+.addContextButton:hover::after {
+  width: 100%;
 }
 
 .addContextButton:hover,
 .removeContextButton:hover {
-  color: var(--color-primary-hover);
+  color: var(--color-accent);
 }
 
 .removeContextButton {
@@ -75,24 +151,47 @@
 }
 
 .removeContextButton:hover {
-  color: var(--color-text-secondary);
+  color: var(--color-con);
 }
 
-/* Flow Mode Selector */
+/* ═══════════════════════════════════════════════════════════════
+   Flow Mode Selector - Editorial Cards
+   ═══════════════════════════════════════════════════════════════ */
+
 .flowModeSelector {
   margin-bottom: var(--spacing-xl);
-  padding: var(--spacing-md);
+  padding: var(--spacing-lg);
   background: var(--color-bg-secondary);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
+  position: relative;
+}
+
+.flowModeSelector::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--spacing-lg);
+  right: var(--spacing-lg);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-border) 30%,
+    var(--color-border) 70%,
+    transparent 100%
+  );
 }
 
 .flowModeLabel {
   display: block;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-sm);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--spacing-md);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .flowModeOptions {
@@ -105,27 +204,49 @@
   display: flex;
   align-items: flex-start;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background: var(--color-bg-primary);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg-elevated);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.flowModeOption::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--color-accent);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
 
 .flowModeOption:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-tertiary);
+  border-color: var(--color-border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .flowModeOption.flowModeActive {
   border-color: var(--color-primary);
-  background: var(--color-primary-bg);
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.flowModeOption.flowModeActive::before {
+  opacity: 1;
 }
 
 .flowModeOption input[type="radio"] {
-  margin-top: 2px;
+  margin-top: 3px;
   accent-color: var(--color-primary);
+  width: 16px;
+  height: 16px;
 }
 
 .flowModeText {
@@ -135,21 +256,26 @@
 }
 
 .flowModeText strong {
+  font-family: var(--font-sans);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
 .flowModeText small {
+  font-family: var(--font-serif);
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
   line-height: var(--line-height-normal);
 }
 
-/* Participation Mode Selector */
+/* ═══════════════════════════════════════════════════════════════
+   Participation Mode Selector - Dramatic Choices
+   ═══════════════════════════════════════════════════════════════ */
+
 .participationModeSelector {
   margin-bottom: var(--spacing-xl);
-  padding: var(--spacing-md);
+  padding: var(--spacing-lg);
   background: var(--color-bg-secondary);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
@@ -157,10 +283,13 @@
 
 .participationModeLabel {
   display: block;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--spacing-sm);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--spacing-md);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .participationModeOptions {
@@ -173,27 +302,51 @@
   display: flex;
   align-items: flex-start;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background: var(--color-bg-primary);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg-elevated);
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-base);
+  position: relative;
+}
+
+/* Pro option styling */
+.participationModeOption:nth-child(2) .participationModeText strong {
+  color: var(--color-pro);
+}
+
+.participationModeOption:nth-child(2).participationModeActive {
+  border-color: var(--color-pro);
+  background: var(--color-pro-bg);
+}
+
+/* Con option styling */
+.participationModeOption:nth-child(3) .participationModeText strong {
+  color: var(--color-con);
+}
+
+.participationModeOption:nth-child(3).participationModeActive {
+  border-color: var(--color-con);
+  background: var(--color-con-bg);
 }
 
 .participationModeOption:hover {
-  border-color: var(--color-primary);
-  background: var(--color-bg-tertiary);
+  border-color: var(--color-border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .participationModeOption.participationModeActive {
   border-color: var(--color-primary);
-  background: var(--color-primary-bg);
+  box-shadow: var(--shadow-lg);
 }
 
 .participationModeOption input[type="radio"] {
-  margin-top: 2px;
+  margin-top: 3px;
   accent-color: var(--color-primary);
+  width: 16px;
+  height: 16px;
 }
 
 .participationModeText {
@@ -203,47 +356,79 @@
 }
 
 .participationModeText strong {
+  font-family: var(--font-sans);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
 }
 
 .participationModeText small {
+  font-family: var(--font-serif);
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
   line-height: var(--line-height-normal);
 }
 
+/* API Error */
 .apiError {
   margin-bottom: var(--spacing-lg);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Submit Button - Dramatic CTA
+   ═══════════════════════════════════════════════════════════════ */
+
 .actions {
   margin-top: var(--spacing-2xl);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 .submitButton {
-  min-width: 200px;
+  min-width: 240px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative elements around submit */
+.actions::before,
+.actions::after {
+  content: '';
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-border), transparent);
+}
+
+.actions::after {
+  background: linear-gradient(90deg, transparent, var(--color-border));
 }
 
 .loadingMessage {
   margin-top: var(--spacing-lg);
   text-align: center;
+  font-family: var(--font-serif);
+  font-style: italic;
   color: var(--color-text-secondary);
 }
 
 .loadingSubtext {
   margin-top: var(--spacing-xs);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
 }
 
-/* Responsive */
+/* ═══════════════════════════════════════════════════════════════
+   Responsive Design
+   ═══════════════════════════════════════════════════════════════ */
+
 @media (max-width: 768px) {
   .inputForm {
-    padding: var(--spacing-md);
+    padding: var(--spacing-lg) var(--spacing-md);
   }
 
   .title {
@@ -264,5 +449,11 @@
 
   .submitButton {
     width: 100%;
+    min-width: unset;
+  }
+
+  .actions::before,
+  .actions::after {
+    display: none;
   }
 }

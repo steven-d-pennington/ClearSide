@@ -1,31 +1,40 @@
 /**
  * DebateModeSelector Component
  *
- * Allows users to choose between turn-based and lively debate modes.
+ * Allows users to choose between turn-based, lively, and informal discussion modes.
  * Also provides lively mode settings when lively is selected.
  */
 
 import React, { useState, useEffect } from 'react';
 import type { DebateMode, PacingMode, LivelySettingsInput, LivelyPreset } from '../../types/lively';
 import { PACING_INFO, AGGRESSION_INFO } from '../../types/lively';
+import type { InformalSettingsInput } from '../../types/informal';
 import { useDebateStore } from '../../stores/debate-store';
 import styles from './DebateModeSelector.module.css';
 
 interface DebateModeSelectorProps {
   mode: DebateMode;
   settings: LivelySettingsInput;
+  informalSettings?: InformalSettingsInput;
   onModeChange: (mode: DebateMode) => void;
   onSettingsChange: (settings: LivelySettingsInput) => void;
+  onInformalSettingsChange?: (settings: InformalSettingsInput) => void;
   disabled?: boolean;
 }
 
 export const DebateModeSelector: React.FC<DebateModeSelectorProps> = ({
   mode,
   settings,
+  informalSettings: _informalSettings,
   onModeChange,
   onSettingsChange,
+  onInformalSettingsChange: _onInformalSettingsChange,
   disabled = false,
 }) => {
+  // Note: informalSettings and onInformalSettingsChange are passed through props
+  // but the actual settings UI is rendered by InformalSettings component in InputForm
+  void _informalSettings;
+  void _onInformalSettingsChange;
   const [presets, setPresets] = useState<LivelyPreset[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { fetchLivelyPresets } = useDebateStore();
@@ -86,6 +95,27 @@ export const DebateModeSelector: React.FC<DebateModeSelectorProps> = ({
                 <small>Dynamic debate with interruptions and cross-talk</small>
               </div>
               <span className={styles.betaBadge}>Beta</span>
+            </div>
+          </label>
+
+          <label
+            className={`${styles.modeOption} ${mode === 'informal' ? styles.active : ''}`}
+          >
+            <input
+              type="radio"
+              name="debateMode"
+              value="informal"
+              checked={mode === 'informal'}
+              onChange={() => onModeChange('informal')}
+              disabled={disabled}
+            />
+            <div className={styles.modeContent}>
+              <span className={styles.modeIcon}>💬</span>
+              <div className={styles.modeText}>
+                <strong>Informal Discussion</strong>
+                <small>Freeform conversation between multiple AI models</small>
+              </div>
+              <span className={styles.betaBadge}>New</span>
             </div>
           </label>
         </div>
@@ -237,6 +267,25 @@ export const DebateModeSelector: React.FC<DebateModeSelectorProps> = ({
               <strong>What is Lively Arena?</strong> AI agents can interrupt each other
               with short interjections, creating a dynamic panel discussion feel.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Informal mode info */}
+      {mode === 'informal' && (
+        <div className={styles.livelySettings}>
+          <div className={styles.livelyInfo}>
+            <p>
+              <strong>What is Informal Discussion?</strong> Multiple AI models have a
+              freeform conversation about a topic without debate structure. Each model
+              brings its own perspective and the discussion flows naturally.
+            </p>
+            <ul className={styles.informalFeatures}>
+              <li>2-4 AI participants with different models</li>
+              <li>No Pro/Con roles - just open discussion</li>
+              <li>Intelligent end detection when topic is exhausted</li>
+              <li>Auto-generated summary at the end</li>
+            </ul>
           </div>
         </div>
       )}

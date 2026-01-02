@@ -424,7 +424,7 @@ interface DebateTurn {
 
 **Priority:** P2
 **Complexity:** Medium
-**Status:** Planned
+**Status:** IMPLEMENTED
 
 A freeform discussion mode where multiple AI models converse about a topic without structured debate roles or phases.
 
@@ -527,6 +527,27 @@ interface InformalDiscussionConfig {
 - Could use **Chain of Thought** display for transparency
 - **Human Participation** could join as one of the discussants
 
+### Implementation Notes (2026-01-01)
+
+**Backend (Already Complete):**
+- `InformalOrchestrator` (791 lines) in `backend/src/services/debate/informal-orchestrator.ts`
+- `EndDetector` for AI-based end detection in `backend/src/services/debate/end-detector.ts`
+- Database schema in migration `009_add_informal_discussion.sql`
+- `InformalRepository` for persistence in `backend/src/db/repositories/informal-repository.ts`
+- Types in `backend/src/types/informal.ts`
+
+**Frontend (Now Complete):**
+- `DebateMode` type updated to include `'informal'` in `frontend/src/types/lively.ts`
+- `InformalSettingsInput` types in `frontend/src/types/informal.ts`
+- `DebateModeSelector` now shows "Informal Discussion" option with description
+- `InformalSettings` component for participant configuration (2-4 participants, model selection, personas)
+- `InputForm` hides irrelevant controls (Participation Mode, Model Selector, Persona Selector) when informal mode is selected
+- Button text changes to "Start Discussion" for informal mode
+
+**API Integration:**
+- `debate-store.ts` sends `informalSettings` when `debateMode === 'informal'`
+- `debate-routes.ts` accepts `informalSettings` and starts `InformalOrchestrator`
+
 ---
 
 ## Future Considerations
@@ -558,4 +579,4 @@ interface InformalDiscussionConfig {
 
 ---
 
-*Last Updated: 2025-12-31*
+*Last Updated: 2026-01-01*

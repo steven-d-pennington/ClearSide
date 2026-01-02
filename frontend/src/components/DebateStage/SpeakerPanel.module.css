@@ -1,70 +1,81 @@
 /**
- * SpeakerPanel Styles
+ * SpeakerPanel Styles - Editorial Courtroom Theme
  *
- * Individual speaker cards for the multi-panel debate stage
+ * Individual advocate cards - where arguments are forged
  */
 
 .panel {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background-color: var(--color-bg-secondary, #f9fafb);
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-border);
+  transition: all var(--transition-base);
   overflow: hidden;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--color-border);
+  transition: background var(--transition-base);
 }
 
 .panel:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 /* Size variants */
 .sm {
-  padding: 0.75rem;
+  padding: var(--spacing-md);
 }
 
 .sm .header {
-  gap: 0.5rem;
+  gap: var(--spacing-sm);
 }
 
 .sm .avatar {
   width: 2rem;
   height: 2rem;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
 }
 
 .sm .name {
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
 }
 
 .sm .content {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   max-height: 60px;
 }
 
 .md {
-  padding: 1rem;
+  padding: var(--spacing-lg);
 }
 
 .lg {
-  padding: 1.5rem;
+  padding: var(--spacing-xl);
 }
 
 .lg .header {
-  gap: 1rem;
+  gap: var(--spacing-md);
 }
 
 .lg .avatar {
   width: 3.5rem;
   height: 3.5rem;
-  font-size: 1.25rem;
+  font-size: var(--font-size-lg);
 }
 
 .lg .name {
-  font-size: 1.125rem;
+  font-size: var(--font-size-lg);
 }
 
 .lg .content {
@@ -75,48 +86,54 @@
 .header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
 }
 
 .avatar {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  color: white;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-inverse);
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
 .info {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 2px;
   min-width: 0;
 }
 
 .name {
-  font-size: 1rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .modelBadge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.65rem;
-  font-weight: 500;
-  color: var(--color-text-secondary, #6b7280);
-  background-color: var(--color-bg-tertiary, #f3f4f6);
-  border-radius: 9999px;
+  gap: var(--spacing-xs);
+  padding: 2px var(--spacing-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -129,9 +146,10 @@
   min-height: 40px;
   max-height: 120px;
   overflow-y: auto;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--color-text-secondary, #4b5563);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-secondary);
 }
 
 .text {
@@ -140,32 +158,35 @@
 }
 
 .markdown {
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--color-text-secondary, #4b5563);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-secondary);
 }
 
 .markdown p {
-  margin: 0.25rem 0;
+  margin: var(--spacing-xs) 0;
 }
 
 .markdown h2,
 .markdown h3,
 .markdown h4 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin: 0.5rem 0 0.25rem;
-  color: var(--color-text-primary, #111827);
+  font-family: var(--font-display);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  margin: var(--spacing-sm) 0 var(--spacing-xs);
+  color: var(--color-text-primary);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .markdown ul,
 .markdown ol {
-  margin: 0.25rem 0;
-  padding-left: 1.25rem;
+  margin: var(--spacing-xs) 0;
+  padding-left: var(--spacing-lg);
 }
 
 .markdown li {
-  margin: 0.125rem 0;
+  margin: 2px 0;
 }
 
 /* Collapsible content */
@@ -180,7 +201,7 @@
   overflow: hidden;
 }
 
-/* Expanded state for collapsible content - no max-height limit */
+/* Expanded state */
 .expanded {
   max-height: 400px;
   overflow-y: auto;
@@ -189,26 +210,30 @@
 .expandToggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--color-text-secondary, #6b7280);
-  background: var(--color-bg-tertiary, #f3f4f6);
-  border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 0.375rem;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
 }
 
 .expandToggle:hover {
-  background: var(--color-bg-secondary, #e5e7eb);
-  color: var(--color-text-primary, #111827);
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-hover);
 }
 
 .chevron {
-  transition: transform 0.2s ease;
+  transition: transform var(--transition-fast);
 }
 
 .chevronUp {
@@ -217,60 +242,94 @@
 
 .cursor {
   animation: blink 1s ease-in-out infinite;
-  color: var(--color-primary, #3b82f6);
+  color: var(--color-accent);
   font-weight: bold;
 }
 
-/* Speaker-specific colors */
+/* ═══════════════════════════════════════════════════════════════
+   Speaker-specific colors - The Advocates
+   ═══════════════════════════════════════════════════════════════ */
+
 .pro {
-  border-color: rgba(34, 197, 94, 0.3);
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.05), rgba(34, 197, 94, 0.1));
+  border-color: var(--color-pro-light);
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-elevated) 0%,
+    var(--color-pro-bg) 100%
+  );
+}
+
+.pro::before {
+  background: var(--color-pro);
 }
 
 .pro .avatar {
-  background-color: rgb(34, 197, 94);
+  background: var(--color-pro);
+  box-shadow: var(--shadow-pro);
 }
 
 .pro.active {
-  border-color: rgb(34, 197, 94);
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  border-color: var(--color-pro);
+  box-shadow: 0 0 24px rgba(45, 106, 79, 0.25);
 }
 
 .con {
-  border-color: rgba(239, 68, 68, 0.3);
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(239, 68, 68, 0.1));
+  border-color: var(--color-con-light);
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-elevated) 0%,
+    var(--color-con-bg) 100%
+  );
+}
+
+.con::before {
+  background: var(--color-con);
 }
 
 .con .avatar {
-  background-color: rgb(239, 68, 68);
+  background: var(--color-con);
+  box-shadow: var(--shadow-con);
 }
 
 .con.active {
-  border-color: rgb(239, 68, 68);
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  border-color: var(--color-con);
+  box-shadow: 0 0 24px rgba(158, 42, 43, 0.25);
 }
 
 .moderator {
-  border-color: rgba(99, 102, 241, 0.3);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(99, 102, 241, 0.1));
+  border-color: var(--color-moderator-light);
+  background: linear-gradient(
+    135deg,
+    var(--color-bg-elevated) 0%,
+    var(--color-moderator-bg) 100%
+  );
+}
+
+.moderator::before {
+  background: var(--color-moderator);
 }
 
 .moderator .avatar {
-  background-color: rgb(99, 102, 241);
+  background: var(--color-moderator);
+  box-shadow: 0 4px 16px rgba(92, 77, 125, 0.3);
 }
 
 .moderator.active {
-  border-color: rgb(99, 102, 241);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  border-color: var(--color-moderator);
+  box-shadow: 0 0 24px rgba(92, 77, 125, 0.25);
 }
 
 .system {
-  border-color: rgba(156, 163, 175, 0.3);
-  background-color: rgba(156, 163, 175, 0.1);
+  border-color: var(--color-border);
+  background: var(--color-bg-tertiary);
+}
+
+.system::before {
+  background: var(--color-text-muted);
 }
 
 .system .avatar {
-  background-color: rgb(156, 163, 175);
+  background: var(--color-text-muted);
 }
 
 /* Active indicator */
@@ -281,7 +340,7 @@
 .activeRing {
   position: absolute;
   inset: -4px;
-  border-radius: 1rem;
+  border-radius: var(--radius-lg);
   border: 2px solid currentColor;
   opacity: 0.5;
   animation: ringPulse 2s ease-in-out infinite;
@@ -289,15 +348,15 @@
 }
 
 .pro .activeRing {
-  border-color: rgb(34, 197, 94);
+  border-color: var(--color-pro);
 }
 
 .con .activeRing {
-  border-color: rgb(239, 68, 68);
+  border-color: var(--color-con);
 }
 
 .moderator .activeRing {
-  border-color: rgb(99, 102, 241);
+  border-color: var(--color-moderator);
 }
 
 /* Animations */
@@ -321,48 +380,48 @@
   }
 }
 
-/* =====================================
-   LIVELY MODE STATES
-   ===================================== */
+/* ═══════════════════════════════════════════════════════════════
+   LIVELY MODE STATES - High Drama
+   ═══════════════════════════════════════════════════════════════ */
 
 /* Queued state - speaker about to interrupt */
 .queued {
   animation: queuedPulse 0.8s ease-in-out infinite;
 }
 
-.queued::before {
+.queued::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-md);
   background: linear-gradient(
     45deg,
     transparent 30%,
-    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.2) 50%,
     transparent 70%
   );
   animation: queuedShimmer 1.5s ease-in-out infinite;
 }
 
 .pro.queued {
-  box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
-  border-color: rgb(34, 197, 94);
+  box-shadow: 0 0 32px rgba(45, 106, 79, 0.4);
+  border-color: var(--color-pro);
 }
 
 .con.queued {
-  box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
-  border-color: rgb(239, 68, 68);
+  box-shadow: 0 0 32px rgba(158, 42, 43, 0.4);
+  border-color: var(--color-con);
 }
 
 .moderator.queued {
-  box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
-  border-color: rgb(99, 102, 241);
+  box-shadow: 0 0 32px rgba(92, 77, 125, 0.4);
+  border-color: var(--color-moderator);
 }
 
 /* Cooldown state - speaker can't interrupt yet */
 .cooldown {
   opacity: 0.6;
-  filter: grayscale(30%);
+  filter: grayscale(20%);
 }
 
 .cooldown .avatar {
@@ -373,22 +432,22 @@
   content: '';
   position: absolute;
   inset: -3px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   border: 2px dashed currentColor;
   opacity: 0.5;
   animation: cooldownSpin 4s linear infinite;
 }
 
 .pro.cooldown .avatar::after {
-  border-color: rgb(34, 197, 94);
+  border-color: var(--color-pro);
 }
 
 .con.cooldown .avatar::after {
-  border-color: rgb(239, 68, 68);
+  border-color: var(--color-con);
 }
 
 .moderator.cooldown .avatar::after {
-  border-color: rgb(99, 102, 241);
+  border-color: var(--color-moderator);
 }
 
 /* Interjecting state - speaker delivering interjection */
@@ -398,24 +457,24 @@
 }
 
 .pro.interjecting {
-  border-color: rgb(34, 197, 94);
+  border-color: var(--color-pro);
   box-shadow:
-    0 0 20px rgba(34, 197, 94, 0.5),
-    inset 0 0 30px rgba(34, 197, 94, 0.1);
+    0 0 24px rgba(45, 106, 79, 0.5),
+    inset 0 0 32px rgba(45, 106, 79, 0.1);
 }
 
 .con.interjecting {
-  border-color: rgb(239, 68, 68);
+  border-color: var(--color-con);
   box-shadow:
-    0 0 20px rgba(239, 68, 68, 0.5),
-    inset 0 0 30px rgba(239, 68, 68, 0.1);
+    0 0 24px rgba(158, 42, 43, 0.5),
+    inset 0 0 32px rgba(158, 42, 43, 0.1);
 }
 
 .moderator.interjecting {
-  border-color: rgb(99, 102, 241);
+  border-color: var(--color-moderator);
   box-shadow:
-    0 0 20px rgba(99, 102, 241, 0.5),
-    inset 0 0 30px rgba(99, 102, 241, 0.1);
+    0 0 24px rgba(92, 77, 125, 0.5),
+    inset 0 0 32px rgba(92, 77, 125, 0.1);
 }
 
 /* Cutoff state - speaker was interrupted */
@@ -445,18 +504,18 @@
 .ready::after {
   content: '';
   position: absolute;
-  bottom: 8px;
-  right: 8px;
+  bottom: var(--spacing-sm);
+  right: var(--spacing-sm);
   width: 8px;
   height: 8px;
-  border-radius: 50%;
-  background-color: rgb(34, 197, 94);
+  border-radius: var(--radius-full);
+  background: var(--color-pro);
   animation: readyPulse 2s ease-in-out infinite;
 }
 
-/* =====================================
+/* ═══════════════════════════════════════════════════════════════
    ADDITIONAL ANIMATIONS
-   ===================================== */
+   ═══════════════════════════════════════════════════════════════ */
 
 @keyframes queuedPulse {
   0%, 100% {
@@ -540,9 +599,9 @@
   }
 }
 
-/* =====================================
+/* ═══════════════════════════════════════════════════════════════
    SCROLLBAR STYLING
-   ===================================== */
+   ═══════════════════════════════════════════════════════════════ */
 
 .content::-webkit-scrollbar {
   width: 4px;
@@ -553,16 +612,20 @@
 }
 
 .content::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
 }
 
-/* =====================================
+.content::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════
    RESPONSIVE
-   ===================================== */
+   ═══════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
-  .queued::before {
+  .queued::after {
     display: none;
   }
 

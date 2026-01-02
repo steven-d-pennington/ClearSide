@@ -1,7 +1,9 @@
+/* Input styles - Editorial Courtroom Theme */
+
 .wrapper {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-sm);
 }
 
 .fullWidth {
@@ -9,13 +11,16 @@
 }
 
 .label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wider);
 }
 
 .required {
-  color: var(--color-error);
+  color: var(--color-con);
   margin-left: 2px;
 }
 
@@ -27,18 +32,20 @@
 
 .input {
   width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  font-family: var(--font-sans);
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-family: var(--font-serif);
   font-size: var(--font-size-base);
   color: var(--color-text-primary);
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   transition: all var(--transition-base);
 }
 
 .input::placeholder {
-  color: var(--color-text-tertiary);
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--color-text-muted);
 }
 
 .input:hover:not(:disabled):not(:focus) {
@@ -48,29 +55,29 @@
 .input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+  box-shadow: 0 0 0 4px var(--color-primary-alpha);
 }
 
 .input:disabled {
   background: var(--color-bg-tertiary);
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .input.error {
-  border-color: var(--color-error);
+  border-color: var(--color-con);
 }
 
 .input.error:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  box-shadow: 0 0 0 4px var(--color-con-light);
 }
 
 .hasLeftIcon {
-  padding-left: 40px;
+  padding-left: 44px;
 }
 
 .hasRightIcon {
-  padding-right: 40px;
+  padding-right: 44px;
 }
 
 .leftIcon,
@@ -79,24 +86,33 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-muted);
   pointer-events: none;
+  transition: color var(--transition-fast);
 }
 
 .leftIcon {
-  left: var(--spacing-md);
+  left: var(--spacing-lg);
 }
 
 .rightIcon {
-  right: var(--spacing-md);
+  right: var(--spacing-lg);
+}
+
+/* Icon color changes on focus */
+.inputWrapper:focus-within .leftIcon,
+.inputWrapper:focus-within .rightIcon {
+  color: var(--color-primary);
 }
 
 .errorText {
+  font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-error);
+  color: var(--color-con);
 }
 
 .helperText {
+  font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
 }

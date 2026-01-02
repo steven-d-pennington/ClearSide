@@ -9,18 +9,20 @@ import { Card, CardFooter, Button } from '../components/ui';
 import { InputForm } from '../components/InputForm';
 import { DebateStream } from '../components/DebateStream';
 import { DebateStage } from '../components/DebateStage/DebateStage';
-import { useDebateStore, selectIsLivelyMode } from '../stores/debate-store';
+import { useDebateStore, selectIsLivelyMode, selectIsInformalMode } from '../stores/debate-store';
 import styles from './HomePage.module.css';
 
 export function HomePage() {
   const debate = useDebateStore((state) => state.debate);
   const isLivelyMode = useDebateStore(selectIsLivelyMode);
+  const isInformalMode = useDebateStore(selectIsInformalMode);
 
   // If a debate is active, show the appropriate view
+  // DebateStage handles both lively mode and informal discussion mode
   if (debate) {
     return (
       <div className={styles.container}>
-        {isLivelyMode ? <DebateStage /> : <DebateStream />}
+        {(isLivelyMode || isInformalMode) ? <DebateStage /> : <DebateStream />}
       </div>
     );
   }

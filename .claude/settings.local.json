@@ -2,7 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Complete task management system with 45 individual task files\n\nAdded comprehensive task file system for agent-ready, independent work:\n\n## What''s New\n- 45 individual task files \\(~175,000 words, ~24,000 lines of code\\)\n- Complete Phase 1 tasks \\(29 files\\): Infrastructure, Core, Agents, UI, Testing\n- Complete Phase 2 tasks \\(16 files\\): Text/Audio/Video Export, Queue, Storage, UI\n- Updated KANBAN.md v3.0.0 with direct task file links\n- Created task directory navigation guide \\(tasks/README.md\\)\n- Added comprehensive summary report \\(TASK_SYSTEM_COMPLETE.md\\)\n\n## Documentation Updates\n- Updated ROADMAP.md to v0.2.0 with live debate architecture\n- Updated REQUIREMENTS.md to v2.0.0 with live debate features\n- Updated Product Vision to v2.0.0 emphasizing live debate theater\n- Added 3 new architecture specs:\n  * docs/08_live-debate-protocol.md - Custom 6-phase debate format\n  * docs/09_real-time-architecture.md - SSE, state machine, database\n  * docs/10_media-production.md - TTS/audio/video export pipeline\n\n## Task File Features\nEach file includes:\n- Full context and implementation guide\n- 3,000-5,000 words of detailed guidance\n- 500-1,500 lines of TypeScript/React code examples\n- Complete test suites \\(Jest, Playwright\\)\n- Clear dependencies and validation steps\n- References to requirements and architecture docs\n\n## Impact\n- Agents can grab tasks and execute independently\n- No context bloat - everything needed in each file\n- Parallel execution - multiple agents can work simultaneously\n- Production-ready - can start Sprint 1 immediately\n- 12-week development timeline fully planned\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+
       "Bash(git push)",
       "Bash(npm install)",
       "Bash(git commit:*)",
@@ -14,7 +14,6 @@
       "Bash(cat:*)",
       "Bash(docker-compose logs:*)",
       "Bash(docker-compose restart:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat\\(reasoning\\): add extended thinking support for OpenRouter models\n\n- Add ReasoningConfig type with effort levels \\(xhigh, high, medium, low, minimal, none\\)\n- Update OpenRouterLLMClient to pass reasoning parameter in API requests\n- Add reasoning model detection based on known model patterns\n- Sort models alphabetically by provider then name\n- Show 🧠 indicator for models that support extended thinking\n- Add supportsReasoning field to model API responses\n\nThis enables deeper, more thorough responses from models that support\nextended thinking/reasoning tokens.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(docker logs:*)",
       "Bash(docker compose:*)",
       "Bash(docker exec:*)",
@@ -30,11 +29,6 @@
       "Bash(Get-Content:*)",
       "Bash(Select-String -Pattern \"retry|empty response|contentLength:0|retrying\" -CaseSensitive:$false)",
       "Bash(powershell -Command:*)",
-      "Bash(cmd /c \"powershell -Command \"\"Get-Content ''c:\\\\projects\\\\ClearSide\\\\backend\\\\logs\\\\combined.log'' -Tail 1000 | Select-String -Pattern ''retry|retrying|contentLength:0|d402bd87''\"\"\")",
-      "Bash(cmd /c \"powershell -Command \"\"Get-ChildItem ''c:\\\\projects\\\\ClearSide\\\\backend\\\\logs\\\\'' | Select-Object Name, Length, LastWriteTime\"\"\")",
-      "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\backend && npm run build\")",
-      "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\backend && npm run build 2>&1\")",
-      "Bash(cmd /c \"cd /d c:\\\\projects\\\\ClearSide\\\\frontend && npm run build 2>&1\")",
       "Bash(find:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run docker:logs:*)",

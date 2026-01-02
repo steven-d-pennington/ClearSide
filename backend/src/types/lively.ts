@@ -8,7 +8,7 @@ import { Speaker } from './debate.js';
 /**
  * Debate mode selection
  */
-export type DebateMode = 'turn_based' | 'lively';
+export type DebateMode = 'turn_based' | 'lively' | 'informal';
 
 /**
  * Pacing mode for lively debates

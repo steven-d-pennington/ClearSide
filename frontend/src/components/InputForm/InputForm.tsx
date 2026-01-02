@@ -9,11 +9,14 @@ import { ConfigPanel } from '../ConfigPanel/ConfigPanel';
 import { ModelSelector } from '../ConfigPanel/ModelSelector';
 import { PersonaSelector } from './PersonaSelector';
 import { DebateModeSelector } from './DebateModeSelector';
+import { InformalSettings } from './InformalSettings';
 import type { FlowMode, HumanParticipation, HumanSide } from '../../types/debate';
 import type { DebateConfiguration, PersonaSelection, ModelSelection } from '../../types/configuration';
 import { DEFAULT_CONFIGURATION, DEFAULT_PERSONA_SELECTION, DEFAULT_MODEL_SELECTION } from '../../types/configuration';
 import type { DebateMode, LivelySettingsInput } from '../../types/lively';
 import { DEFAULT_LIVELY_SETTINGS } from '../../types/lively';
+import type { InformalSettingsInput } from '../../types/informal';
+import { DEFAULT_INFORMAL_SETTINGS } from '../../types/informal';
 import styles from './InputForm.module.css';
 
 interface InputFormProps {
@@ -36,6 +39,7 @@ interface FormState {
   modelSelection: ModelSelection;
   debateMode: DebateMode;
   livelySettings: LivelySettingsInput;
+  informalSettings: InformalSettingsInput;
   participationMode: ParticipationMode;
 }
 
@@ -59,6 +63,7 @@ export const InputForm: React.FC<InputFormProps> = ({
     modelSelection: DEFAULT_MODEL_SELECTION,
     debateMode: 'turn_based',
     livelySettings: DEFAULT_LIVELY_SETTINGS,
+    informalSettings: DEFAULT_INFORMAL_SETTINGS,
     participationMode: 'watch',
   });
 
@@ -163,6 +168,13 @@ export const InputForm: React.FC<InputFormProps> = ({
   }, []);
 
   /**
+   * Handle informal settings change
+   */
+  const handleInformalSettingsChange = useCallback((settings: InformalSettingsInput) => {
+    setFormState((prev) => ({ ...prev, informalSettings: settings }));
+  }, []);
+
+  /**
    * Handle paste event - suggest context field for long pastes
    */
   const handleQuestionPaste = useCallback(
@@ -225,7 +237,7 @@ export const InputForm: React.FC<InputFormProps> = ({
         console.log('🔵 Configuration:', formState.configuration);
 
         // Build start options including configuration, personas, model selection, and debate mode
-        const { configuration, personaSelection, modelSelection, debateMode, livelySettings, participationMode } = formState;
+        const { configuration, personaSelection, modelSelection, debateMode, livelySettings, informalSettings, participationMode } = formState;
 
         // Build human participation config
         const humanParticipation: HumanParticipation | undefined =
@@ -259,6 +271,7 @@ export const InputForm: React.FC<InputFormProps> = ({
           reasoningEffort: modelSelection.reasoningEffort,
           debateMode,
           livelySettings: debateMode === 'lively' ? livelySettings : undefined,
+          informalSettings: debateMode === 'informal' ? informalSettings : undefined,
           // Human participation
           humanParticipation,
         });
@@ -279,8 +292,11 @@ export const InputForm: React.FC<InputFormProps> = ({
   /**
    * Determine if submit button should be disabled
    */
+  const isInformalInvalid = formState.debateMode === 'informal' &&
+    formState.informalSettings.participants.some((p) => !p.modelId);
+
   const isSubmitDisabled =
-    isLoading || !formState.question.trim() || Object.keys(errors).length > 0;
+    isLoading || !formState.question.trim() || Object.keys(errors).length > 0 || isInformalInvalid;
 
   return (
     <form
@@ -369,59 +385,72 @@ export const InputForm: React.FC<InputFormProps> = ({
       <DebateModeSelector
         mode={formState.debateMode}
         settings={formState.livelySettings}
+        informalSettings={formState.informalSettings}
         onModeChange={handleDebateModeChange}
         onSettingsChange={handleLivelySettingsChange}
+        onInformalSettingsChange={handleInformalSettingsChange}
         disabled={isLoading}
       />
 
-      {/* Participation Mode Selector */}
-      <div className={styles.participationModeSelector}>
-        <span className={styles.participationModeLabel}>Participation:</span>
-        <div className={styles.participationModeOptions}>
-          <label className={`${styles.participationModeOption} ${formState.participationMode === 'watch' ? styles.participationModeActive : ''}`}>
-            <input
-              type="radio"
-              name="participationMode"
-              value="watch"
-              checked={formState.participationMode === 'watch'}
-              onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'watch' }))}
-              disabled={isLoading}
-            />
-            <span className={styles.participationModeText}>
-              <strong>Watch</strong>
-              <small>Watch AI debate both sides</small>
-            </span>
-          </label>
-          <label className={`${styles.participationModeOption} ${formState.participationMode === 'pro' ? styles.participationModeActive : ''}`}>
-            <input
-              type="radio"
-              name="participationMode"
-              value="pro"
-              checked={formState.participationMode === 'pro'}
-              onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'pro' }))}
-              disabled={isLoading}
-            />
-            <span className={styles.participationModeText}>
-              <strong>Argue Pro</strong>
-              <small>Argue for the proposition</small>
-            </span>
-          </label>
-          <label className={`${styles.participationModeOption} ${formState.participationMode === 'con' ? styles.participationModeActive : ''}`}>
-            <input
-              type="radio"
-              name="participationMode"
-              value="con"
-              checked={formState.participationMode === 'con'}
-              onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'con' }))}
-              disabled={isLoading}
-            />
-            <span className={styles.participationModeText}>
-              <strong>Argue Con</strong>
-              <small>Argue against the proposition</small>
-            </span>
-          </label>
+      {/* Informal Settings (participant configuration) */}
+      {formState.debateMode === 'informal' && (
+        <InformalSettings
+          settings={formState.informalSettings}
+          onChange={handleInformalSettingsChange}
+          disabled={isLoading}
+        />
+      )}
+
+      {/* Participation Mode Selector (not for informal mode) */}
+      {formState.debateMode !== 'informal' && (
+        <div className={styles.participationModeSelector}>
+          <span className={styles.participationModeLabel}>Participation:</span>
+          <div className={styles.participationModeOptions}>
+            <label className={`${styles.participationModeOption} ${formState.participationMode === 'watch' ? styles.participationModeActive : ''}`}>
+              <input
+                type="radio"
+                name="participationMode"
+                value="watch"
+                checked={formState.participationMode === 'watch'}
+                onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'watch' }))}
+                disabled={isLoading}
+              />
+              <span className={styles.participationModeText}>
+                <strong>Watch</strong>
+                <small>Watch AI debate both sides</small>
+              </span>
+            </label>
+            <label className={`${styles.participationModeOption} ${formState.participationMode === 'pro' ? styles.participationModeActive : ''}`}>
+              <input
+                type="radio"
+                name="participationMode"
+                value="pro"
+                checked={formState.participationMode === 'pro'}
+                onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'pro' }))}
+                disabled={isLoading}
+              />
+              <span className={styles.participationModeText}>
+                <strong>Argue Pro</strong>
+                <small>Argue for the proposition</small>
+              </span>
+            </label>
+            <label className={`${styles.participationModeOption} ${formState.participationMode === 'con' ? styles.participationModeActive : ''}`}>
+              <input
+                type="radio"
+                name="participationMode"
+                value="con"
+                checked={formState.participationMode === 'con'}
+                onChange={() => setFormState((prev) => ({ ...prev, participationMode: 'con' }))}
+                disabled={isLoading}
+              />
+              <span className={styles.participationModeText}>
+                <strong>Argue Con</strong>
+                <small>Argue against the proposition</small>
+              </span>
+            </label>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Flow Mode Selector (only for turn-based mode) */}
       {formState.debateMode === 'turn_based' && (
@@ -467,21 +496,25 @@ export const InputForm: React.FC<InputFormProps> = ({
         disabled={isLoading}
       />
 
-      {/* Model Selector (OpenRouter Integration) */}
-      <ModelSelector
-        selection={formState.modelSelection}
-        onChange={handleModelSelectionChange}
-        disabled={isLoading}
-        presetId={formState.configuration.presetMode}
-        humanSide={formState.participationMode !== 'watch' ? formState.participationMode : undefined}
-      />
+      {/* Model Selector (OpenRouter Integration) - not for informal mode */}
+      {formState.debateMode !== 'informal' && (
+        <ModelSelector
+          selection={formState.modelSelection}
+          onChange={handleModelSelectionChange}
+          disabled={isLoading}
+          presetId={formState.configuration.presetMode}
+          humanSide={formState.participationMode !== 'watch' ? formState.participationMode : undefined}
+        />
+      )}
 
-      {/* Persona Selector */}
-      <PersonaSelector
-        selection={formState.personaSelection}
-        onChange={handlePersonaChange}
-        disabled={isLoading}
-      />
+      {/* Persona Selector - not for informal mode */}
+      {formState.debateMode !== 'informal' && (
+        <PersonaSelector
+          selection={formState.personaSelection}
+          onChange={handlePersonaChange}
+          disabled={isLoading}
+        />
+      )}
 
       {/* API Error Display */}
       {apiError && (
@@ -500,14 +533,18 @@ export const InputForm: React.FC<InputFormProps> = ({
           loading={isLoading}
           className={styles.submitButton}
         >
-          Start Debate
+          {formState.debateMode === 'informal' ? 'Start Discussion' : 'Start Debate'}
         </Button>
       </div>
 
       {/* Loading State Message */}
       {isLoading && (
         <div className={styles.loadingMessage} role="status" aria-live="polite">
-          <p>Initializing debate and connecting to AI agents...</p>
+          <p>
+            {formState.debateMode === 'informal'
+              ? 'Initializing discussion and connecting to AI participants...'
+              : 'Initializing debate and connecting to AI agents...'}
+          </p>
           <p className={styles.loadingSubtext}>This may take a few seconds.</p>
         </div>
       )}

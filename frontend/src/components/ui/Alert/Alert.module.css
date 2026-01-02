@@ -1,35 +1,64 @@
+/* Alert styles - Editorial Courtroom Theme */
+
 .alert {
   display: flex;
   align-items: flex-start;
   gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-md);
   font-family: var(--font-sans);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative left accent bar */
+.alert::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: currentColor;
+  opacity: 0.6;
 }
 
 /* Variants */
 .info {
   background: var(--color-info-bg);
   color: var(--color-info);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
 .success {
   background: var(--color-success-bg);
   color: var(--color-success);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
 .warning {
   background: var(--color-warning-bg);
   color: var(--color-warning);
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.15);
 }
 
 .error {
   background: var(--color-error-bg);
   color: var(--color-error);
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+/* Debate-specific variants */
+.pro {
+  background: var(--color-pro-bg);
+  color: var(--color-pro);
+  border: 1px solid var(--color-pro-light);
+}
+
+.con {
+  background: var(--color-con-bg);
+  color: var(--color-con);
+  border: 1px solid var(--color-con-light);
 }
 
 .icon {
@@ -37,6 +66,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-top: 2px;
 }
 
 .content {
@@ -45,15 +75,18 @@
 }
 
 .title {
+  font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-base);
   margin-bottom: var(--spacing-xs);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .message {
+  font-family: var(--font-serif);
   font-size: var(--font-size-sm);
   color: var(--color-text-primary);
-  line-height: var(--line-height-normal);
+  line-height: var(--line-height-relaxed);
 }
 
 .closeButton {
@@ -67,15 +100,33 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: currentColor;
-  opacity: 0.6;
-  transition: opacity var(--transition-fast);
+  opacity: 0.5;
+  transition: all var(--transition-fast);
 }
 
 .closeButton:hover {
   opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .closeButton:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 2px;
+  opacity: 1;
+}
+
+/* Animation for alert appearance */
+.alert {
+  animation: alertSlideIn 0.4s var(--ease-out-expo);
+}
+
+@keyframes alertSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

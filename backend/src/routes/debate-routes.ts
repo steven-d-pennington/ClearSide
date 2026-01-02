@@ -30,6 +30,8 @@ import { getOpenRouterClient, createModelPairingService } from '../services/open
 // Orchestrator and dependencies
 import { DebateOrchestrator, DebateStateMachine, turnManager, orchestratorRegistry } from '../services/debate/index.js';
 import { createLivelyOrchestrator } from '../services/debate/lively-orchestrator.js';
+import { createInformalOrchestrator } from '../services/debate/informal-orchestrator.js';
+import type { CreateInformalDiscussionInput } from '../types/informal.js';
 import {
   ProAdvocateAgent,
   ConAdvocateAgent,
@@ -55,6 +57,7 @@ interface ConfigInput {
   conPersonaId?: unknown;
   debateMode?: unknown;
   livelySettings?: unknown;
+  informalSettings?: unknown;
   // Model selection
   modelSelectionMode?: unknown;
   proModelId?: unknown;
@@ -108,8 +111,8 @@ function validateConfigInput(config: ConfigInput): string[] {
   }
 
   // Debate mode validation
-  if (config.debateMode !== undefined && config.debateMode !== 'turn_based' && config.debateMode !== 'lively') {
-    errors.push(`Invalid debateMode: must be 'turn_based' or 'lively'`);
+  if (config.debateMode !== undefined && config.debateMode !== 'turn_based' && config.debateMode !== 'lively' && config.debateMode !== 'informal') {
+    errors.push(`Invalid debateMode: must be 'turn_based', 'lively', or 'informal'`);
   }
 
   // Lively settings validation (only validate structure if provided)
@@ -297,6 +300,7 @@ async function startDebateOrchestrator(
   flowMode: FlowMode = 'auto',
   debateMode: DebateMode = 'turn_based',
   livelySettings?: LivelySettingsInput,
+  informalSettings?: CreateInformalDiscussionInput,
   modelConfig?: DebateModelConfig,
   humanParticipation?: HumanParticipationConfig
 ): Promise<void> {
@@ -307,6 +311,7 @@ async function startDebateOrchestrator(
     debateMode,
     modelConfig,
     humanParticipation,
+    informalSettings: informalSettings ? { participantCount: informalSettings.participants?.length } : undefined,
   }, 'Starting debate orchestrator');
 
   try {
@@ -335,6 +340,43 @@ async function startDebateOrchestrator(
         clients.moderatorModelId ? { model: clients.moderatorModelId } : undefined
       ),
     };
+
+    // Check if informal mode is requested
+    if (debateMode === 'informal') {
+      if (!informalSettings) {
+        throw new Error('Informal mode requires informalSettings');
+      }
+
+      logger.info({ debateId, participantCount: informalSettings.participants.length }, 'Starting informal discussion mode');
+
+      // Create informal orchestrator
+      const informalOrchestrator = await createInformalOrchestrator(
+        debateId,
+        propositionText, // Topic
+        sseManager,
+        {
+          topicContext: informalSettings.topicContext,
+          participants: informalSettings.participants,
+          maxExchanges: informalSettings.maxExchanges,
+          endDetectionEnabled: informalSettings.endDetectionEnabled,
+          endDetectionInterval: informalSettings.endDetectionInterval,
+          endDetectionThreshold: informalSettings.endDetectionThreshold,
+        }
+      );
+
+      // Register orchestrator so it can be accessed for stop
+      orchestratorRegistry.register(debateId, informalOrchestrator);
+
+      try {
+        // Start informal discussion
+        await informalOrchestrator.start();
+        logger.info({ debateId }, 'Informal discussion completed successfully');
+      } finally {
+        // Always unregister when done (success or failure)
+        orchestratorRegistry.unregister(debateId);
+      }
+      return;
+    }
 
     // Check if lively mode is requested
     if (debateMode === 'lively') {
@@ -579,6 +621,7 @@ router.post('/debates', async (req: Request, res: Response) => {
       conPersonaId: req.body.conPersonaId,
       debateMode: req.body.debateMode,
       livelySettings: req.body.livelySettings,
+      informalSettings: req.body.informalSettings,
       // Model selection fields
       modelSelectionMode: req.body.modelSelectionMode,
       proModelId: req.body.proModelId,
@@ -685,9 +728,19 @@ router.post('/debates', async (req: Request, res: Response) => {
     res.status(201).json(debate);
 
     // Extract debate mode settings
-    const debateMode: DebateMode = configInput.debateMode === 'lively' ? 'lively' : 'turn_based';
+    let debateMode: DebateMode = 'turn_based';
+    if (configInput.debateMode === 'lively') {
+      debateMode = 'lively';
+    } else if (configInput.debateMode === 'informal') {
+      debateMode = 'informal';
+    }
+
     const livelySettings = debateMode === 'lively'
       ? (configInput.livelySettings as LivelySettingsInput | undefined)
+      : undefined;
+
+    const informalSettings = debateMode === 'informal'
+      ? (configInput.informalSettings as CreateInformalDiscussionInput | undefined)
       : undefined;
 
     // Extract human participation config if enabled
@@ -702,6 +755,7 @@ router.post('/debates', async (req: Request, res: Response) => {
       flowMode,
       debateMode,
       livelySettings,
+      informalSettings,
       modelConfig,
       humanParticipation
     ).catch((error) => {
