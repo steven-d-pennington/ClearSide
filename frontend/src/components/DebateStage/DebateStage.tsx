@@ -27,7 +27,7 @@ import {
   selectExchangeCount,
   selectMaxExchanges,
 } from '../../stores/debate-store';
-import { Speaker, DebatePhase, PHASE_INFO } from '../../types/debate';
+import { Speaker, DebatePhase } from '../../types/debate';
 import { SpeakerPanel } from './SpeakerPanel';
 import { CenterStage } from './CenterStage';
 import { HumanTurnInput } from '../DebateStream/HumanTurnInput';
