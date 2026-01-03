@@ -8,9 +8,9 @@
 -- ============================================================================
 
 -- Add debate_mode column if not exists
--- Values: 'formal' (default), 'lively', 'informal', 'duelogic'
+-- Values: 'turn_based' (default), 'lively', 'informal', 'duelogic'
 ALTER TABLE debates
-ADD COLUMN IF NOT EXISTS debate_mode VARCHAR(30) DEFAULT 'formal';
+ADD COLUMN IF NOT EXISTS debate_mode VARCHAR(30) DEFAULT 'turn_based';
 
 -- Add duelogic_config JSONB column for storing full Duelogic configuration
 ALTER TABLE debates
@@ -196,7 +196,7 @@ COMMENT ON COLUMN chair_interruptions.timestamp_ms IS 'Milliseconds from debate 
 -- Update the debate_mode constraint to include duelogic
 ALTER TABLE debates DROP CONSTRAINT IF EXISTS debates_debate_mode_check;
 ALTER TABLE debates ADD CONSTRAINT debates_debate_mode_check
-  CHECK (debate_mode IN ('formal', 'lively', 'informal', 'duelogic'));
+  CHECK (debate_mode IN ('turn_based', 'lively', 'informal', 'duelogic'));
 
 -- ============================================================================
 -- SPEAKER CONSTRAINT UPDATE
