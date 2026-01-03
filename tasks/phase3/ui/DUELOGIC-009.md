@@ -1,0 +1,645 @@
+# DUELOGIC-009: Frontend Configuration UI
+
+**Priority:** P1
+**Estimate:** L (2-3 days)
+**Labels:** `ui`, `frontend`, `duelogic`
+**Status:** 🟢 TO DO
+**Depends On:** DUELOGIC-008
+
+---
+
+## Context
+
+The Frontend Configuration UI allows users to set up Duelogic debates by selecting philosophical chairs, assigning LLM models, choosing presets, and configuring debate parameters.
+
+**References:**
+- [Master Duelogic Spec](../../DUELOGIC-001.md) - Configuration Defaults section
+- [Existing UI Components](../../../frontend/src/components/) - UI patterns
+
+---
+
+## Requirements
+
+### Acceptance Criteria
+
+- [ ] Create `frontend/src/components/DuelogicConfig/` component folder
+- [ ] ChairSelector - visual selection of philosophical frameworks
+- [ ] ModelSelector - dropdown for LLM model per chair
+- [ ] PresetSelector - quick setup with preset matchups
+- [ ] InterruptionSettings - configure interruption behavior
+- [ ] ToneSelector - respectful/spirited/heated toggle
+- [ ] ArbiterSettings - accountability level, model selection
+- [ ] Full DuelogicConfigPanel integrating all components
+- [ ] Form validation with helpful error messages
+- [ ] Responsive design for mobile
+- [ ] Accessibility (ARIA labels, keyboard navigation)
+- [ ] Integration with API endpoints
+
+---
+
+## Implementation Guide
+
+### File Structure
+
+```
+frontend/src/components/DuelogicConfig/
+├── index.ts
+├── DuelogicConfigPanel.tsx
+├── ChairSelector.tsx
+├── ChairCard.tsx
+├── ModelSelector.tsx
+├── PresetSelector.tsx
+├── PresetCard.tsx
+├── InterruptionSettings.tsx
+├── ToneSelector.tsx
+├── ArbiterSettings.tsx
+├── FlowSettings.tsx
+└── duelogic-config.types.ts
+```
+
+### Types: `duelogic-config.types.ts`
+
+```typescript
+import type {
+  PhilosophicalChair,
+  DuelogicConfig,
+  DuelogicChair,
+  AccountabilityLevel
+} from '@/types/duelogic';
+
+export interface ChairSelectorProps {
+  chairs: DuelogicChair[];
+  onChairsChange: (chairs: DuelogicChair[]) => void;
+  maxChairs?: number;
+  minChairs?: number;
+}
+
+export interface ModelSelectorProps {
+  value: string;
+  onChange: (modelId: string, displayName?: string, provider?: string) => void;
+  label?: string;
+}
+
+export interface PresetSelectorProps {
+  onPresetSelect: (preset: string) => void;
+}
+
+export interface DuelogicConfigPanelProps {
+  onSubmit: (config: DuelogicConfig, proposition: string) => void;
+  isLoading?: boolean;
+}
+```
+
+### Component: `ChairCard.tsx`
+
+```tsx
+import React from 'react';
+import { PhilosophicalChair, PHILOSOPHICAL_CHAIR_INFO } from '@/types/duelogic';
+import { ModelSelector } from './ModelSelector';
+
+interface ChairCardProps {
+  position: string;
+  framework: PhilosophicalChair;
+  modelId: string;
+  modelDisplayName?: string;
+  onFrameworkChange: (framework: PhilosophicalChair) => void;
+  onModelChange: (modelId: string, displayName?: string, provider?: string) => void;
+  onRemove: () => void;
+  canRemove: boolean;
+}
+
+export function ChairCard({
+  position,
+  framework,
+  modelId,
+  modelDisplayName,
+  onFrameworkChange,
+  onModelChange,
+  onRemove,
+  canRemove,
+}: ChairCardProps) {
+  const info = PHILOSOPHICAL_CHAIR_INFO[framework];
+  const positionNumber = parseInt(position.replace('chair_', ''));
+
+  return (
+    <div className="border rounded-lg p-4 bg-white shadow-sm">
+      <div className="flex justify-between items-start mb-3">
+        <h3 className="text-lg font-semibold">Chair {positionNumber}</h3>
+        {canRemove && (
+          <button
+            onClick={onRemove}
+            className="text-red-500 hover:text-red-700 text-sm"
+            aria-label={`Remove chair ${positionNumber}`}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+
+      {/* Framework Selection */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Philosophical Framework
+        </label>
+        <select
+          value={framework}
+          onChange={(e) => onFrameworkChange(e.target.value as PhilosophicalChair)}
+          className="w-full border rounded-md px-3 py-2"
+          aria-label={`Select framework for chair ${positionNumber}`}
+        >
+          {Object.entries(PHILOSOPHICAL_CHAIR_INFO).map(([id, info]) => (
+            <option key={id} value={id}>
+              {info.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Framework Description */}
+      <div className="mb-4 p-3 bg-gray-50 rounded-md">
+        <p className="text-sm text-gray-600 italic">"{info.coreQuestion}"</p>
+        <p className="text-xs text-gray-500 mt-1">{info.description}</p>
+      </div>
+
+      {/* Model Selection */}
+      <ModelSelector
+        value={modelId}
+        onChange={onModelChange}
+        label={`LLM Model for Chair ${positionNumber}`}
+      />
+
+      {/* Blind Spots Preview */}
+      <details className="mt-3">
+        <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+          Known Blind Spots (what they must acknowledge)
+        </summary>
+        <ul className="mt-2 text-xs text-gray-600 list-disc list-inside">
+          {info.blindSpotsToAdmit.map((spot, i) => (
+            <li key={i}>{spot}</li>
+          ))}
+        </ul>
+      </details>
+    </div>
+  );
+}
+```
+
+### Component: `ChairSelector.tsx`
+
+```tsx
+import React from 'react';
+import { ChairCard } from './ChairCard';
+import { DuelogicChair, PhilosophicalChair, DUELOGIC_CONSTRAINTS } from '@/types/duelogic';
+
+interface ChairSelectorProps {
+  chairs: DuelogicChair[];
+  onChairsChange: (chairs: DuelogicChair[]) => void;
+}
+
+export function ChairSelector({ chairs, onChairsChange }: ChairSelectorProps) {
+  const canAddChair = chairs.length < DUELOGIC_CONSTRAINTS.maxChairs;
+  const canRemoveChair = chairs.length > DUELOGIC_CONSTRAINTS.minChairs;
+
+  const handleAddChair = () => {
+    if (!canAddChair) return;
+
+    const usedFrameworks = chairs.map(c => c.framework);
+    const availableFrameworks: PhilosophicalChair[] = [
+      'utilitarian', 'virtue_ethics', 'deontological', 'pragmatic',
+      'libertarian', 'communitarian', 'cosmopolitan', 'precautionary',
+      'autonomy_centered', 'care_ethics'
+    ].filter(f => !usedFrameworks.includes(f as PhilosophicalChair)) as PhilosophicalChair[];
+
+    const newChair: DuelogicChair = {
+      position: `chair_${chairs.length + 1}`,
+      framework: availableFrameworks[0] || 'pragmatic',
+      modelId: 'anthropic/claude-sonnet-4',
+      modelDisplayName: 'Claude Sonnet 4',
+      providerName: 'Anthropic',
+    };
+
+    onChairsChange([...chairs, newChair]);
+  };
+
+  const handleRemoveChair = (index: number) => {
+    if (!canRemoveChair) return;
+    const newChairs = chairs.filter((_, i) => i !== index);
+    // Renumber positions
+    const renumbered = newChairs.map((chair, i) => ({
+      ...chair,
+      position: `chair_${i + 1}`,
+    }));
+    onChairsChange(renumbered);
+  };
+
+  const handleFrameworkChange = (index: number, framework: PhilosophicalChair) => {
+    const newChairs = [...chairs];
+    newChairs[index] = { ...newChairs[index], framework };
+    onChairsChange(newChairs);
+  };
+
+  const handleModelChange = (
+    index: number,
+    modelId: string,
+    displayName?: string,
+    provider?: string
+  ) => {
+    const newChairs = [...chairs];
+    newChairs[index] = {
+      ...newChairs[index],
+      modelId,
+      modelDisplayName: displayName,
+      providerName: provider,
+    };
+    onChairsChange(newChairs);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold">Debate Chairs</h2>
+        <span className="text-sm text-gray-500">
+          {chairs.length} of {DUELOGIC_CONSTRAINTS.maxChairs} chairs
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {chairs.map((chair, index) => (
+          <ChairCard
+            key={chair.position}
+            position={chair.position}
+            framework={chair.framework}
+            modelId={chair.modelId}
+            modelDisplayName={chair.modelDisplayName}
+            onFrameworkChange={(f) => handleFrameworkChange(index, f)}
+            onModelChange={(m, d, p) => handleModelChange(index, m, d, p)}
+            onRemove={() => handleRemoveChair(index)}
+            canRemove={canRemoveChair}
+          />
+        ))}
+      </div>
+
+      {canAddChair && (
+        <button
+          onClick={handleAddChair}
+          className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg
+                     text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors"
+        >
+          + Add Chair (up to {DUELOGIC_CONSTRAINTS.maxChairs})
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+### Component: `PresetSelector.tsx`
+
+```tsx
+import React from 'react';
+import { DUELOGIC_PRESETS } from '@/types/duelogic';
+
+interface PresetSelectorProps {
+  onPresetSelect: (presetId: string) => void;
+}
+
+export function PresetSelector({ onPresetSelect }: PresetSelectorProps) {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xl font-bold">Quick Start: Preset Matchups</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {Object.entries(DUELOGIC_PRESETS).map(([id, preset]) => (
+          <button
+            key={id}
+            onClick={() => onPresetSelect(id)}
+            className="p-4 border rounded-lg text-left hover:border-blue-500
+                       hover:bg-blue-50 transition-colors"
+          >
+            <h3 className="font-semibold">{preset.name}</h3>
+            <p className="text-sm text-gray-600 mt-1">{preset.description}</p>
+            <p className="text-xs text-gray-400 mt-2">
+              {preset.chairs.length} chairs
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### Component: `ToneSelector.tsx`
+
+```tsx
+import React from 'react';
+
+type Tone = 'respectful' | 'spirited' | 'heated';
+
+interface ToneSelectorProps {
+  value: Tone;
+  onChange: (tone: Tone) => void;
+}
+
+const toneDescriptions: Record<Tone, { label: string; description: string; icon: string }> = {
+  respectful: {
+    label: 'Respectful',
+    description: 'Professional, collegial discourse. Disagree with ideas, not people.',
+    icon: '🤝',
+  },
+  spirited: {
+    label: 'Spirited',
+    description: 'Engage with passion and conviction. Be direct and pointed.',
+    icon: '⚡',
+  },
+  heated: {
+    label: 'Heated',
+    description: 'Argue forcefully. Challenge aggressively. Make disagreements memorable.',
+    icon: '🔥',
+  },
+};
+
+export function ToneSelector({ value, onChange }: ToneSelectorProps) {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-lg font-semibold">Debate Tone</h3>
+      <div className="flex gap-2">
+        {(Object.keys(toneDescriptions) as Tone[]).map((tone) => {
+          const info = toneDescriptions[tone];
+          const isSelected = value === tone;
+
+          return (
+            <button
+              key={tone}
+              onClick={() => onChange(tone)}
+              className={`flex-1 p-3 rounded-lg border-2 transition-colors ${
+                isSelected
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              aria-pressed={isSelected}
+            >
+              <span className="text-2xl block mb-1">{info.icon}</span>
+              <span className="font-medium block">{info.label}</span>
+              <span className="text-xs text-gray-500 block mt-1">{info.description}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+```
+
+### Component: `DuelogicConfigPanel.tsx`
+
+```tsx
+import React, { useState } from 'react';
+import { ChairSelector } from './ChairSelector';
+import { PresetSelector } from './PresetSelector';
+import { ToneSelector } from './ToneSelector';
+import { ArbiterSettings } from './ArbiterSettings';
+import { InterruptionSettings } from './InterruptionSettings';
+import { FlowSettings } from './FlowSettings';
+import {
+  DuelogicConfig,
+  DuelogicChair,
+  DUELOGIC_DEFAULTS,
+  DUELOGIC_PRESETS
+} from '@/types/duelogic';
+
+interface DuelogicConfigPanelProps {
+  onSubmit: (proposition: string, config: DuelogicConfig) => void;
+  isLoading?: boolean;
+}
+
+export function DuelogicConfigPanel({ onSubmit, isLoading }: DuelogicConfigPanelProps) {
+  const [proposition, setProposition] = useState('');
+  const [propositionContext, setPropositionContext] = useState('');
+  const [config, setConfig] = useState<DuelogicConfig>(DUELOGIC_DEFAULTS);
+  const [activeTab, setActiveTab] = useState<'preset' | 'custom'>('preset');
+
+  const handlePresetSelect = (presetId: string) => {
+    const preset = DUELOGIC_PRESETS[presetId as keyof typeof DUELOGIC_PRESETS];
+    if (!preset) return;
+
+    const chairs: DuelogicChair[] = preset.chairs.map((c, i) => ({
+      position: `chair_${i + 1}`,
+      framework: c.framework,
+      modelId: 'anthropic/claude-sonnet-4',
+      modelDisplayName: 'Claude Sonnet 4',
+      providerName: 'Anthropic',
+    }));
+
+    setConfig(prev => ({ ...prev, chairs }));
+    setActiveTab('custom'); // Switch to custom to show the loaded preset
+  };
+
+  const handleChairsChange = (chairs: DuelogicChair[]) => {
+    setConfig(prev => ({ ...prev, chairs }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!proposition.trim()) return;
+    onSubmit(proposition, { ...config, propositionContext } as any);
+  };
+
+  const isValid = proposition.trim().length >= 10 && config.chairs.length >= 2;
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl mx-auto">
+      {/* Proposition Input */}
+      <div className="space-y-3">
+        <h2 className="text-xl font-bold">Debate Proposition</h2>
+        <input
+          type="text"
+          value={proposition}
+          onChange={(e) => setProposition(e.target.value)}
+          placeholder="e.g., Should AI development be paused for safety research?"
+          className="w-full px-4 py-3 border rounded-lg text-lg"
+          aria-label="Debate proposition"
+          required
+        />
+        <textarea
+          value={propositionContext}
+          onChange={(e) => setPropositionContext(e.target.value)}
+          placeholder="Optional: Provide context for the debate..."
+          className="w-full px-4 py-2 border rounded-lg text-sm"
+          rows={3}
+          aria-label="Proposition context"
+        />
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="flex border-b">
+        <button
+          type="button"
+          onClick={() => setActiveTab('preset')}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'preset'
+              ? 'border-b-2 border-blue-500 text-blue-600'
+              : 'text-gray-500'
+          }`}
+        >
+          Preset Matchups
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('custom')}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'custom'
+              ? 'border-b-2 border-blue-500 text-blue-600'
+              : 'text-gray-500'
+          }`}
+        >
+          Custom Configuration
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'preset' && (
+        <PresetSelector onPresetSelect={handlePresetSelect} />
+      )}
+
+      {activeTab === 'custom' && (
+        <>
+          <ChairSelector
+            chairs={config.chairs}
+            onChairsChange={handleChairsChange}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ToneSelector
+              value={config.tone}
+              onChange={(tone) => setConfig(prev => ({ ...prev, tone }))}
+            />
+
+            <ArbiterSettings
+              value={config.arbiter}
+              onChange={(arbiter) => setConfig(prev => ({ ...prev, arbiter }))}
+            />
+          </div>
+
+          <InterruptionSettings
+            value={config.interruptions}
+            onChange={(interruptions) => setConfig(prev => ({ ...prev, interruptions }))}
+          />
+
+          <FlowSettings
+            value={config.flow}
+            onChange={(flow) => setConfig(prev => ({ ...prev, flow }))}
+          />
+        </>
+      )}
+
+      {/* Submit Button */}
+      <button
+        type="submit"
+        disabled={!isValid || isLoading}
+        className={`w-full py-4 rounded-lg text-white font-bold text-lg transition-colors ${
+          isValid && !isLoading
+            ? 'bg-blue-600 hover:bg-blue-700'
+            : 'bg-gray-400 cursor-not-allowed'
+        }`}
+      >
+        {isLoading ? 'Starting Debate...' : 'Start Duelogic Debate'}
+      </button>
+    </form>
+  );
+}
+```
+
+---
+
+## Dependencies
+
+- DUELOGIC-008: API Routes (for fetching models, presets)
+
+---
+
+## Validation
+
+```bash
+# Component tests
+npm run test -- --grep "DuelogicConfig"
+
+# Storybook (if available)
+npm run storybook
+
+# Visual regression
+npm run test:visual
+```
+
+---
+
+## Test Cases
+
+```typescript
+describe('DuelogicConfigPanel', () => {
+  it('renders preset selector by default', () => {
+    render(<DuelogicConfigPanel onSubmit={jest.fn()} />);
+    expect(screen.getByText('Quick Start: Preset Matchups')).toBeInTheDocument();
+  });
+
+  it('applies preset configuration', async () => {
+    render(<DuelogicConfigPanel onSubmit={jest.fn()} />);
+
+    await userEvent.click(screen.getByText('Classic Clash'));
+
+    expect(screen.getByText('Chair 1')).toBeInTheDocument();
+    expect(screen.getByText('Utilitarian Chair')).toBeInTheDocument();
+  });
+
+  it('allows adding and removing chairs', async () => {
+    render(<DuelogicConfigPanel onSubmit={jest.fn()} />);
+
+    // Switch to custom tab first
+    await userEvent.click(screen.getByText('Custom Configuration'));
+
+    const addButton = screen.getByText(/Add Chair/);
+    await userEvent.click(addButton);
+
+    expect(screen.getByText('Chair 3')).toBeInTheDocument();
+  });
+
+  it('validates proposition length', async () => {
+    const onSubmit = jest.fn();
+    render(<DuelogicConfigPanel onSubmit={onSubmit} />);
+
+    const input = screen.getByLabelText('Debate proposition');
+    await userEvent.type(input, 'Short');
+
+    const submitButton = screen.getByText('Start Duelogic Debate');
+    expect(submitButton).toBeDisabled();
+  });
+
+  it('submits valid configuration', async () => {
+    const onSubmit = jest.fn();
+    render(<DuelogicConfigPanel onSubmit={onSubmit} />);
+
+    await userEvent.type(
+      screen.getByLabelText('Debate proposition'),
+      'Should artificial intelligence development be paused?'
+    );
+    await userEvent.click(screen.getByText('Classic Clash'));
+    await userEvent.click(screen.getByText('Start Duelogic Debate'));
+
+    expect(onSubmit).toHaveBeenCalled();
+    expect(onSubmit.mock.calls[0][1].chairs.length).toBe(2);
+  });
+});
+```
+
+---
+
+## Definition of Done
+
+- [ ] All configuration components implemented
+- [ ] Preset selection works correctly
+- [ ] Chair add/remove works with proper limits
+- [ ] Model selection integrated with API
+- [ ] All settings persist in form state
+- [ ] Form validation prevents invalid submissions
+- [ ] Responsive design works on mobile
+- [ ] Accessibility requirements met (ARIA, keyboard nav)
+- [ ] Component tests pass
