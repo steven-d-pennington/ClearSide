@@ -784,3 +784,89 @@ interface EvaluationResponse {
   interjectionReason?: string;
 }
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-006
+
+> Added by agent completing Sprint 3 on 2026-01-03
+
+### Interruption Statistics Endpoint
+
+Add endpoint for interrupt statistics using ChairInterruptionEngine:
+
+```typescript
+import { getInterruptionsByDebate, getInterruptionCountsByReason } from '../db/repositories/duelogic-repository.js';
+
+// GET /api/debates/:id/duelogic/interruptions
+router.get('/debates/:id/duelogic/interruptions', async (req, res) => {
+  const interruptions = await getInterruptionsByDebate(req.params.id);
+
+  res.json({
+    success: true,
+    interruptions: interruptions.map(i => ({
+      interrupter: i.interruptingChair,
+      interrupted: i.interruptedChair,
+      reason: i.triggerReason,
+      content: i.interruptionContent,
+      urgency: i.urgency,
+      timestamp: i.timestampMs,
+    })),
+    count: interruptions.length,
+  });
+});
+```
+
+### Interruption Counts by Reason
+
+```typescript
+// GET /api/debates/:id/duelogic/interruptions/stats
+router.get('/debates/:id/duelogic/interruptions/stats', async (req, res) => {
+  const [byReason, byChair] = await Promise.all([
+    getInterruptionCountsByReason(req.params.id),
+    getInterruptionCountsByChair(req.params.id),
+  ]);
+
+  res.json({
+    success: true,
+    stats: {
+      byReason: Object.fromEntries(byReason),
+      byChair: {
+        made: Object.fromEntries(byChair.made),
+        received: Object.fromEntries(byChair.received),
+      },
+    },
+  });
+});
+```
+
+### Interrupt Reason Types
+
+When returning interrupt data, use these standard reason types:
+
+```typescript
+type ChairInterruptReason =
+  | 'factual_correction'     // Correcting a misrepresentation
+  | 'straw_man_detected'     // Attacking weak version
+  | 'direct_challenge'       // Pushback on claim
+  | 'clarification_needed'   // Requesting clarity
+  | 'strong_agreement'       // Amplifying good point
+  | 'pivotal_point';         // Core disagreement moment
+```
+
+### SSE Events for Interrupts
+
+When orchestrator triggers an interrupt, broadcast:
+
+```typescript
+{
+  type: 'chair_interrupt',
+  data: {
+    interrupter: 'chair_1',
+    interrupted: 'chair_2',
+    reason: 'straw_man_detected',
+    opener: "Hold on, you're attacking a position I never took—",
+    urgency: 0.85,
+  }
+}
+```

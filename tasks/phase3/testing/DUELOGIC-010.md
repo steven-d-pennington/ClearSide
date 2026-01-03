@@ -1078,3 +1078,146 @@ describe('batchEvaluate', () => {
   });
 });
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-006
+
+> Added by agent completing Sprint 3 on 2026-01-03
+
+### ChairInterruptionEngine Tests
+
+Tests already created at `backend/tests/chair-interruption-engine.test.ts`:
+
+```typescript
+import {
+  ChairInterruptionEngine,
+  createChairInterruptionEngine,
+  createTestInterruptionEngine,
+} from '../src/services/debate/chair-interruption-engine.js';
+
+// Run with: npm run test -- --grep "ChairInterruptionEngine"
+```
+
+### Quick Heuristic Tests
+
+Test the pattern matching for interrupt triggers:
+
+```typescript
+describe('quickInterruptCheck', () => {
+  it('detects straw-man patterns', () => {
+    const result = engine.quickInterruptCheck('They just want to ignore consequences!');
+    expect(result.potentialTrigger).toBe(true);
+    expect(result.likelyReason).toBe('straw_man_detected');
+  });
+
+  it('detects pivotal point patterns', () => {
+    const result = engine.quickInterruptCheck('The fundamental issue is...');
+    expect(result.potentialTrigger).toBe(true);
+    expect(result.likelyReason).toBe('pivotal_point');
+  });
+
+  it('returns false for neutral content', () => {
+    const result = engine.quickInterruptCheck('I appreciate your point...');
+    expect(result.potentialTrigger).toBe(false);
+  });
+});
+```
+
+### Cooldown Management Tests
+
+```typescript
+describe('cooldown management', () => {
+  it('allows first interrupt for a chair', () => {
+    expect(engine.canInterrupt('chair_1')).toBe(true);
+  });
+
+  it('blocks interrupt during cooldown', async () => {
+    await engine.triggerManualInterrupt(chair1, chair2, 'direct_challenge', 'Test');
+    expect(engine.canInterrupt('chair_1')).toBe(false);
+  });
+
+  it('resets cooldowns correctly', () => {
+    engine.resetCooldowns();
+    expect(engine.canInterrupt('chair_1')).toBe(true);
+  });
+});
+```
+
+### Aggressiveness Threshold Tests
+
+```typescript
+describe('urgency thresholds', () => {
+  it('uses 0.9 threshold for aggressiveness 1', () => {
+    const conservativeEngine = createTestInterruptionEngine(
+      { ...config, interruptions: { ...config.interruptions, aggressiveness: 1 } },
+      'test-debate'
+    );
+    expect(conservativeEngine.getUrgencyThreshold()).toBe(0.9);
+  });
+
+  it('uses 0.5 threshold for aggressiveness 5', () => {
+    const aggressiveEngine = createTestInterruptionEngine(
+      { ...config, interruptions: { ...config.interruptions, aggressiveness: 5 } },
+      'test-debate'
+    );
+    expect(aggressiveEngine.getUrgencyThreshold()).toBe(0.5);
+  });
+});
+```
+
+### Interrupt Evaluation Tests
+
+```typescript
+describe('evaluateInterrupt', () => {
+  it('returns null when interruptions disabled', async () => {
+    const disabledEngine = createTestInterruptionEngine(
+      { ...config, interruptions: { ...config.interruptions, enabled: false } },
+      'test-debate'
+    );
+    const result = await disabledEngine.evaluateInterrupt(context);
+    expect(result).toBeNull();
+  });
+
+  it('returns candidate for straw-man content', async () => {
+    mockChat.mockResolvedValue(JSON.stringify({
+      shouldInterrupt: true,
+      interruptingChairPosition: 'chair_2',
+      reason: 'straw_man_detected',
+      urgency: 0.85,
+    }));
+
+    const result = await engine.evaluateInterrupt(strawManContext);
+    expect(result).not.toBeNull();
+    expect(result!.triggerReason).toBe('straw_man_detected');
+  });
+
+  it('handles LLM errors gracefully', async () => {
+    mockChat.mockRejectedValue(new Error('API error'));
+    const result = await engine.evaluateInterrupt(context);
+    expect(result).toBeNull();  // No crash
+  });
+});
+```
+
+### Integration Test Pattern
+
+```typescript
+describe('Interruption Integration', () => {
+  it('interrupts flow naturally during exchange', async () => {
+    // Start debate
+    await orchestrator.start();
+
+    // Verify interrupt events in SSE stream
+    const interruptEvents = sseEvents.filter(e => e.type === 'chair_interrupt');
+
+    // With spirited tone and aggressiveness 3, should have some interrupts
+    if (interruptEvents.length > 0) {
+      const event = interruptEvents[0];
+      expect(event.data.interrupter).toMatch(/chair_\d/);
+      expect(event.data.interrupted).toMatch(/chair_\d/);
+      expect(['straw_man_detected', 'direct_challenge', 'pivotal_point']).toContain(event.data.reason);
+    }
+  });
+});
+```

@@ -67,7 +67,7 @@ Phase 3 implements the **Duelogic Debate Mode** - a philosophical debate format 
 
 | Task ID | Task Name | Priority | Estimate | Status | Dependencies | Task File |
 |---------|-----------|----------|----------|--------|--------------|-----------|
-| DUELOGIC-006 | Chair Interruption Engine | P1 | M | 🟢 TO DO | DUELOGIC-001, 004 | [View](./orchestrator/DUELOGIC-006.md) |
+| DUELOGIC-006 | Chair Interruption Engine | P1 | M | ✅ DONE | DUELOGIC-001, 004 | [View](./orchestrator/DUELOGIC-006.md) |
 | DUELOGIC-007 | Duelogic Orchestrator | P0 | L | 🟢 TO DO | DUELOGIC-001 to 006 | [View](./orchestrator/DUELOGIC-007.md) |
 
 **Sprint 3 Deliverables:**

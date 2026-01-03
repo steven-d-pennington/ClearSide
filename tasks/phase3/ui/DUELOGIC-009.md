@@ -969,3 +969,146 @@ export function DebateStatsPanel({ stats }: DebateStatsProps) {
   );
 }
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-006
+
+> Added by agent completing Sprint 3 on 2026-01-03
+
+### Interrupt Indicator Component
+
+Display when an interrupt occurs in the debate stream:
+
+```tsx
+interface InterruptIndicatorProps {
+  interrupter: string;
+  interrupted: string;
+  reason: ChairInterruptReason;
+  opener: string;
+}
+
+const reasonLabels: Record<ChairInterruptReason, string> = {
+  factual_correction: 'Factual Correction',
+  straw_man_detected: 'Straw Man Detected',
+  direct_challenge: 'Direct Challenge',
+  clarification_needed: 'Clarification',
+  strong_agreement: 'Strong Agreement',
+  pivotal_point: 'Pivotal Point',
+};
+
+const reasonIcons: Record<ChairInterruptReason, string> = {
+  factual_correction: '📝',
+  straw_man_detected: '⚠️',
+  direct_challenge: '💥',
+  clarification_needed: '❓',
+  strong_agreement: '✨',
+  pivotal_point: '🎯',
+};
+
+export function InterruptIndicator({ interrupter, interrupted, reason, opener }: InterruptIndicatorProps) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border-l-4 border-amber-400 rounded-r">
+      <span className="text-lg">{reasonIcons[reason]}</span>
+      <div className="flex-1">
+        <div className="text-xs text-amber-700 font-medium">
+          {interrupter} interrupts {interrupted}
+        </div>
+        <div className="text-sm text-amber-900">{reasonLabels[reason]}</div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Aggressiveness Slider for Configuration
+
+```tsx
+interface AggressivenessSliderProps {
+  value: 1 | 2 | 3 | 4 | 5;
+  onChange: (value: 1 | 2 | 3 | 4 | 5) => void;
+}
+
+const aggressivenessLabels = {
+  1: 'Very Polite',
+  2: 'Conservative',
+  3: 'Moderate',
+  4: 'Aggressive',
+  5: 'Very Aggressive',
+};
+
+export function AggressivenessSlider({ value, onChange }: AggressivenessSliderProps) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium">Interruption Aggressiveness</label>
+      <input
+        type="range"
+        min={1}
+        max={5}
+        value={value}
+        onChange={(e) => onChange(parseInt(e.target.value) as 1 | 2 | 3 | 4 | 5)}
+        className="w-full"
+      />
+      <div className="flex justify-between text-xs text-gray-500">
+        <span>Polite</span>
+        <span className="font-medium">{aggressivenessLabels[value]}</span>
+        <span>Aggressive</span>
+      </div>
+    </div>
+  );
+}
+```
+
+### Interruption Stats Display
+
+```tsx
+interface InterruptionStatsProps {
+  byReason: Record<ChairInterruptReason, number>;
+  byChair: {
+    made: Record<string, number>;
+    received: Record<string, number>;
+  };
+}
+
+export function InterruptionStats({ byReason, byChair }: InterruptionStatsProps) {
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <h4 className="font-medium mb-2">By Reason</h4>
+        {Object.entries(byReason).map(([reason, count]) => (
+          <div key={reason} className="flex justify-between text-sm">
+            <span>{reasonIcons[reason as ChairInterruptReason]} {reasonLabels[reason as ChairInterruptReason]}</span>
+            <span className="font-medium">{count}</span>
+          </div>
+        ))}
+      </div>
+      <div>
+        <h4 className="font-medium mb-2">By Chair</h4>
+        {Object.entries(byChair.made).map(([chair, count]) => (
+          <div key={chair} className="flex justify-between text-sm">
+            <span>{chair}</span>
+            <span className="font-medium">{count} made</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### SSE Event Handler for Interrupts
+
+```typescript
+// In useDebateStream hook:
+case 'chair_interrupt':
+  // Show interrupt notification
+  setInterruptNotification({
+    interrupter: event.data.interrupter,
+    interrupted: event.data.interrupted,
+    reason: event.data.reason,
+    opener: event.data.opener,
+  });
+  // Auto-clear after delay
+  setTimeout(() => setInterruptNotification(null), 5000);
+  break;
+```

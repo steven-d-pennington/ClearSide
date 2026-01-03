@@ -945,3 +945,121 @@ if (!quickResult.steelManning.attempted || !quickResult.selfCritique.attempted) 
   const fullResult = await this.evaluator.evaluate(context);
 }
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-006
+
+> Added by agent completing Sprint 3 on 2026-01-03
+
+### Chair Interruption Engine Integration
+
+The ChairInterruptionEngine is now available at `backend/src/services/debate/chair-interruption-engine.ts`:
+
+```typescript
+import {
+  ChairInterruptionEngine,
+  createChairInterruptionEngine,
+  type InterruptEvaluationContext,
+} from './chair-interruption-engine.js';
+
+// Create engine during orchestrator init
+this.interruptionEngine = createChairInterruptionEngine(this.config, this.debateId);
+```
+
+### Evaluating Interrupts During Exchange
+
+Call during each chair turn after content is generated:
+
+```typescript
+// After a chair speaks, check if another chair should interrupt
+const interruptCandidate = await this.interruptionEngine.evaluateInterrupt({
+  currentSpeaker: currentChair,
+  otherChairs: this.getOtherChairs(currentChair),
+  recentContent: utteranceContent,
+  debateSoFar: this.getTranscriptText(),
+  topic: this.proposition,
+});
+
+if (interruptCandidate) {
+  // Execute the interruption
+  await this.executeChairInterrupt(interruptCandidate);
+}
+```
+
+### Executing Chair Interrupts
+
+```typescript
+async executeChairInterrupt(candidate: ChairInterruptCandidate): Promise<void> {
+  // 1. Broadcast interrupt start event
+  this.sseManager.broadcast(this.debateId, {
+    type: 'chair_interrupt',
+    data: {
+      interrupter: candidate.interruptingChair.position,
+      interrupted: candidate.interruptedChair.position,
+      reason: candidate.triggerReason,
+      opener: candidate.suggestedOpener,
+    },
+  });
+
+  // 2. Get the interrupting chair agent
+  const interrupterAgent = this.chairAgents.get(candidate.interruptingChair.position);
+
+  // 3. Generate interruption response
+  const content = await interrupterAgent.respondToInterruption(
+    candidate.interruptedChair,
+    candidate.triggerContent
+  );
+
+  // 4. Record as utterance
+  await this.recordUtterance({
+    speaker: candidate.interruptingChair.position,
+    content,
+    segment: 'exchange',
+    isInterruption: true,
+    interruptionReason: candidate.triggerReason,
+  });
+}
+```
+
+### Quick Heuristic Pre-Check
+
+The engine provides efficient heuristic checks:
+
+```typescript
+// Fast pattern matching (no LLM call)
+const quickCheck = this.interruptionEngine.quickInterruptCheck(content);
+
+if (quickCheck.potentialTrigger) {
+  // Likely to warrant interrupt, do full evaluation
+  const candidate = await this.interruptionEngine.evaluateInterrupt(context);
+}
+```
+
+### Cooldown Management
+
+The engine tracks cooldowns automatically:
+
+```typescript
+// Check if a chair can interrupt (not on cooldown)
+if (this.interruptionEngine.canInterrupt(chair.position)) {
+  // Eligible to interrupt
+}
+
+// Get remaining cooldown time
+const seconds = this.interruptionEngine.getCooldownRemaining(chair.position);
+
+// Reset cooldowns for new segment
+this.interruptionEngine.resetCooldowns();
+```
+
+### Interrupt Statistics
+
+Get interrupt stats for closing segment:
+
+```typescript
+const stats = await this.interruptionEngine.getInterruptStats();
+// stats.totalInterrupts: number
+// stats.byChair: Map<string, number>
+// stats.byReason: Map<ChairInterruptReason, number>
+```
