@@ -844,3 +844,128 @@ interface EvaluationDisplay {
   frameworkConsistency: { consistent: boolean };
 }
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-005
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Evaluation Badge Component
+
+Create visual indicators for evaluation quality:
+
+```tsx
+interface EvaluationBadgeProps {
+  quality: 'strong' | 'adequate' | 'weak' | 'absent';
+  type: 'steelManning' | 'selfCritique';
+}
+
+const qualityColors = {
+  strong: 'bg-green-100 text-green-800 border-green-300',
+  adequate: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+  weak: 'bg-orange-100 text-orange-800 border-orange-300',
+  absent: 'bg-red-100 text-red-800 border-red-300',
+};
+
+const qualityEmojis = {
+  strong: '🟢',
+  adequate: '🟡',
+  weak: '🟠',
+  absent: '🔴',
+};
+
+export function EvaluationBadge({ quality, type }: EvaluationBadgeProps) {
+  const label = type === 'steelManning' ? 'Steel-Man' : 'Self-Critique';
+
+  return (
+    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${qualityColors[quality]}`}>
+      <span className="mr-1">{qualityEmojis[quality]}</span>
+      {label}: {quality}
+    </span>
+  );
+}
+```
+
+### Adherence Score Progress Bar
+
+Display adherence score as a visual progress bar:
+
+```tsx
+interface AdherenceScoreProps {
+  score: number;  // 0-100
+}
+
+export function AdherenceScore({ score }: AdherenceScoreProps) {
+  const color = score >= 80 ? 'bg-green-500' : score >= 60 ? 'bg-yellow-500' : score >= 40 ? 'bg-orange-500' : 'bg-red-500';
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full ${color} transition-all`} style={{ width: `${score}%` }} />
+      </div>
+      <span className="text-sm font-medium">{score}</span>
+    </div>
+  );
+}
+```
+
+### Evaluation Card for Utterance
+
+Complete evaluation display component:
+
+```tsx
+interface EvaluationCardProps {
+  evaluation: ResponseEvaluation;
+}
+
+export function EvaluationCard({ evaluation }: EvaluationCardProps) {
+  return (
+    <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm">
+      <div className="flex justify-between items-center mb-2">
+        <span className="font-medium">Duelogic Evaluation</span>
+        <AdherenceScore score={evaluation.adherenceScore} />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <EvaluationBadge quality={evaluation.steelManning.quality} type="steelManning" />
+        <EvaluationBadge quality={evaluation.selfCritique.quality} type="selfCritique" />
+
+        {!evaluation.frameworkConsistency.consistent && (
+          <span className="text-orange-600 text-xs">⚠️ Framework violation</span>
+        )}
+      </div>
+
+      {evaluation.interjectionReason && (
+        <p className="mt-2 text-xs text-red-600 italic">
+          Arbiter interjection: {evaluation.interjectionReason}
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+### Debate Stats Panel
+
+Display aggregate evaluation statistics:
+
+```tsx
+interface DebateStatsProps {
+  stats: {
+    averageAdherence: number | null;
+    steelManningRate: number | null;
+    selfCritiqueRate: number | null;
+  };
+}
+
+export function DebateStatsPanel({ stats }: DebateStatsProps) {
+  return (
+    <div className="grid grid-cols-3 gap-4 p-4 bg-white rounded-lg shadow">
+      <StatCard label="Avg. Adherence" value={stats.averageAdherence} unit="%" />
+      <StatCard label="Steel-Manning Rate" value={stats.steelManningRate} unit="%" />
+      <StatCard label="Self-Critique Rate" value={stats.selfCritiqueRate} unit="%" />
+    </div>
+  );
+}
+```

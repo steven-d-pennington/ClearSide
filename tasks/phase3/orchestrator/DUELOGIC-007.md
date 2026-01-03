@@ -849,3 +849,99 @@ chair.displayName;     // 'Claude Sonnet 4'
 chair.getFrameworkInfo();  // Full PHILOSOPHICAL_CHAIR_INFO entry
 chair.getOpeningHook();    // Framework-specific opener
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-005
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Response Evaluator Integration
+
+The standalone ResponseEvaluator replaces direct arbiter evaluation:
+
+```typescript
+import {
+  ResponseEvaluator,
+  createResponseEvaluator,
+} from './response-evaluator.js';
+
+// Create evaluator during orchestrator init
+this.evaluator = createResponseEvaluator(this.config, this.debateId);
+
+// In exchange loop:
+const { evaluation } = await this.evaluator.evaluateAndPersist(
+  {
+    chair,
+    responseContent: content,
+    debateHistory: this.getTranscriptText(),
+    previousSpeaker,
+    previousContent,
+  },
+  utteranceId  // Links evaluation to utterance in DB
+);
+
+// Check for interjection
+if (this.evaluator.shouldInterject(evaluation, this.config.mandates.arbiterCanInterject)) {
+  const violation = this.evaluator.determineViolationType(evaluation);
+  if (violation) {
+    await this.executeArbiterInterjection(violation, chair);
+  }
+}
+```
+
+### Evaluation Tracking Per Chair
+
+Track evaluations using the evaluator's methods:
+
+```typescript
+// After debate, get all evaluations grouped by chair
+const evaluationsByChair = await this.evaluator.getEvaluationsByChair(this.debateId);
+
+// Use in closing stats
+const closing = await this.arbiter.generateClosing(
+  this.proposition,
+  this.getTranscriptText(),
+  evaluationsByChair  // Map<string, ResponseEvaluation[]>
+);
+```
+
+### Accountability Level Effects
+
+The evaluator respects accountability settings:
+
+- **relaxed**: Uses quick heuristic only, never triggers interjection
+- **moderate**: Full LLM evaluation, interjections for major violations (score < 40)
+- **strict**: Full LLM evaluation, interjections for any violation (score < 60)
+
+```typescript
+// Change during debate if needed
+this.evaluator.setAccountabilityLevel('strict');
+```
+
+### Cache Management
+
+The evaluator caches results to avoid redundant LLM calls:
+
+```typescript
+// Clear cache between debate segments if needed
+this.evaluator.clearCache();
+
+// Get cache stats for debugging
+const stats = this.evaluator.getCacheStats();
+// { size: number, entries: string[] }
+```
+
+### Performance Optimization
+
+Use quick evaluation for non-critical paths:
+
+```typescript
+// Quick mode (no LLM call, just heuristics)
+const quickResult = this.evaluator.performQuickEvaluation(context);
+
+// Full evaluation only when needed
+if (!quickResult.steelManning.attempted || !quickResult.selfCritique.attempted) {
+  const fullResult = await this.evaluator.evaluate(context);
+}
+```

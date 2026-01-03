@@ -569,3 +569,96 @@ import { getUrgencyThreshold } from '../../types/duelogic.js';
 // 1: 0.9, 2: 0.8, 3: 0.7, 4: 0.6, 5: 0.5
 const threshold = getUrgencyThreshold(config.interruptions.aggressiveness);
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-005
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Response Evaluator Service
+
+The ResponseEvaluator is now available at `backend/src/services/debate/response-evaluator.ts`:
+
+```typescript
+import {
+  ResponseEvaluator,
+  createResponseEvaluator,
+  createQuickEvaluator,
+  quickSteelManCheck,
+  quickSelfCritiqueCheck,
+} from '../response-evaluator.js';
+
+// Create evaluator with config
+const evaluator = createResponseEvaluator(config, debateId);
+
+// Evaluate a response
+const result = await evaluator.evaluate({
+  chair,
+  responseContent,
+  debateHistory,
+  previousSpeaker,
+  previousContent,
+});
+
+// Result includes:
+// - evaluation: ResponseEvaluation object
+// - cached: boolean
+// - method: 'full' | 'quick' | 'cached'
+// - durationMs: number
+```
+
+### Quick Heuristic Checks for Interrupt Triggers
+
+Use these heuristic functions before full LLM evaluation:
+
+```typescript
+import { quickSteelManCheck, quickSelfCritiqueCheck } from '../response-evaluator.js';
+
+// Check if content might be straw-manning (lacking steel-man)
+const mightBeStrawMan = !quickSteelManCheck(content);
+
+// Combine with your interrupt detection:
+if (mightBeStrawMan && shouldEvaluateDeeper) {
+  const evaluation = await evaluator.evaluate(context);
+  if (evaluator.shouldInterject(evaluation)) {
+    // Generate interrupt
+  }
+}
+```
+
+### Determining Violation Types
+
+The evaluator can determine what type of violation occurred:
+
+```typescript
+const violationType = evaluator.determineViolationType(evaluation);
+// Returns: 'straw_manning' | 'missing_self_critique' | 'framework_inconsistency' | 'rhetorical_evasion' | null
+
+// Map to interrupt reasons:
+const interruptReasonMap = {
+  straw_manning: 'straw_man_detected',
+  missing_self_critique: 'direct_challenge',  // or use for interjection only
+  framework_inconsistency: 'factual_correction',
+  rhetorical_evasion: 'direct_challenge',
+};
+```
+
+### Batch Evaluation for Interrupt Candidates
+
+When evaluating multiple chairs for potential interrupts:
+
+```typescript
+const contexts = potentialInterrupters.map(chair => ({
+  chair,
+  responseContent: currentSpeakerContent,
+  debateHistory: transcript,
+}));
+
+const results = await evaluator.batchEvaluate(contexts, {
+  concurrency: 2,
+  useQuickMode: true,  // Fast heuristic for initial screening
+});
+
+// Then do full evaluation only on flagged responses
+```

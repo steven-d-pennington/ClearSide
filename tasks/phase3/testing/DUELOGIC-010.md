@@ -921,3 +921,160 @@ describe('Framework prompts', () => {
   });
 });
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-005
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### ResponseEvaluator Tests
+
+Tests already created at `backend/tests/response-evaluator.test.ts`:
+
+```typescript
+import {
+  ResponseEvaluator,
+  createResponseEvaluator,
+  createQuickEvaluator,
+  quickSteelManCheck,
+  quickSelfCritiqueCheck,
+  getDefaultEvaluation,
+} from '../src/services/debate/response-evaluator.js';
+
+// Run with: npm run test -- --grep "ResponseEvaluator"
+```
+
+### Test Patterns from Implementation
+
+Key patterns used in ResponseEvaluator tests:
+
+```typescript
+// Mock LLM client
+const mockChat = vi.fn();
+vi.mock('../src/services/llm/openrouter-adapter.js', () => ({
+  createOpenRouterClient: () => ({ chat: mockChat }),
+}));
+
+// Mock database repository
+const mockSaveEvaluation = vi.fn().mockResolvedValue(1);
+vi.mock('../src/db/repositories/duelogic-repository.js', () => ({
+  saveResponseEvaluation: (...args) => mockSaveEvaluation(...args),
+  getEvaluationsForDebate: vi.fn().mockResolvedValue([]),
+  getEvaluationsByChair: vi.fn().mockResolvedValue(new Map()),
+}));
+
+// Sample test responses for evaluation tests
+const strongSteelManResponse = `I appreciate the force of the Utilitarian argument here.
+  What they're really saying is that aggregate welfare matters...`;
+
+const noSteelManResponse = `The Utilitarian view is fundamentally wrong because
+  it treats people as mere numbers.`;
+```
+
+### Heuristic Function Tests
+
+Test the quick check functions that don't require LLM:
+
+```typescript
+describe('quickSteelManCheck', () => {
+  it('detects appreciation patterns', () => {
+    expect(quickSteelManCheck('I appreciate the point you are making')).toBe(true);
+    expect(quickSteelManCheck('They are completely wrong')).toBe(false);
+  });
+});
+
+describe('quickSelfCritiqueCheck', () => {
+  it('detects limitation acknowledgments', () => {
+    expect(quickSelfCritiqueCheck('My framework struggles with edge cases')).toBe(true);
+    expect(quickSelfCritiqueCheck('My framework is superior')).toBe(false);
+  });
+});
+```
+
+### Caching Tests
+
+Verify evaluation caching works correctly:
+
+```typescript
+describe('caching', () => {
+  it('returns cached result for repeated evaluations', async () => {
+    const context = { chair, responseContent: 'Test', debateHistory: '' };
+
+    await evaluator.evaluate(context);
+    await evaluator.evaluate(context);
+
+    expect(mockChat).toHaveBeenCalledTimes(1);  // Only one LLM call
+  });
+
+  it('clears cache correctly', () => {
+    evaluator.clearCache();
+    expect(evaluator.getCacheStats().size).toBe(0);
+  });
+});
+```
+
+### Accountability Level Tests
+
+Test different accountability modes:
+
+```typescript
+describe('accountability levels', () => {
+  it('uses quick mode for relaxed accountability', async () => {
+    const relaxedEvaluator = new ResponseEvaluator({
+      accountabilityLevel: 'relaxed',
+    });
+
+    const result = await relaxedEvaluator.evaluate(context);
+    expect(result.method).toBe('quick');
+    expect(mockChat).not.toHaveBeenCalled();
+  });
+
+  it('uses full LLM evaluation for strict accountability', async () => {
+    const strictEvaluator = new ResponseEvaluator({
+      accountabilityLevel: 'strict',
+    });
+
+    const result = await strictEvaluator.evaluate(context);
+    expect(result.method).toBe('full');
+  });
+});
+```
+
+### Interjection Threshold Tests
+
+Test interjection decision logic:
+
+```typescript
+describe('shouldInterject', () => {
+  it('never interjects when disabled', () => {
+    const badEvaluation = { adherenceScore: 20, requiresInterjection: true };
+    expect(evaluator.shouldInterject(badEvaluation, false)).toBe(false);
+  });
+
+  it('interjects for low scores in strict mode', () => {
+    strictEvaluator.setAccountabilityLevel('strict');
+    const lowScoreEval = { adherenceScore: 55, requiresInterjection: false };
+    expect(strictEvaluator.shouldInterject(lowScoreEval, true)).toBe(true);
+  });
+});
+```
+
+### Batch Evaluation Performance
+
+Test concurrent evaluation efficiency:
+
+```typescript
+describe('batchEvaluate', () => {
+  it('processes multiple contexts with concurrency limit', async () => {
+    const contexts = [context1, context2, context3];
+
+    const results = await evaluator.batchEvaluate(contexts, {
+      concurrency: 2,
+      useQuickMode: true,
+    });
+
+    expect(results.size).toBe(3);
+  });
+});
+```

@@ -689,3 +689,98 @@ const evaluation = await arbiter.evaluateResponse({
 const arbiterMeta = arbiter.getMetadata();
 const chairMetas = getAllChairAgents(chairAgents).map(c => c.getMetadata());
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-005
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Response Evaluator for Manual Evaluation Endpoint
+
+Add optional evaluation endpoint using ResponseEvaluator:
+
+```typescript
+import { createResponseEvaluator } from '../services/debate/response-evaluator.js';
+
+// POST /api/debates/:id/evaluate (optional endpoint)
+router.post('/debates/:id/evaluate', async (req, res) => {
+  const { chairPosition, responseContent, previousSpeakerPosition, previousContent } = req.body;
+
+  const config = await getDuelogicConfig(req.params.id);
+  const evaluator = createResponseEvaluator(config, req.params.id);
+
+  const chair = config.chairs.find(c => c.position === chairPosition);
+  const previousSpeaker = config.chairs.find(c => c.position === previousSpeakerPosition);
+
+  const result = await evaluator.evaluate({
+    chair,
+    responseContent,
+    debateHistory: '',  // Or fetch from DB
+    previousSpeaker,
+    previousContent,
+  });
+
+  res.json({
+    success: true,
+    evaluation: result.evaluation,
+    method: result.method,
+    durationMs: result.durationMs,
+  });
+});
+```
+
+### Debate Stats with Evaluation Metrics
+
+Enhance status endpoint with evaluation statistics:
+
+```typescript
+import { getEvaluationsForDebate, getDuelogicDebateStats } from '../db/repositories/duelogic-repository.js';
+
+// GET /api/debates/:id/duelogic/stats
+router.get('/debates/:id/duelogic/stats', async (req, res) => {
+  const stats = await getDuelogicDebateStats(req.params.id);
+
+  res.json({
+    success: true,
+    stats: {
+      chairCount: stats.chairCount,
+      utteranceCount: stats.utteranceCount,
+      interruptionCount: stats.interruptionCount,
+      averageAdherence: stats.averageAdherence,
+      steelManningRate: stats.steelManningRate,
+      selfCritiqueRate: stats.selfCritiqueRate,
+    }
+  });
+});
+```
+
+### Evaluation Response Format
+
+When returning evaluation data from API:
+
+```typescript
+interface EvaluationResponse {
+  adherenceScore: number;  // 0-100
+  steelManning: {
+    attempted: boolean;
+    quality: 'strong' | 'adequate' | 'weak' | 'absent';
+    notes?: string;
+  };
+  selfCritique: {
+    attempted: boolean;
+    quality: 'strong' | 'adequate' | 'weak' | 'absent';
+    notes?: string;
+  };
+  frameworkConsistency: {
+    consistent: boolean;
+    violations?: string[];
+  };
+  intellectualHonesty: {
+    score: 'high' | 'medium' | 'low';
+    issues?: string[];
+  };
+  requiresInterjection: boolean;
+  interjectionReason?: string;
+}
+```
