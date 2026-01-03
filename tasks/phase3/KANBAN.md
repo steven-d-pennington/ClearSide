@@ -1,9 +1,9 @@
 # Phase 3: Duelogic Debate Mode - Kanban Board
 
 > Last Updated: 2026-01-03
-> Version: 1.0.0 - Initial Planning
-> Total Tasks: 10
-> Estimated Duration: ~17 days
+> Version: 1.1.0 - Post-MVP Enhancements
+> Total Tasks: 11
+> Estimated Duration: ~19 days
 
 ---
 
@@ -26,6 +26,7 @@ Phase 3 implements the **Duelogic Debate Mode** - a philosophical debate format 
 | Sprint 3 | Orchestration | DUELOGIC-006, DUELOGIC-007 | ~5 days |
 | Sprint 4 | API & UI | DUELOGIC-008, DUELOGIC-009 | ~3.5 days |
 | Sprint 5 | Testing | DUELOGIC-010 | ~2 days |
+| Sprint 6 | Enhancements | DUELOGIC-011 | ~2 days |
 
 ---
 
@@ -115,6 +116,21 @@ Phase 3 implements the **Duelogic Debate Mode** - a philosophical debate format 
 
 ---
 
+### Sprint 6: Enhancements (2 days)
+
+| Task ID | Task Name | Priority | Estimate | Status | Dependencies | Task File |
+|---------|-----------|----------|----------|--------|--------------|-----------|
+| DUELOGIC-011 | Allowed Sources | P1 | M | 🟢 TO DO | DUELOGIC-001, 008, 009 | [View](./features/DUELOGIC-011.md) |
+
+**Sprint 6 Deliverables:**
+- User-defined allowed source URLs/domains
+- Default generic web search with optional restrictions
+- Source enforcement levels (strict/moderate/advisory)
+- Citation tracking in chair arguments
+- Frontend SourcesSettings component
+
+---
+
 ## Quick Reference
 
 ### Status Legend
@@ -155,11 +171,11 @@ DUELOGIC-001 (Types)
     │       └── DUELOGIC-005 (Evaluator) ├── DUELOGIC-007 (Orchestrator)
     ├── DUELOGIC-004 (Chair) ────────────┤       │
     │       └── DUELOGIC-006 (Interrupt) ┘       │
-    └───────────────────────────────────────────→ DUELOGIC-008 (API)
-                                                        │
-                                                  DUELOGIC-009 (UI)
-                                                        │
-                                                  DUELOGIC-010 (Testing)
+    └───────────────────────────────────────────→ DUELOGIC-008 (API) ──┐
+                                                        │               │
+                                                  DUELOGIC-009 (UI) ────┼── DUELOGIC-011 (Allowed Sources)
+                                                        │               │
+                                                  DUELOGIC-010 (Testing)┘
 ```
 
 ---
@@ -205,8 +221,10 @@ tasks/phase3/
 │   └── DUELOGIC-008.md
 ├── ui/
 │   └── DUELOGIC-009.md
-└── testing/
-    └── DUELOGIC-010.md
+├── testing/
+│   └── DUELOGIC-010.md
+└── features/
+    └── DUELOGIC-011.md
 ```
 
 ---
