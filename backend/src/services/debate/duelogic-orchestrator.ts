@@ -342,7 +342,7 @@ export class DuelogicOrchestrator {
         speaker: 'arbiter',
         segment: 'introduction',
         content: intro,
-        timestampMs: Date.now(),
+        timestampMs: this.getElapsedMs(),
       });
     }
 
@@ -381,7 +381,7 @@ export class DuelogicOrchestrator {
         speaker: chair.position,
         segment: 'opening',
         content,
-        timestampMs: Date.now(),
+        timestampMs: this.getElapsedMs(),
       });
     }
 
@@ -462,7 +462,7 @@ export class DuelogicOrchestrator {
           speaker: chair.position,
           segment: 'exchange',
           content,
-          timestampMs: Date.now(),
+          timestampMs: this.getElapsedMs(),
           evaluation,
         });
 
@@ -500,7 +500,7 @@ export class DuelogicOrchestrator {
       speaker: 'arbiter',
       segment: 'synthesis',
       content: closing,
-      timestampMs: Date.now(),
+      timestampMs: this.getElapsedMs(),
     });
 
     this.broadcastSegmentComplete('synthesis');
@@ -573,7 +573,7 @@ export class DuelogicOrchestrator {
       speaker: candidate.interruptingChair.position,
       segment: 'exchange',
       content: `[INTERRUPTION: ${candidate.suggestedOpener}] ${interruptContent}`,
-      timestampMs: Date.now(),
+      timestampMs: this.getElapsedMs(),
       isInterruption: true,
       interruptionReason: candidate.triggerReason,
     });
@@ -593,7 +593,7 @@ export class DuelogicOrchestrator {
       speaker: interruptedChair.position,
       segment: 'exchange',
       content: `[RESPONDING TO INTERRUPTION] ${response}`,
-      timestampMs: Date.now(),
+      timestampMs: this.getElapsedMs(),
     });
   }
 
@@ -633,7 +633,7 @@ export class DuelogicOrchestrator {
       speaker: 'arbiter',
       segment: 'exchange',
       content: `[ARBITER INTERJECTION] ${interjection}`,
-      timestampMs: Date.now(),
+      timestampMs: this.getElapsedMs(),
     });
   }
 

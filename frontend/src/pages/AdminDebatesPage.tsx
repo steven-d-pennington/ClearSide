@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Alert } from '../components/ui';
+import { RerunDebateModal } from '../components/RerunDebateModal';
 import styles from './AdminDebatesPage.module.css';
 
 interface Debate {
@@ -51,6 +52,7 @@ export function AdminDebatesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [rerunDebateId, setRerunDebateId] = useState<string | null>(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -333,6 +335,12 @@ export function AdminDebatesPage() {
                     <Link to={`/debates/${debate.id}`} className={styles.actionLink}>
                       View
                     </Link>
+                    <button
+                      onClick={() => setRerunDebateId(debate.id)}
+                      className={styles.rerunBtn}
+                    >
+                      Re-run
+                    </button>
                     {canStop(debate) && (
                       <button
                         onClick={() => handleStopDebate(debate.id)}
@@ -356,6 +364,13 @@ export function AdminDebatesPage() {
           </table>
         </div>
       )}
+
+      {/* Re-run Debate Modal */}
+      <RerunDebateModal
+        isOpen={rerunDebateId !== null}
+        onClose={() => setRerunDebateId(null)}
+        debateId={rerunDebateId || ''}
+      />
     </div>
   );
 }
