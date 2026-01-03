@@ -680,12 +680,10 @@ export class InformalOrchestrator {
 
   /**
    * Generate auto-summary of the discussion
+   * Uses primary model with fallback to a secondary model if primary fails
    */
   private async generateSummary(): Promise<InformalSummary> {
     logger.info({ discussionId: this.discussionId }, 'Generating discussion summary');
-
-    // Use a capable model for summary generation
-    const summaryClient = createOpenRouterClient('anthropic/claude-sonnet-4');
 
     // Build transcript for summary
     const transcript = this.utterances
@@ -700,56 +698,115 @@ export class InformalOrchestrator {
       .replace('{participants}', participantNames)
       .replace('{transcript}', transcript);
 
-    try {
-      const response = await summaryClient.complete({
-        messages: [
+    const messages = [
+      {
+        role: 'system' as const,
+        content: 'You are summarizing an informal discussion. Respond only in valid JSON.',
+      },
+      { role: 'user' as const, content: prompt },
+    ];
+
+    // Try primary model first, then fallback
+    const modelsToTry = [
+      'anthropic/claude-sonnet-4',
+      'google/gemini-2.0-flash-001',
+      'openai/gpt-4o-mini',
+    ];
+
+    for (const modelId of modelsToTry) {
+      try {
+        logger.info({ discussionId: this.discussionId, model: modelId }, 'Attempting summary generation');
+
+        const summaryClient = createOpenRouterClient(modelId);
+        const response = await summaryClient.complete({
+          messages,
+          temperature: 0.3,
+          maxTokens: 1000, // Increased for better summaries
+        });
+
+        logger.debug(
+          { discussionId: this.discussionId, model: modelId, responseLength: response.content.length },
+          'Summary response received'
+        );
+
+        // Parse JSON response
+        const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          logger.warn(
+            { discussionId: this.discussionId, model: modelId, content: response.content.substring(0, 200) },
+            'No JSON found in summary response, trying next model'
+          );
+          continue;
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+
+        const summary: InformalSummary = {
+          topicsCovered: parsed.topicsCovered || [],
+          keyInsights: parsed.keyInsights || [],
+          areasOfAgreement: parsed.areasOfAgreement || [],
+          areasOfDisagreement: parsed.areasOfDisagreement || [],
+          participantHighlights: parsed.participantHighlights || [],
+          generatedAt: new Date().toISOString(),
+        };
+
+        // Verify we got at least some content
+        const hasContent = summary.keyInsights.length > 0 ||
+                          summary.areasOfAgreement.length > 0 ||
+                          summary.areasOfDisagreement.length > 0;
+
+        if (!hasContent) {
+          logger.warn(
+            { discussionId: this.discussionId, model: modelId },
+            'Summary generated but has no content, trying next model'
+          );
+          continue;
+        }
+
+        logger.info(
           {
-            role: 'system',
-            content: 'You are summarizing an informal discussion. Respond only in valid JSON.',
+            discussionId: this.discussionId,
+            model: modelId,
+            topicCount: summary.topicsCovered.length,
+            insightCount: summary.keyInsights.length,
           },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        maxTokens: 500,
-      });
+          'Summary generated successfully'
+        );
 
-      // Parse JSON response
-      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in summary response');
+        return summary;
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        logger.error(
+          {
+            discussionId: this.discussionId,
+            model: modelId,
+            error: errorMessage,
+            stack: errorStack,
+          },
+          'Error generating summary with model, trying next'
+        );
+        // Continue to next model
       }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      const summary: InformalSummary = {
-        topicsCovered: parsed.topicsCovered || [],
-        keyInsights: parsed.keyInsights || [],
-        areasOfAgreement: parsed.areasOfAgreement || [],
-        areasOfDisagreement: parsed.areasOfDisagreement || [],
-        participantHighlights: parsed.participantHighlights || [],
-        generatedAt: new Date().toISOString(),
-      };
-
-      logger.info(
-        { discussionId: this.discussionId, topicCount: summary.topicsCovered.length },
-        'Summary generated'
-      );
-
-      return summary;
-
-    } catch (error) {
-      logger.error({ error, discussionId: this.discussionId }, 'Error generating summary');
-
-      // Return empty summary on error
-      return {
-        topicsCovered: [],
-        keyInsights: [],
-        areasOfAgreement: [],
-        areasOfDisagreement: [],
-        participantHighlights: [],
-        generatedAt: new Date().toISOString(),
-      };
     }
+
+    // All models failed
+    logger.error(
+      { discussionId: this.discussionId, modelsAttempted: modelsToTry },
+      'All models failed to generate summary'
+    );
+
+    // Return empty summary on complete failure
+    return {
+      topicsCovered: [],
+      keyInsights: [],
+      areasOfAgreement: [],
+      areasOfDisagreement: [],
+      participantHighlights: [],
+      generatedAt: new Date().toISOString(),
+    };
   }
 
   // ===========================================================================
