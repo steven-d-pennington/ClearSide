@@ -37,11 +37,15 @@ export interface ModelInfo {
   costTier: 'low' | 'medium' | 'high';
 }
 
+export interface PresetChairInfo {
+  framework: PhilosophicalFramework;
+}
+
 export interface PresetInfo {
   id: string;
   name: string;
   description: string;
-  chairs: string[];
+  chairs: PresetChairInfo[];
 }
 
 export interface DuelogicChair {

@@ -82,9 +82,9 @@ export const DuelogicConfigPanel: React.FC<DuelogicConfigPanelProps> = ({
     (_presetId: string, preset: PresetInfo) => {
       // Map preset chairs to DuelogicChair format
       const defaultModel = availableModels[0]?.id || '';
-      const presetChairs: DuelogicChair[] = preset.chairs.map((framework, index) => ({
+      const presetChairs: DuelogicChair[] = preset.chairs.map((chair, index) => ({
         position: `chair_${index + 1}`,
-        framework: framework as PhilosophicalFramework,
+        framework: chair.framework,
         modelId: defaultModel,
       }));
       setChairs(presetChairs);
