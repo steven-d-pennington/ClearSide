@@ -1221,3 +1221,226 @@ describe('Interruption Integration', () => {
   });
 });
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-007
+
+> Added by agent completing Sprint 3 on 2026-01-03
+
+### DuelogicOrchestrator Tests
+
+Tests at `backend/tests/duelogic-orchestrator.test.ts`:
+
+```typescript
+import {
+  DuelogicOrchestrator,
+  createDuelogicOrchestrator,
+  type DuelogicOrchestratorOptions,
+  type DuelogicOrchestratorStatus,
+} from '../src/services/debate/duelogic-orchestrator.js';
+
+// Run with: npm run test -- --grep "DuelogicOrchestrator"
+```
+
+### Mock Pattern for Orchestrator Dependencies
+
+```typescript
+// Mock all orchestrator dependencies
+vi.mock('../src/services/agents/arbiter-agent.js', () => ({
+  createArbiterAgent: vi.fn(() => ({
+    generateIntroduction: vi.fn().mockResolvedValue('Welcome...'),
+    generateClosing: vi.fn().mockResolvedValue('In conclusion...'),
+    generateInterjection: vi.fn().mockResolvedValue('Let me interject...'),
+  })),
+}));
+
+vi.mock('../src/services/agents/chair-agent.js', () => ({
+  createChairAgents: vi.fn(() => {
+    const map = new Map();
+    map.set('utilitarian', {
+      generateOpening: vi.fn().mockResolvedValue('From a utilitarian perspective...'),
+      generateExchangeResponse: vi.fn().mockResolvedValue('I steel-man...'),
+      respondToChallenge: vi.fn().mockResolvedValue('Responding...'),
+      respondToInterruption: vi.fn().mockResolvedValue('Addressing...'),
+    });
+    map.set('deontological', { /* similar mocks */ });
+    return map;
+  }),
+}));
+
+vi.mock('../src/services/debate/response-evaluator.js', () => ({
+  createResponseEvaluator: vi.fn(() => ({
+    evaluate: vi.fn().mockResolvedValue({
+      evaluation: {
+        adherenceScore: 85,
+        steelManning: { attempted: true, quality: 'good' },
+        selfCritique: { attempted: true, quality: 'good' },
+      },
+      cached: false,
+    }),
+    shouldInterject: vi.fn().mockReturnValue(false),
+    determineViolationType: vi.fn().mockReturnValue(null),
+  })),
+}));
+
+vi.mock('../src/services/debate/chair-interruption-engine.js', () => ({
+  createChairInterruptionEngine: vi.fn(() => ({
+    evaluateInterrupt: vi.fn().mockResolvedValue(null),
+  })),
+}));
+```
+
+### SSE Manager Mock
+
+```typescript
+function createMockSSEManager() {
+  return {
+    broadcastToDebate: vi.fn(),
+    broadcast: vi.fn(),
+    addClient: vi.fn(),
+    removeClient: vi.fn(),
+  };
+}
+```
+
+### Test Fixtures for Orchestrator
+
+```typescript
+function createTestOptions(overrides?: Partial<DuelogicOrchestratorOptions>): DuelogicOrchestratorOptions {
+  return {
+    debateId: 'test-debate-123',
+    proposition: 'Should AI systems be given legal personhood?',
+    propositionContext: 'Context about AI development',
+    config: {
+      chairs: [
+        { position: 'utilitarian', framework: 'utilitarian', modelId: 'test' },
+        { position: 'deontological', framework: 'deontological', modelId: 'test' },
+      ],
+      flow: { maxExchanges: 2, autoAdvance: true },
+      podcastMode: { enabled: true },
+      interruptions: { enabled: false },
+      mandates: { steelManningRequired: true, selfCritiqueRequired: true, arbiterCanInterject: false },
+      arbiter: { accountabilityLevel: 'moderate' },
+      tone: 'academic',
+    },
+    sseManager: createMockSSEManager() as any,
+    ...overrides,
+  };
+}
+```
+
+### Key Test Assertions
+
+```typescript
+// Status assertions
+expect(orchestrator.getStatus()).toEqual({
+  isRunning: false,
+  isPaused: false,
+  currentSegment: 'introduction',
+  utteranceCount: 0,
+  exchangeNumber: 0,
+  elapsedMs: 0,
+});
+
+// Segment event assertions
+const segmentStartCalls = sseManager.broadcastToDebate.mock.calls.filter(
+  (call: any[]) => call[1] === 'segment_start'
+);
+expect(segmentStartCalls.length).toBe(4);  // intro, opening, exchange, synthesis
+
+// Transcript assertions
+const transcript = orchestrator.getTranscript();
+expect(transcript.length).toBeGreaterThan(0);
+transcript.forEach((utterance) => {
+  expect(utterance).toHaveProperty('speaker');
+  expect(utterance).toHaveProperty('segment');
+  expect(utterance).toHaveProperty('content');
+  expect(utterance).toHaveProperty('timestampMs');
+});
+```
+
+### Pause/Resume Test Pattern
+
+```typescript
+it('pauses and resumes correctly', async () => {
+  const orchestrator = createDuelogicOrchestrator(options);
+  const debatePromise = orchestrator.start();
+
+  // Wait for debate to start
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  // Pause
+  orchestrator.pause();
+  expect(orchestrator.getStatus().isPaused).toBe(true);
+  expect(sseManager.broadcastToDebate).toHaveBeenCalledWith(
+    'test-debate-123', 'debate_paused', expect.any(Object)
+  );
+
+  // Resume
+  orchestrator.resume();
+  expect(orchestrator.getStatus().isPaused).toBe(false);
+  expect(sseManager.broadcastToDebate).toHaveBeenCalledWith(
+    'test-debate-123', 'debate_resumed', expect.any(Object)
+  );
+
+  await debatePromise;
+});
+```
+
+### Error Handling Test
+
+```typescript
+it('broadcasts error event on failure', async () => {
+  const { createArbiterAgent } = await import('../src/services/agents/arbiter-agent.js');
+  (createArbiterAgent as any).mockReturnValueOnce({
+    generateIntroduction: vi.fn().mockRejectedValue(new Error('LLM API error')),
+    generateClosing: vi.fn().mockResolvedValue('Closing...'),
+  });
+
+  const orchestrator = createDuelogicOrchestrator(options);
+  await orchestrator.start();
+
+  expect(sseManager.broadcastToDebate).toHaveBeenCalledWith(
+    'test-debate-123',
+    'error',
+    expect.objectContaining({ message: 'LLM API error' })
+  );
+});
+```
+
+### Integration Test with All Components
+
+```typescript
+describe('DuelogicOrchestrator Integration', () => {
+  it('executes complete debate flow', async () => {
+    // Use real (mocked) dependencies
+    const sseEvents: any[] = [];
+    const sseManager = {
+      broadcastToDebate: vi.fn((debateId, type, data) => {
+        sseEvents.push({ type, data });
+      }),
+    };
+
+    const orchestrator = createDuelogicOrchestrator({
+      ...options,
+      sseManager: sseManager as any,
+    });
+
+    await orchestrator.start();
+
+    // Verify event sequence
+    const eventTypes = sseEvents.map(e => e.type);
+    expect(eventTypes).toContain('duelogic_debate_started');
+    expect(eventTypes).toContain('segment_start');
+    expect(eventTypes).toContain('utterance');
+    expect(eventTypes).toContain('debate_complete');
+
+    // Verify stats in completion
+    const completeEvent = sseEvents.find(e => e.type === 'debate_complete');
+    expect(completeEvent.data.stats).toHaveProperty('durationMs');
+    expect(completeEvent.data.stats).toHaveProperty('utteranceCount');
+    expect(completeEvent.data.stats).toHaveProperty('chairStats');
+  });
+});
+```

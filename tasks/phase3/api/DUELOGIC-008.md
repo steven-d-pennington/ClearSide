@@ -870,3 +870,130 @@ When orchestrator triggers an interrupt, broadcast:
   }
 }
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-007
+
+> Added by agent completing Sprint 3 on 2026-01-03
+
+### DuelogicOrchestrator Integration
+
+The orchestrator is at `backend/src/services/debate/duelogic-orchestrator.ts`:
+
+```typescript
+import {
+  DuelogicOrchestrator,
+  createDuelogicOrchestrator,
+  type DuelogicOrchestratorOptions,
+  type DuelogicOrchestratorStatus,
+} from '../services/debate/duelogic-orchestrator.js';
+```
+
+### Creating Orchestrator in Route Handler
+
+```typescript
+// POST /api/debates/duelogic
+const orchestratorOptions: DuelogicOrchestratorOptions = {
+  debateId,
+  proposition: parsed.proposition,
+  propositionContext: parsed.propositionContext,
+  config,               // Full DuelogicConfig
+  sseManager,           // Inject the SSE manager
+};
+
+const orchestrator = createDuelogicOrchestrator(orchestratorOptions);
+
+// Store in active orchestrators map for pause/resume/stop
+activeOrchestrators.set(debateId, orchestrator);
+
+// Start in background (non-blocking)
+orchestrator.start().catch(err => {
+  logger.error({ err, debateId }, 'Debate failed');
+  activeOrchestrators.delete(debateId);
+});
+```
+
+### Orchestrator Control Methods
+
+Use for pause/resume/stop endpoints:
+
+```typescript
+// GET status
+const status: DuelogicOrchestratorStatus = orchestrator.getStatus();
+// Returns: { isRunning, isPaused, currentSegment, utteranceCount, exchangeNumber, elapsedMs }
+
+// POST /api/debates/:id/pause
+orchestrator.pause();
+
+// POST /api/debates/:id/resume
+orchestrator.resume();
+
+// POST /api/debates/:id/stop
+orchestrator.stop('User requested stop');
+
+// Get transcript
+const transcript = orchestrator.getTranscript();
+```
+
+### SSE Events Broadcast by Orchestrator
+
+The orchestrator broadcasts these events via `sseManager.broadcastToDebate()`:
+
+```typescript
+// Debate lifecycle
+'duelogic_debate_started'  // { debateId, proposition, chairs, config }
+'debate_paused'            // { debateId, pausedAt, segment, exchangeNumber }
+'debate_resumed'           // { debateId, resumedAt, segment, exchangeNumber }
+'debate_stopped'           // { debateId, stoppedAt, reason, segment, utteranceCount }
+'debate_complete'          // { debateId, completedAt, stats }
+'error'                    // { debateId, message, timestamp }
+
+// Segment lifecycle
+'segment_start'            // { segment, timestamp }
+'segment_complete'         // { segment, timestamp }
+'exchange_complete'        // { exchangeNumber, maxExchanges }
+
+// Speaker events
+'speaker_started'          // { speaker, framework, segment, exchangeNumber? }
+'utterance'                // { speaker, segment, content, timestampMs, evaluation?, isInterruption? }
+
+// Interventions
+'chair_interrupt'          // { interrupter, interrupted, reason, opener, urgency }
+'arbiter_interjection'     // { chair, violation, adherenceScore }
+```
+
+### Stats Returned on Completion
+
+```typescript
+interface DebateStats {
+  durationMs: number;
+  utteranceCount: number;
+  interruptionCount: number;
+  chairStats: Record<string, {
+    averageAdherence: number;
+    steelManningRate: number;
+    selfCritiqueRate: number;
+    utteranceCount: number;
+    interruptionsMade: number;
+  }>;
+}
+```
+
+### Active Orchestrator Map Pattern
+
+```typescript
+// Keep track of running orchestrators
+const activeOrchestrators = new Map<string, DuelogicOrchestrator>();
+
+// In stop handler
+router.post('/debates/:id/stop', (req, res) => {
+  const orchestrator = activeOrchestrators.get(req.params.id);
+  if (!orchestrator) {
+    return res.status(404).json({ success: false, message: 'Debate not found' });
+  }
+  orchestrator.stop();
+  activeOrchestrators.delete(req.params.id);  // Clean up
+  res.json({ success: true, message: 'Debate stopped' });
+});
+```

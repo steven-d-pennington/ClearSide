@@ -1112,3 +1112,198 @@ case 'chair_interrupt':
   setTimeout(() => setInterruptNotification(null), 5000);
   break;
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-007
+
+> Added by agent completing Sprint 3 on 2026-01-03
+
+### SSE Events to Handle from Orchestrator
+
+The DuelogicOrchestrator broadcasts these events. Handle in `useDebateStream` hook:
+
+```typescript
+interface DuelogicSSEEvents {
+  // Debate lifecycle
+  duelogic_debate_started: {
+    debateId: string;
+    proposition: string;
+    chairs: Array<{ position: string; framework: string; displayName: string }>;
+    config: { maxExchanges: number; tone: string; podcastMode: boolean; interruptionsEnabled: boolean };
+  };
+  debate_paused: { debateId: string; pausedAt: string; segment: string; exchangeNumber: number };
+  debate_resumed: { debateId: string; resumedAt: string; segment: string; exchangeNumber: number };
+  debate_stopped: { debateId: string; stoppedAt: string; reason: string; segment: string; utteranceCount: number; durationMs: number };
+  debate_complete: { debateId: string; completedAt: string; stats: DebateStats };
+  error: { debateId: string; message: string; timestamp: number };
+
+  // Segment lifecycle
+  segment_start: { segment: 'introduction' | 'opening' | 'exchange' | 'synthesis'; timestamp: number };
+  segment_complete: { segment: string; timestamp: number };
+  exchange_complete: { exchangeNumber: number; maxExchanges: number };
+
+  // Speaker events
+  speaker_started: { speaker: string; framework?: string; segment: string; exchangeNumber?: number };
+  utterance: {
+    speaker: string;
+    segment: string;
+    content: string;
+    timestampMs: number;
+    evaluation?: { adherenceScore: number; steelManning: object; selfCritique: object };
+    isInterruption?: boolean;
+  };
+
+  // Interventions
+  chair_interrupt: { interrupter: string; interrupted: string; reason: string; opener: string; urgency: number };
+  arbiter_interjection: { chair: string; violation: string; adherenceScore: number };
+}
+```
+
+### Segment Progress Component
+
+```tsx
+interface SegmentProgressProps {
+  currentSegment: 'introduction' | 'opening' | 'exchange' | 'synthesis';
+  exchangeNumber: number;
+  maxExchanges: number;
+}
+
+const segmentOrder = ['introduction', 'opening', 'exchange', 'synthesis'];
+
+export function SegmentProgress({ currentSegment, exchangeNumber, maxExchanges }: SegmentProgressProps) {
+  const currentIndex = segmentOrder.indexOf(currentSegment);
+
+  return (
+    <div className="flex items-center gap-2">
+      {segmentOrder.map((segment, index) => (
+        <div key={segment} className="flex items-center">
+          <div className={`w-3 h-3 rounded-full ${
+            index < currentIndex ? 'bg-green-500' :
+            index === currentIndex ? 'bg-blue-500 animate-pulse' :
+            'bg-gray-300'
+          }`} />
+          <span className={`ml-1 text-xs ${index === currentIndex ? 'font-bold' : ''}`}>
+            {segment === 'exchange' ? `Exchange ${exchangeNumber}/${maxExchanges}` : segment}
+          </span>
+          {index < segmentOrder.length - 1 && <div className="w-4 h-0.5 bg-gray-300 mx-2" />}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Debate Controls Component
+
+```tsx
+interface DebateControlsProps {
+  debateId: string;
+  isRunning: boolean;
+  isPaused: boolean;
+  onPause: () => void;
+  onResume: () => void;
+  onStop: () => void;
+}
+
+export function DebateControls({ debateId, isRunning, isPaused, onPause, onResume, onStop }: DebateControlsProps) {
+  if (!isRunning) return null;
+
+  return (
+    <div className="flex gap-2">
+      {isPaused ? (
+        <button onClick={onResume} className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+          Resume
+        </button>
+      ) : (
+        <button onClick={onPause} className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">
+          Pause
+        </button>
+      )}
+      <button onClick={onStop} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">
+        Stop
+      </button>
+    </div>
+  );
+}
+```
+
+### API Integration for Controls
+
+```typescript
+// In useDuelogicDebate hook:
+const pauseDebate = async () => {
+  await fetch(`/api/debates/${debateId}/pause`, { method: 'POST' });
+  setIsPaused(true);
+};
+
+const resumeDebate = async () => {
+  await fetch(`/api/debates/${debateId}/resume`, { method: 'POST' });
+  setIsPaused(false);
+};
+
+const stopDebate = async () => {
+  await fetch(`/api/debates/${debateId}/stop`, { method: 'POST' });
+  setIsRunning(false);
+};
+```
+
+### Debate Stats Display
+
+```tsx
+interface DebateStatsDisplayProps {
+  stats: {
+    durationMs: number;
+    utteranceCount: number;
+    interruptionCount: number;
+    chairStats: Record<string, {
+      averageAdherence: number;
+      steelManningRate: number;
+      selfCritiqueRate: number;
+      utteranceCount: number;
+      interruptionsMade: number;
+    }>;
+  };
+}
+
+export function DebateStatsDisplay({ stats }: DebateStatsDisplayProps) {
+  const formatDuration = (ms: number) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}m ${seconds}s`;
+  };
+
+  return (
+    <div className="p-4 bg-white rounded-lg shadow">
+      <h3 className="text-lg font-bold mb-4">Debate Complete</h3>
+
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold">{formatDuration(stats.durationMs)}</div>
+          <div className="text-sm text-gray-500">Duration</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">{stats.utteranceCount}</div>
+          <div className="text-sm text-gray-500">Utterances</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold">{stats.interruptionCount}</div>
+          <div className="text-sm text-gray-500">Interruptions</div>
+        </div>
+      </div>
+
+      <h4 className="font-medium mb-2">Chair Performance</h4>
+      {Object.entries(stats.chairStats).map(([position, chairStat]) => (
+        <div key={position} className="flex justify-between items-center py-2 border-b">
+          <span className="font-medium">{position}</span>
+          <div className="flex gap-4 text-sm">
+            <span>Adherence: {chairStat.averageAdherence}%</span>
+            <span>Steel-Man: {chairStat.steelManningRate}%</span>
+            <span>Self-Critique: {chairStat.selfCritiqueRate}%</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
