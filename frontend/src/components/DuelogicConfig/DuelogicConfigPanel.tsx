@@ -79,7 +79,7 @@ export const DuelogicConfigPanel: React.FC<DuelogicConfigPanelProps> = ({
 
   // Handle preset selection
   const handlePresetSelect = useCallback(
-    (presetId: string, preset: PresetInfo) => {
+    (_presetId: string, preset: PresetInfo) => {
       // Map preset chairs to DuelogicChair format
       const defaultModel = availableModels[0]?.id || '';
       const presetChairs: DuelogicChair[] = preset.chairs.map((framework, index) => ({

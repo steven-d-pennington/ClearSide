@@ -10,7 +10,6 @@ import type {
   ChairInfo,
   ModelInfo,
   DuelogicChair,
-  TIER_COLORS,
 } from './duelogic-config.types';
 import styles from './DuelogicConfig.module.css';
 
