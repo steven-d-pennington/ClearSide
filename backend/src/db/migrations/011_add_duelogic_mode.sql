@@ -218,6 +218,7 @@ ALTER TABLE utterances ADD CONSTRAINT utterances_speaker_check
 -- ============================================================================
 
 -- Update phase constraint to include duelogic segments
+-- Keep all phases from informal mode as well
 ALTER TABLE utterances DROP CONSTRAINT IF EXISTS utterances_phase_check;
 ALTER TABLE utterances ADD CONSTRAINT utterances_phase_check
   CHECK (phase IN (
@@ -228,6 +229,9 @@ ALTER TABLE utterances ADD CONSTRAINT utterances_phase_check
     'rebuttals',
     'synthesis',
     'closing_statements',
+    -- Informal mode phases
+    'informal',
+    'wrapup',
     -- Duelogic segments
     'introduction',
     'opening',
@@ -239,6 +243,7 @@ ALTER TABLE utterances ADD CONSTRAINT utterances_phase_check
 -- ============================================================================
 
 -- Update debates.current_phase to include duelogic segments
+-- Keep all phases from informal mode as well
 ALTER TABLE debates DROP CONSTRAINT IF EXISTS debates_current_phase_check;
 ALTER TABLE debates ADD CONSTRAINT debates_current_phase_check
   CHECK (current_phase IN (
@@ -249,6 +254,9 @@ ALTER TABLE debates ADD CONSTRAINT debates_current_phase_check
     'rebuttals',
     'synthesis',
     'closing_statements',
+    -- Informal mode phases
+    'informal',
+    'wrapup',
     -- Duelogic segments
     'introduction',
     'opening',
@@ -263,6 +271,19 @@ ALTER TABLE debates ADD CONSTRAINT debates_current_phase_check
 ALTER TABLE debates DROP CONSTRAINT IF EXISTS debates_current_speaker_check;
 ALTER TABLE debates ADD CONSTRAINT debates_current_speaker_check
   CHECK (current_speaker IN (
+    'moderator', 'pro_advocate', 'con_advocate', 'user', 'arbiter',
+    'participant_1', 'participant_2', 'participant_3', 'participant_4',
+    'chair_1', 'chair_2', 'chair_3', 'chair_4', 'chair_5', 'chair_6'
+  ));
+
+-- ============================================================================
+-- USER INTERVENTIONS DIRECTED_TO CONSTRAINT UPDATE
+-- ============================================================================
+
+-- Update user_interventions.directed_to to include all speaker types
+ALTER TABLE user_interventions DROP CONSTRAINT IF EXISTS user_interventions_directed_to_check;
+ALTER TABLE user_interventions ADD CONSTRAINT user_interventions_directed_to_check
+  CHECK (directed_to IS NULL OR directed_to IN (
     'moderator', 'pro_advocate', 'con_advocate', 'user', 'arbiter',
     'participant_1', 'participant_2', 'participant_3', 'participant_4',
     'chair_1', 'chair_2', 'chair_3', 'chair_4', 'chair_5', 'chair_6'
