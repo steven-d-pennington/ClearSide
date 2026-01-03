@@ -23,7 +23,6 @@ import type {
   DuelogicChair,
   DebateTone,
   AggressivenessLevel,
-  PhilosophicalFramework,
   PresetInfo,
 } from './duelogic-config.types';
 import styles from './DuelogicConfig.module.css';
