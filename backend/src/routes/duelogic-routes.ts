@@ -16,6 +16,7 @@
 
 import express, { type Request, type Response } from 'express';
 import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 import { sseManager } from '../services/sse/index.js';
 import * as debateRepository from '../db/repositories/debate-repository.js';
 import * as duelogicRepository from '../db/repositories/duelogic-repository.js';
@@ -156,12 +157,10 @@ const ManualInterjectionSchema = z.object({
 // ============================================================================
 
 /**
- * Generate a unique debate ID
+ * Generate a unique debate ID (UUID format required by database)
  */
 function generateDebateId(): string {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substring(2, 8);
-  return `duelogic_${timestamp}_${random}`;
+  return uuidv4();
 }
 
 // ============================================================================
