@@ -277,6 +277,19 @@ ALTER TABLE debates ADD CONSTRAINT debates_current_speaker_check
   ));
 
 -- ============================================================================
+-- USER INTERVENTIONS DIRECTED_TO CONSTRAINT UPDATE
+-- ============================================================================
+
+-- Update user_interventions.directed_to to include all speaker types
+ALTER TABLE user_interventions DROP CONSTRAINT IF EXISTS user_interventions_directed_to_check;
+ALTER TABLE user_interventions ADD CONSTRAINT user_interventions_directed_to_check
+  CHECK (directed_to IS NULL OR directed_to IN (
+    'moderator', 'pro_advocate', 'con_advocate', 'user', 'arbiter',
+    'participant_1', 'participant_2', 'participant_3', 'participant_4',
+    'chair_1', 'chair_2', 'chair_3', 'chair_4', 'chair_5', 'chair_6'
+  ));
+
+-- ============================================================================
 -- HELPER VIEW: DUELOGIC DEBATE SUMMARY
 -- ============================================================================
 
