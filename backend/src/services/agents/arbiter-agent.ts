@@ -16,8 +16,6 @@ import {
   type DuelogicConfig,
   type DuelogicChair,
   type ResponseEvaluation,
-  type AccountabilityLevel,
-  PHILOSOPHICAL_CHAIR_INFO,
 } from '../../types/duelogic.js';
 import {
   buildPodcastIntroPrompt,
@@ -33,7 +31,7 @@ import {
   type EvaluationContext,
   type ViolationType,
 } from './prompts/arbiter-prompts.js';
-import { createOpenRouterClient, type OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
+import { createOpenRouterClient, OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 
 const logger = pino({
   name: 'arbiter-agent',
@@ -438,9 +436,10 @@ export class ArbiterAgent {
 
         // Broadcast token via SSE
         if (this.sseManager) {
-          this.sseManager.broadcast(this.debateId, {
-            type: 'token',
-            data: { speaker: 'arbiter', segment, token: chunk },
+          this.sseManager.broadcastToDebate(this.debateId, 'token', {
+            speaker: 'arbiter',
+            segment,
+            token: chunk,
           });
         }
       }

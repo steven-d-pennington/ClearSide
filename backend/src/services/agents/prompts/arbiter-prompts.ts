@@ -11,7 +11,6 @@
 import {
   type DuelogicChair,
   type ResponseEvaluation,
-  type PhilosophicalChair,
   type QualityLevel,
   PHILOSOPHICAL_CHAIR_INFO,
 } from '../../../types/duelogic.js';
@@ -439,7 +438,7 @@ Evaluate now and respond in JSON format:`;
 function getOrdinal(n: number): string {
   const suffixes = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
-  return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+  return n + (suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0] ?? 'th');
 }
 
 /**

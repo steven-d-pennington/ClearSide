@@ -26,13 +26,6 @@ import {
   DUELOGIC_CONSTRAINTS,
   DUELOGIC_DEFAULTS,
   mergeWithDuelogicDefaults,
-  type DuelogicConfig,
-  type DuelogicChair,
-  type PhilosophicalChair,
-  type AccountabilityLevel,
-  type AggressivenessLevel,
-  type DebateTone,
-  type FlowStyle,
 } from '../types/duelogic.js';
 import {
   DuelogicOrchestrator,
@@ -196,8 +189,8 @@ router.post('/debates/duelogic', async (req: Request, res: Response) => {
     // Generate debate ID
     const debateId = generateDebateId();
 
-    // Merge with defaults
-    const config = mergeWithDuelogicDefaults(inputConfig || {});
+    // Merge with defaults - cast to allow partial arbiter config
+    const config = mergeWithDuelogicDefaults(inputConfig as any || {});
 
     logger.info(
       {
@@ -216,7 +209,7 @@ router.post('/debates/duelogic', async (req: Request, res: Response) => {
       propositionText: proposition,
       propositionContext: propositionContext ? { context: propositionContext } : undefined,
       debateMode: 'duelogic',
-      duelogicConfig: config,
+      duelogicConfig: config as unknown as Record<string, unknown>,
     });
 
     // Create orchestrator
@@ -401,7 +394,7 @@ router.get('/debates/:id/duelogic/status', async (req: Request, res: Response) =
     // Get stats from database
     const stats = await duelogicRepository.getDuelogicDebateStats(id!);
 
-    res.json({
+    return res.json({
       success: true,
       active: false,
       debate: {
@@ -415,7 +408,7 @@ router.get('/debates/:id/duelogic/status', async (req: Request, res: Response) =
     });
   } catch (error) {
     logger.error({ id, error }, 'Error getting Duelogic debate status');
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to get debate status',
     });
@@ -441,7 +434,7 @@ router.post('/debates/:id/duelogic/pause', (req: Request, res: Response) => {
 
   logger.info({ debateId: id }, 'Duelogic debate paused');
 
-  res.json({
+  return res.json({
     success: true,
     message: 'Debate paused',
     debateId: id,
@@ -468,7 +461,7 @@ router.post('/debates/:id/duelogic/resume', (req: Request, res: Response) => {
 
   logger.info({ debateId: id }, 'Duelogic debate resumed');
 
-  res.json({
+  return res.json({
     success: true,
     message: 'Debate resumed',
     debateId: id,
@@ -497,7 +490,7 @@ router.post('/debates/:id/duelogic/stop', (req: Request, res: Response) => {
 
   logger.info({ debateId: id, reason }, 'Duelogic debate stopped');
 
-  res.json({
+  return res.json({
     success: true,
     message: 'Debate stopped',
     debateId: id,
@@ -540,7 +533,7 @@ router.post('/debates/:id/arbiter/interject', async (req: Request, res: Response
       'Manual interjection requested'
     );
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Interjection queued',
       debateId: id,
@@ -549,7 +542,7 @@ router.post('/debates/:id/arbiter/interject', async (req: Request, res: Response
     });
   } catch (error) {
     logger.error({ id, error }, 'Error triggering manual interjection');
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Failed to trigger interjection',
     });

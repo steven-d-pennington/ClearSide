@@ -19,15 +19,13 @@
 
 import pino from 'pino';
 import type { LLMClient } from '../llm/client.js';
-import { createOpenRouterClient, type OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
+import { createOpenRouterClient } from '../llm/openrouter-adapter.js';
 import {
   type DuelogicChair,
   type DuelogicConfig,
   type ChairInterruptCandidate,
   type ChairInterruptReason,
-  type AggressivenessLevel,
   PHILOSOPHICAL_CHAIR_INFO,
-  INTERRUPT_OPENERS,
   getRandomInterruptOpener,
   getUrgencyThreshold,
 } from '../../types/duelogic.js';

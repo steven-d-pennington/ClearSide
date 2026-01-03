@@ -217,11 +217,10 @@ Respond to the challenge now.`;
  * Build prompt for responding to an interruption
  */
 export function buildInterruptionResponsePrompt(
-  chair: DuelogicChair,
+  _chair: DuelogicChair,
   interrupter: DuelogicChair,
   interruptionContent: string
 ): string {
-  const info = PHILOSOPHICAL_CHAIR_INFO[chair.framework];
   const interrupterName = interrupter.modelDisplayName || interrupter.modelId;
 
   return `You've been interrupted by ${interrupterName}.
@@ -251,11 +250,10 @@ Respond to the interruption now.`;
  * Build prompt for requesting clarification from another chair
  */
 export function buildClarificationRequestPrompt(
-  chair: DuelogicChair,
+  _chair: DuelogicChair,
   targetChair: DuelogicChair,
   unclearContent: string
 ): string {
-  const info = PHILOSOPHICAL_CHAIR_INFO[chair.framework];
   const targetInfo = PHILOSOPHICAL_CHAIR_INFO[targetChair.framework];
   const targetName = targetChair.modelDisplayName || targetChair.modelId;
 

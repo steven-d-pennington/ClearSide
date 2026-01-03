@@ -17,7 +17,7 @@
 
 import pino from 'pino';
 import type { LLMClient } from '../llm/client.js';
-import { createOpenRouterClient, type OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
+import { createOpenRouterClient } from '../llm/openrouter-adapter.js';
 import {
   type DuelogicChair,
   type DuelogicConfig,
@@ -29,7 +29,6 @@ import {
 } from '../../types/duelogic.js';
 import {
   saveResponseEvaluation,
-  getEvaluationByUtteranceId,
   getEvaluationsForDebate,
   getEvaluationsByChair,
 } from '../../db/repositories/duelogic-repository.js';
@@ -350,7 +349,10 @@ export class ResponseEvaluator {
       );
 
       batch.forEach((ctx, idx) => {
-        results.set(ctx.chair.position, evaluations[idx]);
+        const evaluation = evaluations[idx];
+        if (evaluation) {
+          results.set(ctx.chair.position, evaluation);
+        }
       });
     }
 

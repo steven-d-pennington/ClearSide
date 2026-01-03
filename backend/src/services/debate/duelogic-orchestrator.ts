@@ -23,7 +23,6 @@ import {
   type DuelogicSegment,
   type ResponseEvaluation,
   type ChairInterruptCandidate,
-  DUELOGIC_DEFAULTS,
   mergeWithDuelogicDefaults,
 } from '../../types/duelogic.js';
 import {
@@ -33,7 +32,6 @@ import {
 import {
   ChairAgent,
   createChairAgents,
-  getAllChairAgents,
 } from '../agents/chair-agent.js';
 import {
   ResponseEvaluator,
@@ -46,8 +44,8 @@ import {
 import {
   saveAllChairAssignments,
   saveDuelogicConfig,
-  getDuelogicDebateStats,
 } from '../../db/repositories/duelogic-repository.js';
+import type { DebatePhase } from '../../types/database.js';
 import * as utteranceRepo from '../../db/repositories/utterance-repository.js';
 
 const logger = pino({
@@ -420,8 +418,12 @@ export class DuelogicOrchestrator {
         });
 
         // Generate response
+        const fallbackChair = this.config.chairs[0];
+        if (!fallbackChair && !previousSpeaker) {
+          throw new Error('No previous speaker and no chairs configured');
+        }
         const content = await agent.generateExchangeResponse(
-          previousSpeaker || this.config.chairs[0],
+          previousSpeaker || fallbackChair!,
           previousContent,
           this.getTranscriptText()
         );
@@ -448,7 +450,7 @@ export class DuelogicOrchestrator {
           this.evaluations.get(chair.position)!.push(evaluation);
 
           // Check for arbiter interjection
-          if (this.config.mandates.arbiterCanInterject) {
+          if (this.config.mandates.arbiterCanInterject && evaluation) {
             if (this.evaluator.shouldInterject(evaluation, true)) {
               await this.executeArbiterInterjection(evaluation, chair);
             }
@@ -668,7 +670,7 @@ export class DuelogicOrchestrator {
         timestampMs: utterance.timestampMs,
       };
 
-      const persisted = await utteranceRepo.createUtterance(input);
+      const persisted = await utteranceRepo.create(input);
 
       // If we have evaluation, persist it
       if (utterance.evaluation && persisted.id) {
@@ -787,8 +789,9 @@ export class DuelogicOrchestrator {
    * Get last utterance content
    */
   private getLastUtteranceContent(): string {
-    if (this.transcript.length === 0) return '';
-    return this.transcript[this.transcript.length - 1].content;
+    const lastUtterance = this.transcript[this.transcript.length - 1];
+    if (!lastUtterance) return '';
+    return lastUtterance.content;
   }
 
   /**
@@ -808,8 +811,8 @@ export class DuelogicOrchestrator {
   /**
    * Map segment to database phase
    */
-  private mapSegmentToPhase(segment: DuelogicSegment): string {
-    const phaseMap: Record<DuelogicSegment, string> = {
+  private mapSegmentToPhase(segment: DuelogicSegment): DebatePhase {
+    const phaseMap: Record<DuelogicSegment, DebatePhase> = {
       introduction: 'opening_statements',
       opening: 'opening_statements',
       exchange: 'rebuttals',

@@ -759,7 +759,7 @@ export function validateDuelogicConfig(config: Partial<DuelogicConfig>): string[
  */
 export function getRandomInterruptOpener(reason: ChairInterruptReason): string {
   const openers = INTERRUPT_OPENERS[reason];
-  return openers[Math.floor(Math.random() * openers.length)];
+  return openers[Math.floor(Math.random() * openers.length)] ?? openers[0] ?? 'If I may—';
 }
 
 /**

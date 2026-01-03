@@ -13,7 +13,6 @@ import {
   type DuelogicChair,
   type DuelogicConfig,
   type PhilosophicalChair,
-  type DebateTone,
   PHILOSOPHICAL_CHAIR_INFO,
 } from '../../types/duelogic.js';
 import {
@@ -29,7 +28,7 @@ import {
   hasApparentSteelMan,
   hasApparentSelfCritique,
 } from './prompts/chair-prompts.js';
-import { createOpenRouterClient, type OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
+import { createOpenRouterClient, OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 
 const logger = pino({
   name: 'chair-agent',
@@ -68,7 +67,6 @@ export class ChairAgent {
   private llmClient: LLMClient;
   private sseManager?: SSEManager;
   private chair: DuelogicChair;
-  private config: DuelogicConfig;
   private debateId: string;
   private systemPrompt: string;
   private conversationHistory: ConversationEntry[];
@@ -79,7 +77,6 @@ export class ChairAgent {
     this.llmClient = options.llmClient || createOpenRouterClient(options.chair.modelId);
     this.sseManager = options.sseManager;
     this.chair = options.chair;
-    this.config = options.config;
     this.debateId = options.debateId;
     this.frameworkInfo = PHILOSOPHICAL_CHAIR_INFO[options.chair.framework];
 
@@ -507,14 +504,11 @@ export class ChairAgent {
 
         // Broadcast token via SSE
         if (this.sseManager) {
-          this.sseManager.broadcast(this.debateId, {
-            type: 'token',
-            data: {
-              speaker: this.chair.position,
-              segment,
-              framework: this.chair.framework,
-              token: chunk,
-            },
+          this.sseManager.broadcastToDebate(this.debateId, 'token', {
+            speaker: this.chair.position,
+            segment,
+            framework: this.chair.framework,
+            token: chunk,
           });
         }
       }
@@ -538,10 +532,13 @@ export class ChairAgent {
     // Trim history if too long (keep system prompt + last 20 exchanges)
     const maxEntries = 41; // 1 system + 40 user/assistant pairs
     if (this.conversationHistory.length > maxEntries) {
-      this.conversationHistory = [
-        this.conversationHistory[0], // Keep system prompt
-        ...this.conversationHistory.slice(-(maxEntries - 1)),
-      ];
+      const systemPrompt = this.conversationHistory[0];
+      if (systemPrompt) {
+        this.conversationHistory = [
+          systemPrompt, // Keep system prompt
+          ...this.conversationHistory.slice(-(maxEntries - 1)),
+        ];
+      }
     }
   }
 }
