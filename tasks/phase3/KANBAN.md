@@ -85,7 +85,7 @@ Phase 3 implements the **Duelogic Debate Mode** - a philosophical debate format 
 | Task ID | Task Name | Priority | Estimate | Status | Dependencies | Task File |
 |---------|-----------|----------|----------|--------|--------------|-----------|
 | DUELOGIC-008 | API Routes | P0 | S | ✅ DONE | DUELOGIC-001, 002, 007 | [View](./api/DUELOGIC-008.md) |
-| DUELOGIC-009 | Frontend Config UI | P1 | L | 🟢 TO DO | DUELOGIC-008 | [View](./ui/DUELOGIC-009.md) |
+| DUELOGIC-009 | Frontend Config UI | P1 | L | ✅ DONE | DUELOGIC-008 | [View](./ui/DUELOGIC-009.md) |
 
 **Sprint 4 Deliverables:**
 - REST API endpoints for Duelogic debates

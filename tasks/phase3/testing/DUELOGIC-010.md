@@ -1444,3 +1444,179 @@ describe('DuelogicOrchestrator Integration', () => {
   });
 });
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-008
+
+> Added by agent completing DUELOGIC-008 on 2026-01-03
+
+### API Route Tests
+
+Tests at `backend/tests/duelogic-routes.test.ts`:
+
+```typescript
+import duelogicRoutes from '../src/routes/duelogic-routes.js';
+
+// Run with: npm run test -- --grep "Duelogic API Routes"
+```
+
+### Test Fixtures for API Testing
+
+```typescript
+// Valid debate creation payload
+const validDebatePayload = {
+  proposition: 'Should AI development be paused for safety research?',
+  propositionContext: 'Context about AI safety concerns',
+  config: {
+    chairs: [
+      { position: 'chair_1', framework: 'utilitarian', modelId: 'anthropic/claude-sonnet-4' },
+      { position: 'chair_2', framework: 'deontological', modelId: 'openai/gpt-4o' },
+    ],
+    tone: 'spirited',
+    flow: { maxExchanges: 5, style: 'structured' },
+    interruptions: { enabled: true, allowChairInterruptions: true, aggressiveness: 3 },
+  },
+};
+
+// Invalid payloads for error testing
+const invalidPayloads = {
+  shortProposition: { proposition: 'Too short' },
+  tooFewChairs: {
+    proposition: 'Valid proposition text here',
+    config: {
+      chairs: [{ position: 'chair_1', framework: 'utilitarian', modelId: 'test' }],
+    },
+  },
+  invalidFramework: {
+    proposition: 'Valid proposition text here',
+    config: {
+      chairs: [
+        { position: 'chair_1', framework: 'invalid_framework', modelId: 'test' },
+        { position: 'chair_2', framework: 'utilitarian', modelId: 'test' },
+      ],
+    },
+  },
+};
+```
+
+### API Response Validation
+
+```typescript
+// GET /api/duelogic/chairs response validation
+expect(response.body).toEqual({
+  success: true,
+  chairs: expect.arrayContaining([
+    expect.objectContaining({
+      id: expect.any(String),
+      name: expect.any(String),
+      description: expect.any(String),
+      coreQuestion: expect.any(String),
+      strengthsToAcknowledge: expect.any(Array),
+      blindSpotsToAdmit: expect.any(Array),
+    }),
+  ]),
+  count: 10,
+});
+
+// POST /api/debates/duelogic response validation
+expect(response.body).toEqual({
+  success: true,
+  debateId: expect.stringMatching(/^duelogic_/),
+  config: expect.objectContaining({
+    chairs: expect.any(Array),
+    tone: expect.any(String),
+    flow: expect.any(Object),
+  }),
+  message: 'Duelogic debate created and starting',
+});
+
+// Error response validation
+expect(response.body).toEqual({
+  success: false,
+  errors: expect.arrayContaining([
+    expect.objectContaining({
+      message: expect.any(String),
+    }),
+  ]),
+});
+```
+
+### Integration Test with Real API
+
+```typescript
+describe('E2E Duelogic Flow', () => {
+  it('creates and runs a complete debate', async () => {
+    // 1. Get chairs
+    const chairsRes = await request(app).get('/api/duelogic/chairs');
+    expect(chairsRes.body.chairs.length).toBe(10);
+
+    // 2. Get models
+    const modelsRes = await request(app).get('/api/duelogic/models');
+    expect(modelsRes.body.models.length).toBeGreaterThan(0);
+
+    // 3. Create debate
+    const createRes = await request(app)
+      .post('/api/debates/duelogic')
+      .send({
+        proposition: 'Test proposition for E2E',
+        config: {
+          chairs: [
+            { position: 'chair_1', framework: chairsRes.body.chairs[0].id, modelId: modelsRes.body.models[0].id },
+            { position: 'chair_2', framework: chairsRes.body.chairs[1].id, modelId: modelsRes.body.models[1].id },
+          ],
+        },
+      });
+
+    expect(createRes.status).toBe(201);
+    const { debateId } = createRes.body;
+
+    // 4. Check status
+    const statusRes = await request(app).get(`/api/debates/${debateId}/duelogic/status`);
+    expect(statusRes.body.success).toBe(true);
+  });
+});
+```
+
+### Mock Setup for Route Tests
+
+```typescript
+// Mock SSE manager
+vi.mock('../src/services/sse/index.js', () => ({
+  sseManager: {
+    broadcastToDebate: vi.fn(),
+  },
+}));
+
+// Mock debate repository
+vi.mock('../src/db/repositories/debate-repository.js', () => ({
+  create: vi.fn().mockResolvedValue({
+    id: 'duelogic_test_123',
+    propositionText: 'Test',
+    status: 'pending',
+    debateMode: 'duelogic',
+  }),
+  findById: vi.fn().mockImplementation((id) => {
+    if (id === 'not-found') return null;
+    return { id, debateMode: 'duelogic', status: 'completed' };
+  }),
+}));
+
+// Mock orchestrator
+vi.mock('../src/services/debate/duelogic-orchestrator.js', () => ({
+  createDuelogicOrchestrator: vi.fn().mockReturnValue({
+    start: vi.fn().mockResolvedValue(undefined),
+    pause: vi.fn(),
+    resume: vi.fn(),
+    stop: vi.fn(),
+    getStatus: vi.fn().mockReturnValue({
+      isRunning: true,
+      isPaused: false,
+      currentSegment: 'exchange',
+      utteranceCount: 10,
+      exchangeNumber: 3,
+      elapsedMs: 60000,
+    }),
+  }),
+}));
+```

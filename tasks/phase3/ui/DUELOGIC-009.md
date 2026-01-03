@@ -1307,3 +1307,100 @@ export function DebateStatsDisplay({ stats }: DebateStatsDisplayProps) {
   );
 }
 ```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-008
+
+> Added by agent completing DUELOGIC-008 on 2026-01-03
+
+### API Endpoints Available
+
+The following endpoints are implemented and ready to use from the frontend:
+
+```typescript
+// Base URL: /api
+
+// Get all philosophical chairs with descriptions
+GET /api/duelogic/chairs
+// Response: { success: true, chairs: ChairInfo[], count: number }
+
+// Get preset matchups
+GET /api/duelogic/presets
+// Response: { success: true, presets: Preset[], count: number }
+
+// Get available LLM models
+GET /api/duelogic/models
+// Response: { success: true, models: Model[], count: number }
+
+// Get default configuration values
+GET /api/duelogic/defaults
+// Response: { success: true, defaults: DuelogicConfig, constraints: Constraints }
+
+// Create a new Duelogic debate
+POST /api/debates/duelogic
+// Body: { proposition: string, propositionContext?: string, config?: DuelogicConfig }
+// Response: { success: true, debateId: string, config: DuelogicConfig }
+```
+
+### React Hooks for API Integration
+
+```typescript
+// hooks/useDuelogicConfig.ts
+export function useDuelogicChairs() {
+  const [chairs, setChairs] = useState<ChairInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/duelogic/chairs')
+      .then(res => res.json())
+      .then(data => data.success && setChairs(data.chairs))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { chairs, loading };
+}
+
+export function useDuelogicModels() {
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/duelogic/models')
+      .then(res => res.json())
+      .then(data => data.success && setModels(data.models))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { models, loading };
+}
+```
+
+### Create Debate Function
+
+```typescript
+export async function createDuelogicDebate(
+  proposition: string,
+  config?: Partial<DuelogicConfig>
+): Promise<{ debateId: string; config: DuelogicConfig }> {
+  const response = await fetch('/api/debates/duelogic', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ proposition, config }),
+  });
+
+  const data = await response.json();
+  if (!data.success) throw new Error(data.errors?.[0]?.message);
+  return { debateId: data.debateId, config: data.config };
+}
+```
+
+### Model Tier Styling
+
+```tsx
+const tierColors = {
+  low: 'bg-green-100 text-green-800',
+  medium: 'bg-blue-100 text-blue-800',
+  high: 'bg-purple-100 text-purple-800',
+};
+```
