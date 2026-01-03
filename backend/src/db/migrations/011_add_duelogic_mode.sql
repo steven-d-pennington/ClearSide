@@ -218,6 +218,7 @@ ALTER TABLE utterances ADD CONSTRAINT utterances_speaker_check
 -- ============================================================================
 
 -- Update phase constraint to include duelogic segments
+-- Keep all phases from informal mode as well
 ALTER TABLE utterances DROP CONSTRAINT IF EXISTS utterances_phase_check;
 ALTER TABLE utterances ADD CONSTRAINT utterances_phase_check
   CHECK (phase IN (
@@ -228,6 +229,9 @@ ALTER TABLE utterances ADD CONSTRAINT utterances_phase_check
     'rebuttals',
     'synthesis',
     'closing_statements',
+    -- Informal mode phases
+    'informal',
+    'wrapup',
     -- Duelogic segments
     'introduction',
     'opening',
@@ -239,6 +243,7 @@ ALTER TABLE utterances ADD CONSTRAINT utterances_phase_check
 -- ============================================================================
 
 -- Update debates.current_phase to include duelogic segments
+-- Keep all phases from informal mode as well
 ALTER TABLE debates DROP CONSTRAINT IF EXISTS debates_current_phase_check;
 ALTER TABLE debates ADD CONSTRAINT debates_current_phase_check
   CHECK (current_phase IN (
@@ -249,6 +254,9 @@ ALTER TABLE debates ADD CONSTRAINT debates_current_phase_check
     'rebuttals',
     'synthesis',
     'closing_statements',
+    -- Informal mode phases
+    'informal',
+    'wrapup',
     -- Duelogic segments
     'introduction',
     'opening',
