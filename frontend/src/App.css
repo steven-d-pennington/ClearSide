@@ -6,15 +6,18 @@
 }
 
 .app-header {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
   margin-bottom: var(--spacing-2xl);
 }
 
-.app-header h1 {
+.brand h1 {
   font-size: var(--font-size-4xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-sm) 0;
+  margin: 0 0 var(--spacing-xs) 0;
 }
 
 .tagline {
@@ -73,7 +76,12 @@
     padding: var(--spacing-md);
   }
 
-  .app-header h1 {
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .brand h1 {
     font-size: var(--font-size-2xl);
   }
 
