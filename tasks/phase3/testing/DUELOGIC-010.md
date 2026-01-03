@@ -706,3 +706,218 @@ Document findings in `docs/DUELOGIC_TUNING.md`:
 - [ ] Performance benchmarks documented
 - [ ] Tuning recommendations documented
 - [ ] No critical bugs remaining
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Test Helper Imports
+
+```typescript
+// Types for test fixtures
+import {
+  DuelogicConfig,
+  DuelogicChair,
+  PhilosophicalChair,
+  ResponseEvaluation,
+  ChairInterruptCandidate,
+  ChairInterruptReason,
+  DUELOGIC_DEFAULTS,
+  DUELOGIC_PRESETS,
+  PHILOSOPHICAL_CHAIR_INFO,
+} from '../../types/duelogic.js';
+
+// Repository for database tests
+import {
+  DuelogicRepository,
+  saveChairAssignment,
+  saveResponseEvaluation,
+  saveChairInterruption,
+  getEvaluationsForDebate,
+  getInterruptionsByDebate,
+} from '../../db/repositories/duelogic-repository.js';
+```
+
+### Test Fixtures
+
+```typescript
+// Sample chair for tests
+const mockChair: DuelogicChair = {
+  position: 'chair_1',
+  framework: 'utilitarian',
+  modelId: 'test-model',
+  modelDisplayName: 'Test Model',
+  providerName: 'Test Provider',
+};
+
+// Sample evaluation
+const mockEvaluation: ResponseEvaluation = {
+  adherenceScore: 75,
+  steelManning: { attempted: true, quality: 'adequate' },
+  selfCritique: { attempted: true, quality: 'weak' },
+  frameworkConsistency: { consistent: true },
+  intellectualHonesty: { score: 'high' },
+  requiresInterjection: false,
+};
+
+// Sample config for orchestrator tests
+const testConfig: DuelogicConfig = {
+  ...DUELOGIC_DEFAULTS,
+  flow: { ...DUELOGIC_DEFAULTS.flow, maxExchanges: 2 },
+};
+```
+
+### Database Test Setup
+
+Migration file: `backend/src/db/migrations/011_add_duelogic_mode.sql`
+
+Tables to populate in tests:
+- `debates` with `debate_mode = 'duelogic'`
+- `debate_chairs` for chair assignments
+- `utterances` with duelogic speakers (`chair_1`, `chair_2`, `arbiter`)
+- `response_evaluations` linked to utterances
+- `chair_interruptions` for interrupt tests
+
+### Key Test Assertions
+
+```typescript
+// Evaluation quality assertions
+expect(evaluation.steelManning.quality).toMatch(/strong|adequate|weak|absent/);
+expect(evaluation.adherenceScore).toBeGreaterThanOrEqual(0);
+expect(evaluation.adherenceScore).toBeLessThanOrEqual(100);
+
+// Interrupt reason assertions
+const validReasons = [
+  'factual_correction',
+  'straw_man_detected',
+  'direct_challenge',
+  'clarification_needed',
+  'strong_agreement',
+  'pivotal_point',
+];
+expect(validReasons).toContain(interrupt.triggerReason);
+
+// Chair count assertions
+expect(config.chairs.length).toBeGreaterThanOrEqual(2);
+expect(config.chairs.length).toBeLessThanOrEqual(6);
+```
+
+### Existing Test Patterns
+
+Check these files for patterns:
+- `backend/src/__tests__/services/debate/` - Unit test structure
+- `backend/src/__tests__/integration/` - Integration test patterns
+- `backend/src/__tests__/e2e/` - E2E test setup
+- `backend/src/__tests__/mocks/` - Mock LLM client patterns
+
+### Success Metrics from Spec
+
+```typescript
+// Metrics to validate in sample debates
+const successMetrics = {
+  steelManningRate: 0.8,      // >80% include steel-manning
+  selfCritiqueRate: 0.7,      // >70% include self-critique
+  frameworkConsistency: 0.9,  // >90% stay on framework
+  uncertaintyPreservation: true,  // No clear "winner"
+};
+```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-003 & DUELOGIC-004
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Agent Test Setup
+
+```typescript
+import { ArbiterAgent, createArbiterAgent } from '../agents/arbiter-agent.js';
+import { ChairAgent, createChairAgents } from '../agents/chair-agent.js';
+import { DUELOGIC_DEFAULTS, PHILOSOPHICAL_CHAIR_INFO } from '../../types/duelogic.js';
+
+// Create mock config for testing
+const testConfig = {
+  ...DUELOGIC_DEFAULTS,
+  chairs: [
+    { position: 'chair_1', framework: 'utilitarian', modelId: 'test-model' },
+    { position: 'chair_2', framework: 'virtue_ethics', modelId: 'test-model' },
+  ],
+};
+
+// Create agents
+const arbiter = createArbiterAgent({
+  config: testConfig,
+  debateId: 'test-debate-id',
+});
+
+const chairs = createChairAgents(testConfig, 'test-debate-id');
+```
+
+### Heuristic Tests (No LLM Required)
+
+The agents include heuristic checks that can be tested without LLM calls:
+
+```typescript
+import { quickSteelManCheck, quickSelfCritiqueCheck } from '../prompts/arbiter-prompts.js';
+import { hasApparentSteelMan, hasApparentSelfCritique } from '../prompts/chair-prompts.js';
+
+describe('Quick heuristics', () => {
+  it('detects steel-manning patterns', () => {
+    expect(quickSteelManCheck('I appreciate the point about...')).toBe(true);
+    expect(quickSteelManCheck('They are simply wrong.')).toBe(false);
+  });
+
+  it('detects self-critique patterns', () => {
+    expect(quickSelfCritiqueCheck("I'll admit my framework struggles with...")).toBe(true);
+    expect(quickSelfCritiqueCheck('My approach is clearly superior.')).toBe(false);
+  });
+});
+```
+
+### Evaluation Parsing Tests
+
+```typescript
+import { parseEvaluationResponse, getDefaultEvaluation } from '../prompts/arbiter-prompts.js';
+
+describe('Evaluation parsing', () => {
+  it('parses valid JSON response', () => {
+    const response = '{"adherenceScore": 75, "steelManning": {"attempted": true, "quality": "adequate"}}';
+    const evaluation = parseEvaluationResponse(response);
+    expect(evaluation?.adherenceScore).toBe(75);
+  });
+
+  it('returns null for invalid JSON', () => {
+    const evaluation = parseEvaluationResponse('not valid json');
+    expect(evaluation).toBeNull();
+  });
+
+  it('provides sensible defaults', () => {
+    const defaults = getDefaultEvaluation();
+    expect(defaults.adherenceScore).toBe(50);
+    expect(defaults.requiresInterjection).toBe(false);
+  });
+});
+```
+
+### Framework Coverage Tests
+
+```typescript
+import { getFrameworkOpeningHook, getSelfCritiquePrompt } from '../prompts/chair-prompts.js';
+
+describe('Framework prompts', () => {
+  const frameworks = Object.keys(PHILOSOPHICAL_CHAIR_INFO);
+
+  it.each(frameworks)('has opening hook for %s', (framework) => {
+    const hook = getFrameworkOpeningHook(framework as any);
+    expect(hook).toBeDefined();
+    expect(hook.length).toBeGreaterThan(10);
+  });
+
+  it.each(frameworks)('has self-critique for %s', (framework) => {
+    const critique = getSelfCritiquePrompt(framework as any);
+    expect(critique).toContain(PHILOSOPHICAL_CHAIR_INFO[framework].name);
+  });
+});
+```

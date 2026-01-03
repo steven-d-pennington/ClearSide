@@ -543,3 +543,149 @@ describe('Duelogic API Routes', () => {
 - [ ] Pause/resume/stop controls work
 - [ ] API tests pass
 - [ ] Routes registered in main router
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Types to Import
+
+From `backend/src/types/duelogic.ts`:
+
+```typescript
+import {
+  DuelogicConfig,
+  DuelogicChair,
+  PhilosophicalChair,
+  AccountabilityLevel,
+  AggressivenessLevel,
+  DebateTone,
+  FlowStyle,
+  PHILOSOPHICAL_CHAIR_INFO,
+  DUELOGIC_PRESETS,
+  DUELOGIC_DEFAULTS,
+  DUELOGIC_CONSTRAINTS,
+  createDuelogicConfig,      // Factory with validation
+  validateDuelogicConfig,    // Runtime validator
+  isPhilosophicalChair,      // Type guard
+} from '../types/duelogic.js';
+```
+
+### Repository Functions
+
+From `backend/src/db/repositories/duelogic-repository.ts`:
+
+```typescript
+import {
+  saveDuelogicConfig,       // Store config in debates.duelogic_config
+  getDuelogicConfig,        // Retrieve config from database
+  saveChairAssignment,      // Save single chair assignment
+  saveAllChairAssignments,  // Batch save all chairs
+  getChairAssignments,      // Get all chairs for debate
+  getDuelogicDebateStats,   // Summary statistics
+} from '../db/repositories/duelogic-repository.js';
+```
+
+### Database Schema
+
+Debates table with Duelogic columns:
+- `debate_mode`: 'duelogic' for this mode
+- `duelogic_config`: JSONB storing full DuelogicConfig
+
+New tables:
+- `debate_chairs`: Chair assignments per debate
+- `response_evaluations`: Evaluation scores per utterance
+- `chair_interruptions`: Logged interruption events
+
+### Zod Validation Constants
+
+Use `DUELOGIC_CONSTRAINTS` for validation limits:
+```typescript
+const DUELOGIC_CONSTRAINTS = {
+  minChairs: 2,
+  maxChairs: 6,
+  minExchanges: 2,
+  maxExchanges: 10,
+  minTargetDuration: 5,
+  maxTargetDuration: 60,
+};
+```
+
+### Existing Route Patterns
+
+Check `backend/src/routes/debate-routes.ts` for patterns:
+- Express Router setup
+- Zod schema validation
+- Error handling with appropriate status codes
+- SSE integration for real-time updates
+
+### API Response Format
+
+Standard response structure:
+```typescript
+// Success
+{ success: true, debateId: string, config: DuelogicConfig, message: string }
+
+// Error
+{ success: false, errors?: ZodError[], message: string }
+```
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-003 & DUELOGIC-004
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Agent Creation in Route Handler
+
+```typescript
+import { createArbiterAgent, ArbiterAgent } from '../agents/arbiter-agent.js';
+import { createChairAgents, getAllChairAgents } from '../agents/chair-agent.js';
+
+// In POST /api/debates/duelogic handler:
+const arbiter = createArbiterAgent({ config, debateId, sseManager });
+const chairAgents = createChairAgents(config, debateId, sseManager);
+```
+
+### Interjection Endpoint
+
+The manual interjection endpoint can use:
+
+```typescript
+import { ViolationType } from '../agents/prompts/arbiter-prompts.js';
+
+// ViolationType: 'straw_manning' | 'missing_self_critique' | 'framework_inconsistency' | 'rhetorical_evasion'
+
+// In POST /api/debates/:id/arbiter/interject:
+const interjection = await arbiter.generateInterjection(
+  violation,      // ViolationType
+  targetChair,    // DuelogicChair
+  violatingContent
+);
+```
+
+### Evaluation Endpoint (Optional)
+
+Could add endpoint for manual evaluation:
+
+```typescript
+// POST /api/debates/:id/evaluate
+const evaluation = await arbiter.evaluateResponse({
+  chair: targetChair,
+  responseContent,
+  debateHistory,
+});
+
+// Response includes:
+// { adherenceScore, steelManning, selfCritique, frameworkConsistency, intellectualHonesty }
+```
+
+### Agent Metadata for Status
+
+```typescript
+// In GET /api/debates/:id/duelogic/status:
+const arbiterMeta = arbiter.getMetadata();
+const chairMetas = getAllChairAgents(chairAgents).map(c => c.getMetadata());
+```

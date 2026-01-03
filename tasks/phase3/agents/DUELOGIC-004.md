@@ -558,3 +558,71 @@ describe('ChairAgent', () => {
 - [ ] Streaming works for real-time display
 - [ ] Conversation history maintained properly
 - [ ] Unit tests pass with >80% coverage
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Types Available
+
+Import from `backend/src/types/duelogic.ts`:
+
+```typescript
+import {
+  DuelogicChair,
+  DuelogicConfig,
+  PhilosophicalChair,
+  DebateTone,
+  PHILOSOPHICAL_CHAIR_INFO,
+  TONE_INFO,
+} from '../../types/duelogic.js';
+```
+
+### 10 Philosophical Frameworks
+
+Each has `name`, `description`, `coreQuestion`, `strengthsToAcknowledge[]`, `blindSpotsToAdmit[]`:
+
+1. `utilitarian` - "What produces the greatest good for the greatest number?"
+2. `virtue_ethics` - "What would a person of good character do?"
+3. `deontological` - "What does moral duty require, regardless of consequences?"
+4. `pragmatic` - "What approach will actually work in the real world?"
+5. `libertarian` - "Does this respect individual freedom and consent?"
+6. `communitarian` - "What do we owe to our communities?"
+7. `cosmopolitan` - "What do we owe to all humans, regardless of nationality?"
+8. `precautionary` - "What are the risks of getting this wrong?"
+9. `autonomy_centered` - "Does this respect people's right to make their own choices?"
+10. `care_ethics` - "How do we best care for those who depend on us?"
+
+### Tone Settings
+
+Three tones defined in `TONE_INFO`:
+- `respectful` - Professional, collegial
+- `spirited` - Passionate, direct
+- `heated` - Forceful, aggressive
+
+### Chair Position Naming
+
+Chairs use positions: `chair_1`, `chair_2`, ... `chair_6`
+These are valid speakers in the database (utterances table constraint updated).
+
+### Repository Functions for Chair Data
+
+From `backend/src/db/repositories/duelogic-repository.ts`:
+
+```typescript
+import {
+  getChairAssignments,
+  getChairByPosition,
+} from '../../db/repositories/duelogic-repository.js';
+```
+
+### Existing Agent Patterns to Follow
+
+- `backend/src/services/agents/pro-advocate-agent.ts` - Advocate structure
+- `backend/src/services/agents/con-advocate-agent.ts` - Conversation history management
+
+### Multi-Model Support
+
+Each chair can use a different model via `chair.modelId`. The OpenRouter adapter handles routing to different providers (Anthropic, OpenAI, xAI, Google, Meta).

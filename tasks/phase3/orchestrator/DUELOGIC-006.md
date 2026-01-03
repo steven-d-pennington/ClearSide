@@ -431,3 +431,141 @@ describe('ChairInterruptionEngine', () => {
 - [ ] Interruptions logged to database
 - [ ] Quick heuristics improve efficiency
 - [ ] Unit tests pass with >80% coverage
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Types for Interruptions
+
+Import from `backend/src/types/duelogic.ts`:
+
+```typescript
+import {
+  ChairInterruptCandidate,
+  ChairInterruptReason,
+  AggressivenessLevel,  // 1 | 2 | 3 | 4 | 5
+  INTERRUPT_OPENERS,    // Pre-defined opener templates
+  getRandomInterruptOpener,
+  getUrgencyThreshold,  // Returns threshold based on aggressiveness
+} from '../../types/duelogic.js';
+```
+
+### 6 Interrupt Reasons
+
+```typescript
+type ChairInterruptReason =
+  | 'factual_correction'     // Correcting a misrepresentation
+  | 'straw_man_detected'     // Attacking weak version
+  | 'direct_challenge'       // Pushback on claim
+  | 'clarification_needed'   // Requesting clarity
+  | 'strong_agreement'       // Amplifying good point
+  | 'pivotal_point';         // Core disagreement moment
+```
+
+### Repository Functions
+
+From `backend/src/db/repositories/duelogic-repository.ts`:
+
+```typescript
+import {
+  saveChairInterruption,         // Log interrupt to DB
+  getInterruptionsByDebate,      // All interrupts in debate
+  getInterruptionCountsByReason, // Map<reason, count>
+  getInterruptionCountsByChair,  // { made: Map, received: Map }
+  markInterruptionResponded,     // Mark response given
+} from '../../db/repositories/duelogic-repository.js';
+```
+
+### Urgency Thresholds by Aggressiveness
+
+```typescript
+const thresholds = {
+  1: 0.9,  // Very polite - only major issues
+  2: 0.8,
+  3: 0.7,  // Moderate
+  4: 0.6,
+  5: 0.5,  // Aggressive - frequent interrupts
+};
+```
+
+Use `getUrgencyThreshold(aggressiveness)` helper function.
+
+### Interrupt Opener Templates
+
+`INTERRUPT_OPENERS[reason]` returns array of 4 openers per reason.
+Example for `straw_man_detected`:
+- "Hold on, you're attacking a position I never took—"
+- "Wait, that's not the strongest version of my argument—"
+
+### Existing Pattern: Lively Mode
+
+Check `backend/src/services/debate/lively-orchestrator.ts` for similar interruption logic patterns used in lively debate mode.
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-003 & DUELOGIC-004
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Chair Agent Interruption Handling
+
+The `ChairAgent` in `backend/src/services/agents/chair-agent.ts` has:
+
+```typescript
+import { ChairAgent, createChairAgents, getChairAgent } from '../agents/chair-agent.js';
+
+// ChairAgent can respond to interruptions:
+const response = await chairAgent.respondToInterruption(
+  interrupterChair,
+  interruptionContent
+);
+
+// Available methods:
+chairAgent.generateOpening(proposition, context);
+chairAgent.generateExchangeResponse(previousSpeaker, previousContent, debateContext);
+chairAgent.respondToChallenge(challenger, challengeContent);
+chairAgent.respondToInterruption(interrupter, interruptionContent);
+```
+
+### Interrupt Response Prompt
+
+From `backend/src/services/agents/prompts/chair-prompts.ts`:
+
+```typescript
+import { buildInterruptionResponsePrompt } from './prompts/chair-prompts.js';
+
+// Generates prompt for chair to respond to interruption:
+// - Address what they said directly
+// - Don't get defensive
+// - Can concede if valid
+// - Then return to argument
+```
+
+### Streaming During Interruption
+
+The `ChairAgent` uses `streamChat` for longer responses but non-streaming `chat` for short interruption responses (50-150 words) to avoid latency issues.
+
+### Arbiter Interjection vs Chair Interruption
+
+- **Arbiter Interjection**: Enforcement action when chair violates principles
+  - Uses `ArbiterAgent.generateInterjection(violation, chair, content)`
+  - Triggered by `shouldInterject(evaluation)`
+
+- **Chair Interruption**: Chair-to-chair dynamic interaction
+  - Uses `ChairAgent.respondToInterruption(interrupter, content)`
+  - Triggered by `ChairInterruptionEngine.evaluateInterrupt()`
+
+### Urgency Threshold Helper
+
+Already defined in `backend/src/types/duelogic.ts`:
+
+```typescript
+import { getUrgencyThreshold } from '../../types/duelogic.js';
+
+// Returns threshold based on aggressiveness (1-5):
+// 1: 0.9, 2: 0.8, 3: 0.7, 4: 0.6, 5: 0.5
+const threshold = getUrgencyThreshold(config.interruptions.aggressiveness);
+```

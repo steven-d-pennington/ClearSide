@@ -643,3 +643,204 @@ describe('DuelogicConfigPanel', () => {
 - [ ] Responsive design works on mobile
 - [ ] Accessibility requirements met (ARIA, keyboard nav)
 - [ ] Component tests pass
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Types to Import (Frontend)
+
+Copy types from backend or create shared package:
+
+```typescript
+// frontend/src/types/duelogic.ts (or import from shared)
+import type {
+  PhilosophicalChair,
+  DuelogicConfig,
+  DuelogicChair,
+  DuelogicPreset,
+  AccountabilityLevel,  // 'relaxed' | 'moderate' | 'strict'
+  AggressivenessLevel,  // 1 | 2 | 3 | 4 | 5
+  DebateTone,           // 'respectful' | 'spirited' | 'heated'
+  FlowStyle,            // 'structured' | 'conversational'
+} from '@/types/duelogic';
+```
+
+### Constants to Include (Frontend)
+
+```typescript
+// Copy these from backend or fetch from API
+const PHILOSOPHICAL_CHAIR_INFO = {
+  utilitarian: {
+    name: 'Utilitarian Chair',
+    description: 'Greatest good for greatest number...',
+    coreQuestion: 'What outcome produces the most overall well-being?',
+    blindSpotsToAdmit: [...],
+  },
+  // ... 9 more frameworks
+};
+
+const DUELOGIC_PRESETS = {
+  classic_clash: { name: 'Classic Clash', chairs: [...], description: '...' },
+  three_way: { ... },
+  battle_royale: { ... },
+};
+
+const DUELOGIC_CONSTRAINTS = {
+  minChairs: 2,
+  maxChairs: 6,
+  minExchanges: 2,
+  maxExchanges: 10,
+};
+```
+
+### API Endpoints to Integrate
+
+```typescript
+// Fetch available data
+GET /api/duelogic/chairs    // Returns PHILOSOPHICAL_CHAIR_INFO
+GET /api/duelogic/presets   // Returns DUELOGIC_PRESETS
+GET /api/duelogic/models    // Returns available LLM models
+
+// Create debate
+POST /api/debates/duelogic  // { proposition: string, config?: Partial<DuelogicConfig> }
+
+// Debate controls
+POST /api/debates/:id/pause
+POST /api/debates/:id/resume
+POST /api/debates/:id/stop
+```
+
+### Form State Shape
+
+```typescript
+interface DuelogicFormState {
+  proposition: string;
+  propositionContext?: string;
+  chairs: DuelogicChair[];
+  arbiter: {
+    modelId: string;
+    modelDisplayName?: string;
+    accountabilityLevel: AccountabilityLevel;
+  };
+  flow: {
+    style: FlowStyle;
+    maxExchanges: number;
+    targetDurationMinutes: number;
+  };
+  interruptions: {
+    enabled: boolean;
+    allowChairInterruptions: boolean;
+    allowArbiterInterruptions: boolean;
+    aggressiveness: AggressivenessLevel;
+    cooldownSeconds: number;
+  };
+  tone: DebateTone;
+  podcastMode: {
+    enabled: boolean;
+    showName: string;
+    episodeNumber?: number;
+  };
+}
+```
+
+### Existing UI Patterns
+
+Check `frontend/src/components/ConfigPanel/` for patterns:
+- Form state management with React hooks
+- Validation feedback display
+- API integration patterns
+- Loading states and error handling
+
+### Accessibility Requirements
+
+- All form elements need `aria-label` or associated `<label>`
+- Tab order should be logical
+- Color contrast for framework cards
+- Keyboard navigation for preset selection
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-003 & DUELOGIC-004
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### SSE Events to Handle
+
+The UI needs to handle these token streaming events from agents:
+
+```typescript
+// Chair token streaming
+interface ChairTokenEvent {
+  type: 'token';
+  data: {
+    speaker: string;    // 'chair_1', 'chair_2', etc.
+    segment: string;    // 'opening', 'exchange', 'synthesis'
+    framework: string;  // 'utilitarian', 'virtue_ethics', etc.
+    token: string;
+  };
+}
+
+// Arbiter token streaming
+interface ArbiterTokenEvent {
+  type: 'token';
+  data: {
+    speaker: 'arbiter';
+    segment: 'introduction' | 'synthesis';
+    token: string;
+  };
+}
+```
+
+### Displaying Framework Info
+
+Each chair has rich metadata for display:
+
+```typescript
+// From PHILOSOPHICAL_CHAIR_INFO (fetch from /api/duelogic/chairs)
+interface FrameworkInfo {
+  name: string;           // "Utilitarian Chair"
+  description: string;    // Full description
+  coreQuestion: string;   // "What produces the greatest good..."
+  strengthsToAcknowledge: string[];  // What this framework does well
+  blindSpotsToAdmit: string[];       // Known weaknesses
+}
+
+// Display these in:
+// - Chair selector cards (name, description)
+// - Debate viewer (framework badge next to speaker)
+// - Stats panel (show blind spots)
+```
+
+### Chair Position Labels
+
+Map positions to display labels:
+
+```typescript
+const positionLabels: Record<string, string> = {
+  chair_1: 'First Chair',
+  chair_2: 'Second Chair',
+  chair_3: 'Third Chair',
+  chair_4: 'Fourth Chair',
+  chair_5: 'Fifth Chair',
+  chair_6: 'Sixth Chair',
+};
+```
+
+### Evaluation Display
+
+When evaluation data is included:
+
+```typescript
+interface EvaluationDisplay {
+  adherenceScore: number;  // 0-100, show as progress bar
+  steelManning: {
+    quality: 'strong' | 'adequate' | 'weak' | 'absent';
+    // Show as badge: 🟢 strong, 🟡 adequate, 🟠 weak, 🔴 absent
+  };
+  selfCritique: { quality: QualityLevel };
+  frameworkConsistency: { consistent: boolean };
+}
+```

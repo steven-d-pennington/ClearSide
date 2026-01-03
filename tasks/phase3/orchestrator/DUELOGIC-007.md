@@ -686,3 +686,166 @@ describe('DuelogicOrchestrator', () => {
 - [ ] Pause/resume/stop controls work
 - [ ] Errors handled gracefully
 - [ ] Integration tests pass
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Core Types
+
+Import from `backend/src/types/duelogic.ts`:
+
+```typescript
+import {
+  DuelogicConfig,
+  DuelogicSegment,  // 'introduction' | 'opening' | 'exchange' | 'synthesis'
+  ResponseEvaluation,
+  DUELOGIC_DEFAULTS,
+  mergeWithDuelogicDefaults,
+} from '../../types/duelogic.js';
+```
+
+### Repository Functions
+
+From `backend/src/db/repositories/duelogic-repository.ts`:
+
+```typescript
+import {
+  saveAllChairAssignments,  // Save chairs at debate start
+  saveDuelogicConfig,       // Store config JSON
+  getDuelogicConfig,        // Retrieve config
+  getDuelogicDebateStats,   // Full stats summary
+} from '../../db/repositories/duelogic-repository.js';
+```
+
+### Database Schema
+
+The `debates` table has:
+- `debate_mode = 'duelogic'`
+- `duelogic_config JSONB` - Full config storage
+
+Use existing `utterance-repository.ts` for saving utterances with:
+- `speaker`: 'arbiter', 'chair_1', 'chair_2', etc.
+- `phase`: 'introduction', 'opening', 'exchange', 'synthesis'
+
+### SSE Event Types for Frontend
+
+```typescript
+// Segment lifecycle
+{ type: 'segment_start', data: { segment, timestamp } }
+{ type: 'segment_complete', data: { segment, timestamp } }
+
+// Utterances
+{ type: 'utterance', data: { speaker, segment, content, evaluation? } }
+
+// Streaming tokens
+{ type: 'token', data: { speaker, segment, token } }
+
+// Interruptions
+{ type: 'interruption_start', data: { interrupter, interrupted, reason, opener } }
+
+// Debate lifecycle
+{ type: 'debate_paused', data: { timestamp } }
+{ type: 'debate_resumed', data: { timestamp } }
+{ type: 'debate_complete', data: { duration, stats } }
+{ type: 'error', data: { message } }
+```
+
+### Existing Orchestrator Patterns
+
+Reference these for patterns:
+- `backend/src/services/debate/formal-orchestrator.ts` - Turn-based flow
+- `backend/src/services/debate/lively-orchestrator.ts` - Interruption handling
+- `backend/src/services/debate/informal-orchestrator.ts` - Multi-participant
+
+### 4 Segment Flow
+
+1. **Introduction** - Arbiter podcast intro, chair announcements
+2. **Opening** - Each chair in order, no interrupts
+3. **Exchange** - Main debate with evaluations and interrupts
+4. **Synthesis** - Arbiter closing summary
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-003 & DUELOGIC-004
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Agent Creation
+
+```typescript
+import { ArbiterAgent, createArbiterAgent } from '../agents/arbiter-agent.js';
+import { ChairAgent, createChairAgents, getAllChairAgents } from '../agents/chair-agent.js';
+
+// Create arbiter
+const arbiter = createArbiterAgent({
+  config,
+  debateId,
+  sseManager,  // optional, enables streaming
+});
+
+// Create all chairs at once
+const chairAgents = createChairAgents(config, debateId, sseManager);
+// Returns Map<string, ChairAgent> keyed by position
+
+// Get specific chair
+const chair1 = chairAgents.get('chair_1');
+
+// Get all as array
+const allChairs = getAllChairAgents(chairAgents);
+```
+
+### Orchestration Flow
+
+```typescript
+// 1. INTRODUCTION SEGMENT
+const intro = await arbiter.generateIntroduction(proposition, context);
+
+// 2. OPENING SEGMENT - Each chair opens
+for (const chair of getAllChairAgents(chairAgents)) {
+  const opening = await chair.generateOpening(proposition, context);
+}
+
+// 3. EXCHANGE SEGMENT - Chairs respond to each other
+for (let round = 0; round < config.flow.maxExchanges; round++) {
+  for (const chair of getAllChairAgents(chairAgents)) {
+    const response = await chair.generateExchangeResponse(
+      previousChair,
+      previousContent,
+      buildTranscript()
+    );
+
+    // Evaluate response
+    const evaluation = await arbiter.evaluateResponse({
+      chair: chair.chair,
+      responseContent: response,
+      debateHistory: buildTranscript(),
+    });
+
+    // Check for interjection
+    if (arbiter.shouldInterject(evaluation)) {
+      const violation = arbiter.determineViolationType(evaluation);
+      if (violation) {
+        await arbiter.generateInterjection(violation, chair.chair, response);
+      }
+    }
+  }
+}
+
+// 4. SYNTHESIS SEGMENT
+const closing = await arbiter.generateClosing(proposition, transcript, evaluationsMap);
+```
+
+### Chair Agent Properties
+
+```typescript
+const chair = chairAgents.get('chair_1');
+
+chair.position;        // 'chair_1'
+chair.framework;       // 'utilitarian'
+chair.displayName;     // 'Claude Sonnet 4'
+chair.getFrameworkInfo();  // Full PHILOSOPHICAL_CHAIR_INFO entry
+chair.getOpeningHook();    // Framework-specific opener
+```

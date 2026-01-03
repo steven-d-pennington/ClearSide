@@ -566,3 +566,72 @@ describe('ArbiterAgent', () => {
 - [ ] All accountability levels work correctly
 - [ ] Streaming output works for real-time display
 - [ ] Unit tests pass with >80% coverage
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Types Available
+
+Import from `backend/src/types/duelogic.ts`:
+
+```typescript
+import {
+  DuelogicConfig,
+  DuelogicChair,
+  ResponseEvaluation,
+  PhilosophicalChair,
+  AccountabilityLevel,
+  QualityLevel,
+  HonestyScore,
+  PHILOSOPHICAL_CHAIR_INFO,
+  DUELOGIC_DEFAULTS,
+} from '../../types/duelogic.js';
+```
+
+### Key Types for Arbiter
+
+- `ResponseEvaluation` - Full evaluation structure with steelManning, selfCritique, frameworkConsistency, intellectualHonesty
+- `AccountabilityLevel` - 'relaxed' | 'moderate' | 'strict'
+- `QualityLevel` - 'strong' | 'adequate' | 'weak' | 'absent'
+- `PHILOSOPHICAL_CHAIR_INFO` - Contains name, description, coreQuestion, strengthsToAcknowledge, blindSpotsToAdmit for each framework
+
+### Repository Functions for Saving Evaluations
+
+From `backend/src/db/repositories/duelogic-repository.ts`:
+
+```typescript
+import {
+  saveResponseEvaluation,
+  getEvaluationsForDebate,
+  getEvaluationsByChair,
+  getChairAverageAdherence,
+} from '../../db/repositories/duelogic-repository.js';
+```
+
+### Existing Agent Patterns
+
+Check these files for patterns:
+- `backend/src/services/agents/moderator-agent.ts` - Similar agent structure
+- `backend/src/services/agents/pro-advocate-agent.ts` - Streaming patterns
+- `backend/src/services/debate/lively-orchestrator.ts` - SSE broadcasting
+
+### LLM Client Interface
+
+The `LLMClient` from OpenRouter adapter likely supports:
+- `generate()` - Non-streaming completion
+- `generateWithStreaming()` - Streaming with `onToken` callback
+
+Check `backend/src/llm/openrouter-adapter.ts` for exact interface.
+
+### SSE Event Format
+
+Based on existing patterns, broadcast events like:
+```typescript
+sseManager.broadcast(debateId, {
+  type: 'utterance',
+  data: { speaker: 'arbiter', segment: 'introduction', content: '...' }
+});
+```

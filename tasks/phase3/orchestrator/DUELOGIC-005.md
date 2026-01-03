@@ -470,3 +470,140 @@ describe('ResponseEvaluator', () => {
 - [ ] Caching reduces redundant LLM calls
 - [ ] Quick heuristics improve efficiency
 - [ ] Unit tests pass with >85% coverage
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-001 & DUELOGIC-002
+
+> Added by agent completing Sprint 1 on 2026-01-03
+
+### Types for Evaluation
+
+Import from `backend/src/types/duelogic.ts`:
+
+```typescript
+import {
+  ResponseEvaluation,
+  DuelogicChair,
+  QualityLevel,        // 'strong' | 'adequate' | 'weak' | 'absent'
+  HonestyScore,        // 'high' | 'medium' | 'low'
+  PHILOSOPHICAL_CHAIR_INFO,
+} from '../../types/duelogic.js';
+```
+
+### Repository Functions
+
+From `backend/src/db/repositories/duelogic-repository.ts`:
+
+```typescript
+import {
+  saveResponseEvaluation,     // Save evaluation to DB
+  getEvaluationByUtteranceId, // Retrieve single evaluation
+  getEvaluationsForDebate,    // All evaluations for a debate
+  getEvaluationsByChair,      // Map<chairPosition, ResponseEvaluation[]>
+} from '../../db/repositories/duelogic-repository.js';
+```
+
+### ResponseEvaluation Structure
+
+```typescript
+interface ResponseEvaluation {
+  adherenceScore: number;  // 0-100
+  steelManning: {
+    attempted: boolean;
+    quality: 'strong' | 'adequate' | 'weak' | 'absent';
+    notes?: string;
+  };
+  selfCritique: {
+    attempted: boolean;
+    quality: 'strong' | 'adequate' | 'weak' | 'absent';
+    notes?: string;
+  };
+  frameworkConsistency: {
+    consistent: boolean;
+    violations?: string[];
+  };
+  intellectualHonesty: {
+    score: 'high' | 'medium' | 'low';
+    issues?: string[];
+  };
+  requiresInterjection: boolean;
+  interjectionReason?: string;
+}
+```
+
+### Database Schema
+
+Table: `response_evaluations` with columns for each evaluation dimension.
+Linked via `utterance_id` foreign key to utterances table.
+
+### Blind Spots for Each Framework
+
+Use `PHILOSOPHICAL_CHAIR_INFO[framework].blindSpotsToAdmit` to check if self-critique matches known weaknesses.
+
+---
+
+## 📝 Implementation Notes from DUELOGIC-003 & DUELOGIC-004
+
+> Added by agent completing Sprint 2 on 2026-01-03
+
+### Arbiter Evaluation Already Implemented
+
+The `ArbiterAgent` in `backend/src/services/agents/arbiter-agent.ts` already includes evaluation:
+
+```typescript
+import { ArbiterAgent, createArbiterAgent } from '../agents/arbiter-agent.js';
+
+// ArbiterAgent has built-in evaluation:
+const evaluation = await arbiter.evaluateResponse({
+  chair,
+  responseContent: '...',
+  debateHistory: '...',
+  previousSpeaker,  // optional
+  previousContent,  // optional
+});
+
+// Quick heuristic checks (no LLM call):
+const quickEval = arbiter.performQuickEvaluation(context);
+
+// Should we evaluate this response?
+arbiter.shouldEvaluate();  // Based on accountability level
+
+// Should we interject?
+arbiter.shouldInterject(evaluation);
+arbiter.determineViolationType(evaluation);
+```
+
+### Available Prompt Helpers
+
+From `backend/src/services/agents/prompts/arbiter-prompts.ts`:
+
+```typescript
+import {
+  quickSteelManCheck,       // Heuristic steel-man detection
+  quickSelfCritiqueCheck,   // Heuristic self-critique detection
+  parseEvaluationResponse,  // Parse LLM JSON response
+  getDefaultEvaluation,     // Fallback evaluation
+  buildEvaluationPrompt,    // Full evaluation prompt builder
+} from './prompts/arbiter-prompts.js';
+```
+
+### Response Evaluation Flow
+
+1. Chair generates response via `ChairAgent.generateExchangeResponse()`
+2. Arbiter evaluates via `ArbiterAgent.evaluateResponse()`
+3. If `shouldInterject()` returns true, generate interjection
+4. Save evaluation to database via `saveResponseEvaluation()`
+
+### Chair Response Quality Checks
+
+From `backend/src/services/agents/prompts/chair-prompts.ts`:
+
+```typescript
+import {
+  hasApparentSteelMan,      // Quick pattern check
+  hasApparentSelfCritique,  // Quick pattern check
+} from './prompts/chair-prompts.js';
+
+// These are used in ChairAgent to log quality metrics
+```

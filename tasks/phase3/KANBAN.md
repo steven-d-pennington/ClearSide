@@ -50,8 +50,8 @@ Phase 3 implements the **Duelogic Debate Mode** - a philosophical debate format 
 
 | Task ID | Task Name | Priority | Estimate | Status | Dependencies | Task File |
 |---------|-----------|----------|----------|--------|--------------|-----------|
-| DUELOGIC-003 | Arbiter Agent & Prompts | P0 | M | 🟢 TO DO | DUELOGIC-001, 002 | [View](./agents/DUELOGIC-003.md) |
-| DUELOGIC-004 | Chair Agent & Prompts | P0 | M | 🟢 TO DO | DUELOGIC-001 | [View](./agents/DUELOGIC-004.md) |
+| DUELOGIC-003 | Arbiter Agent & Prompts | P0 | M | ✅ DONE | DUELOGIC-001, 002 | [View](./agents/DUELOGIC-003.md) |
+| DUELOGIC-004 | Chair Agent & Prompts | P0 | M | ✅ DONE | DUELOGIC-001 | [View](./agents/DUELOGIC-004.md) |
 | DUELOGIC-005 | Response Evaluator | P0 | M | 🟢 TO DO | DUELOGIC-001, 003 | [View](./orchestrator/DUELOGIC-005.md) |
 
 **Sprint 2 Deliverables:**
