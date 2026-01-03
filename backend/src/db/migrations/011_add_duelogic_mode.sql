@@ -204,10 +204,12 @@ ALTER TABLE debates ADD CONSTRAINT debates_debate_mode_check
 
 -- Update speaker constraint to include chair positions for duelogic mode
 -- We need to allow chair_1 through chair_6 as valid speakers
+-- Also keep participant_1 through participant_4 from informal mode
 ALTER TABLE utterances DROP CONSTRAINT IF EXISTS utterances_speaker_check;
 ALTER TABLE utterances ADD CONSTRAINT utterances_speaker_check
   CHECK (speaker IN (
     'moderator', 'pro_advocate', 'con_advocate', 'user', 'arbiter',
+    'participant_1', 'participant_2', 'participant_3', 'participant_4',
     'chair_1', 'chair_2', 'chair_3', 'chair_4', 'chair_5', 'chair_6'
   ));
 
@@ -257,11 +259,12 @@ ALTER TABLE debates ADD CONSTRAINT debates_current_phase_check
 -- CURRENT SPEAKER CONSTRAINT UPDATE
 -- ============================================================================
 
--- Update debates.current_speaker to include arbiter and chair positions
+-- Update debates.current_speaker to include arbiter, participants, and chair positions
 ALTER TABLE debates DROP CONSTRAINT IF EXISTS debates_current_speaker_check;
 ALTER TABLE debates ADD CONSTRAINT debates_current_speaker_check
   CHECK (current_speaker IN (
     'moderator', 'pro_advocate', 'con_advocate', 'user', 'arbiter',
+    'participant_1', 'participant_2', 'participant_3', 'participant_4',
     'chair_1', 'chair_2', 'chair_3', 'chair_4', 'chair_5', 'chair_6'
   ));
 
