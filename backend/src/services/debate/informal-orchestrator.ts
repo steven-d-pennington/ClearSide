@@ -22,6 +22,8 @@ import type {
   InformalSummary,
   EndDetectionContext,
   EndDetectionResult,
+  DiscussionStyle,
+  DiscussionTone,
 } from '../../types/informal.js';
 import { INFORMAL_DEFAULTS } from '../../types/informal.js';
 import { EndDetector, createEndDetector } from './end-detector.js';
@@ -54,22 +56,103 @@ interface ActiveParticipant extends InformalParticipant {
 }
 
 /**
- * System prompt for participants
+ * Style-specific instructions for participants
  */
-const PARTICIPANT_SYSTEM_PROMPT = `You are participating in an informal discussion about the following topic:
-
-Topic: {topic}
-
-You are {participantName}. There are no assigned positions - explore the topic freely, share perspectives, build on others' ideas, and engage naturally with other participants.
-
-Guidelines:
+const STYLE_INSTRUCTIONS: Record<DiscussionStyle, string> = {
+  collaborative: `Guidelines:
 - Keep responses conversational (2-4 paragraphs, 150-300 words)
 - You may agree, disagree, ask questions, or introduce new angles
 - Acknowledge and build upon points made by others
 - Be intellectually curious and open-minded
-- Maintain a respectful, collegial tone
+- Share perspectives while remaining open to other views`,
 
-Other participants in this discussion: {otherParticipants}`;
+  natural_disagreement: `Guidelines:
+- Keep responses conversational (2-4 paragraphs, 150-300 words)
+- Actively look for points of disagreement with other participants
+- Challenge assumptions and conclusions you find questionable
+- Present alternative perspectives and counterarguments
+- Ask probing questions that test the strength of arguments
+- It's okay to firmly disagree - intellectual conflict drives clarity
+- Don't agree just to be agreeable - push back when you see flaws`,
+
+  devils_advocate: `Guidelines:
+- Keep responses conversational (2-4 paragraphs, 150-300 words)
+- Your role is to challenge every position taken by other participants
+- Find the strongest counterarguments to whatever is being claimed
+- Point out overlooked risks, edge cases, and potential failures
+- Question the evidence and reasoning behind assertions
+- Don't agree easily - your job is to stress-test ideas
+- Play the skeptic even if you might personally agree`,
+};
+
+/**
+ * Instructions for non-devil's advocate participants when someone else is the devil's advocate
+ */
+const NON_DEVILS_ADVOCATE_INSTRUCTIONS = `Guidelines:
+- Keep responses conversational (2-4 paragraphs, 150-300 words)
+- One participant ({devilsAdvocateName}) will challenge your positions
+- Defend your ideas thoughtfully but remain open to valid critiques
+- Acknowledge when the devil's advocate raises a good point
+- Strengthen your arguments in response to challenges`;
+
+/**
+ * Tone-specific instructions
+ */
+const TONE_INSTRUCTIONS: Record<DiscussionTone, string> = {
+  respectful: `Tone:
+- Maintain professional, collegial discourse
+- Disagree with ideas, not people
+- Use measured language even when strongly disagreeing`,
+
+  spirited: `Tone:
+- Engage with passion and conviction
+- Use emphatic language when you disagree
+- Be direct and pointed in your critiques
+- Don't soften valid criticisms - clarity over comfort
+- Make your disagreements memorable and impactful`,
+};
+
+/**
+ * Build dynamic system prompt based on style and tone
+ */
+function buildParticipantSystemPrompt(
+  topic: string,
+  participantName: string,
+  otherParticipants: string,
+  style: DiscussionStyle,
+  tone: DiscussionTone,
+  isDevilsAdvocate: boolean,
+  devilsAdvocateName?: string
+): string {
+  let styleInstructions: string;
+
+  if (style === 'devils_advocate') {
+    if (isDevilsAdvocate) {
+      styleInstructions = STYLE_INSTRUCTIONS.devils_advocate;
+    } else {
+      styleInstructions = NON_DEVILS_ADVOCATE_INSTRUCTIONS.replace(
+        '{devilsAdvocateName}',
+        devilsAdvocateName || 'The Devil\'s Advocate'
+      );
+    }
+  } else {
+    styleInstructions = STYLE_INSTRUCTIONS[style];
+  }
+
+  const toneInstructions = TONE_INSTRUCTIONS[tone];
+
+  return `You are participating in an informal discussion about the following topic:
+
+Topic: ${topic}
+
+You are ${participantName}.${isDevilsAdvocate ? ' You are playing the role of Devil\'s Advocate.' : ''}
+
+${styleInstructions}
+
+${toneInstructions}
+
+Other participants in this discussion: ${otherParticipants}`;
+}
 
 /**
  * Wrap-up prompt for final summary turns
@@ -123,6 +206,12 @@ export interface InformalOrchestratorConfig {
     confidenceThreshold: number;
   };
   broadcastEvents?: boolean;
+  /** Discussion style: collaborative, natural_disagreement, or devils_advocate */
+  discussionStyle: DiscussionStyle;
+  /** Discussion tone: respectful or spirited */
+  tone: DiscussionTone;
+  /** Participant ID assigned as devil's advocate (only for devils_advocate style) */
+  devilsAdvocateParticipantId?: string;
 }
 
 /**
@@ -139,6 +228,10 @@ export class InformalOrchestrator {
 
   private readonly participants: ActiveParticipant[] = [];
   private readonly broadcastEvents: boolean;
+  private readonly discussionStyle: DiscussionStyle;
+  private readonly tone: DiscussionTone;
+  private readonly devilsAdvocateParticipantId?: string;
+  private devilsAdvocateName?: string;
 
   private state: InformalState;
   private startTimeMs: number = 0;
@@ -160,6 +253,9 @@ export class InformalOrchestrator {
     this.config = config;
     this.sseManager = sseManager;
     this.broadcastEvents = config.broadcastEvents ?? true;
+    this.discussionStyle = config.discussionStyle;
+    this.tone = config.tone;
+    this.devilsAdvocateParticipantId = config.devilsAdvocateParticipantId;
 
     // Initialize state
     this.state = {
@@ -176,6 +272,11 @@ export class InformalOrchestrator {
         ...participant,
         llmClient,
       });
+
+      // Track devil's advocate name if applicable
+      if (config.devilsAdvocateParticipantId === participant.id) {
+        this.devilsAdvocateName = participant.name;
+      }
     }
 
     // Create end detector with fast model
@@ -499,10 +600,17 @@ export class InformalOrchestrator {
       .map((p) => p.name)
       .join(', ');
 
-    const systemPrompt = PARTICIPANT_SYSTEM_PROMPT
-      .replace('{topic}', this.topic)
-      .replace('{participantName}', participant.name)
-      .replace('{otherParticipants}', otherNames);
+    const isDevilsAdvocate = this.devilsAdvocateParticipantId === participant.id;
+
+    const systemPrompt = buildParticipantSystemPrompt(
+      this.topic,
+      participant.name,
+      otherNames,
+      this.discussionStyle,
+      this.tone,
+      isDevilsAdvocate,
+      this.devilsAdvocateName
+    );
 
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: systemPrompt },
@@ -763,6 +871,9 @@ export async function createInformalOrchestrator(
     endDetectionEnabled?: boolean;
     endDetectionInterval?: number;
     endDetectionThreshold?: number;
+    discussionStyle?: DiscussionStyle;
+    tone?: DiscussionTone;
+    devilsAdvocateParticipantId?: string;
   }
 ): Promise<InformalOrchestrator> {
   // Assign default names if not provided
@@ -784,6 +895,9 @@ export async function createInformalOrchestrator(
       checkInterval: config.endDetectionInterval ?? INFORMAL_DEFAULTS.endDetection.checkInterval,
       confidenceThreshold: config.endDetectionThreshold ?? INFORMAL_DEFAULTS.endDetection.confidenceThreshold,
     },
+    discussionStyle: config.discussionStyle ?? INFORMAL_DEFAULTS.discussionStyle,
+    tone: config.tone ?? INFORMAL_DEFAULTS.tone,
+    devilsAdvocateParticipantId: config.devilsAdvocateParticipantId,
   };
 
   return new InformalOrchestrator(orchestratorConfig, sseManager);

@@ -337,6 +337,23 @@
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.devilIcon {
+  font-size: 1.25rem;
+  animation: devilPulse 2s ease-in-out infinite;
+}
+
+@keyframes devilPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
 }
 
 .participantModel {

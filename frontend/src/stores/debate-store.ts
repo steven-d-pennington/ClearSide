@@ -357,6 +357,10 @@ export const useDebateStore = create<DebateState>()(
                     persona: p.persona,
                   }))
                 : undefined,
+              // Informal mode: discussion style and tone
+              discussionStyle: isInformal ? options.informalSettings?.discussionStyle : undefined,
+              discussionTone: isInformal ? options.informalSettings?.tone : undefined,
+              devilsAdvocateParticipantId: isInformal ? options.informalSettings?.devilsAdvocateParticipantId : undefined,
             },
             isLoading: false,
             // Set lively mode immediately if selected (don't wait for SSE event)
@@ -1934,5 +1938,17 @@ export const selectParticipantName = (state: DebateState, speaker: Speaker): str
   const participant = state.debate.informalParticipants.find((p) => p.id === speaker);
   return participant?.name ?? speaker;
 };
+
+/**
+ * Get the devil's advocate participant ID (for informal mode)
+ */
+export const selectDevilsAdvocateParticipantId = (state: DebateState) =>
+  state.debate?.devilsAdvocateParticipantId ?? null;
+
+/**
+ * Get the discussion style (for informal mode)
+ */
+export const selectDiscussionStyle = (state: DebateState) =>
+  state.debate?.discussionStyle ?? 'collaborative';
 
 export default useDebateStore;

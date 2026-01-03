@@ -6,6 +6,21 @@
  */
 
 /**
+ * Discussion style determines how participants interact
+ * - collaborative: Build on each other's ideas (default)
+ * - natural_disagreement: Encourage challenging and debating
+ * - devils_advocate: One participant challenges all others
+ */
+export type DiscussionStyle = 'collaborative' | 'natural_disagreement' | 'devils_advocate';
+
+/**
+ * Discussion tone determines the intensity of discourse
+ * - respectful: Professional, measured disagreement (default)
+ * - spirited: Passionate, emphatic, pointed debate
+ */
+export type DiscussionTone = 'respectful' | 'spirited';
+
+/**
  * Participant in an informal discussion
  */
 export interface InformalParticipant {
@@ -33,6 +48,12 @@ export interface InformalDiscussionConfig {
   maxExchanges: number;
   /** End detection settings */
   endDetection: EndDetectionConfig;
+  /** Discussion style: collaborative, natural_disagreement, or devils_advocate */
+  discussionStyle: DiscussionStyle;
+  /** Discussion tone: respectful or spirited */
+  tone: DiscussionTone;
+  /** Participant ID assigned as devil's advocate (only for devils_advocate style) */
+  devilsAdvocateParticipantId?: string;
 }
 
 /**
@@ -165,6 +186,12 @@ export interface CreateInformalDiscussionInput {
   endDetectionInterval?: number;
   /** End detection confidence threshold (default: 0.75) */
   endDetectionThreshold?: number;
+  /** Discussion style (default: collaborative) */
+  discussionStyle?: DiscussionStyle;
+  /** Discussion tone (default: respectful) */
+  tone?: DiscussionTone;
+  /** Participant ID for devil's advocate role (required if style is devils_advocate) */
+  devilsAdvocateParticipantId?: string;
 }
 
 /**
@@ -180,4 +207,6 @@ export const INFORMAL_DEFAULTS = {
     checkInterval: 3,
     confidenceThreshold: 0.75,
   },
+  discussionStyle: 'collaborative' as DiscussionStyle,
+  tone: 'respectful' as DiscussionTone,
 } as const;

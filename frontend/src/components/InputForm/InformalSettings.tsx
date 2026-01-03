@@ -6,10 +6,47 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { InformalSettingsInput } from '../../types/informal';
+import type { InformalSettingsInput, DiscussionStyle, DiscussionTone } from '../../types/informal';
 import { INFORMAL_DEFAULTS } from '../../types/informal';
 import type { ModelInfo } from '../../types/configuration';
 import styles from './InformalSettings.module.css';
+
+/**
+ * Discussion style options with descriptions
+ */
+const STYLE_OPTIONS: Array<{ value: DiscussionStyle; label: string; description: string }> = [
+  {
+    value: 'collaborative',
+    label: 'Collaborative',
+    description: 'Build on each other\'s ideas, find common ground',
+  },
+  {
+    value: 'natural_disagreement',
+    label: 'Natural Disagreement',
+    description: 'Challenge assumptions, debate different perspectives',
+  },
+  {
+    value: 'devils_advocate',
+    label: 'Devil\'s Advocate',
+    description: 'One participant challenges all positions',
+  },
+];
+
+/**
+ * Tone options with descriptions
+ */
+const TONE_OPTIONS: Array<{ value: DiscussionTone; label: string; description: string }> = [
+  {
+    value: 'respectful',
+    label: 'Respectful',
+    description: 'Professional, measured disagreement',
+  },
+  {
+    value: 'spirited',
+    label: 'Spirited',
+    description: 'Passionate, emphatic, pointed debate',
+  },
+];
 
 interface InformalSettingsProps {
   settings: InformalSettingsInput;
@@ -97,6 +134,93 @@ export const InformalSettings: React.FC<InformalSettingsProps> = ({
 
   return (
     <div className={styles.container}>
+      {/* Discussion Style and Tone Settings */}
+      <div className={styles.styleSettings}>
+        <div className={styles.settingRow}>
+          <label className={styles.settingLabel}>
+            Discussion Style
+            <span className={styles.settingHint}>
+              How participants interact with each other
+            </span>
+          </label>
+          <select
+            className={styles.styleSelect}
+            value={settings.discussionStyle ?? INFORMAL_DEFAULTS.discussionStyle}
+            onChange={(e) =>
+              onChange({
+                ...settings,
+                discussionStyle: e.target.value as DiscussionStyle,
+                // Clear devil's advocate selection if switching away from that style
+                devilsAdvocateParticipantId:
+                  e.target.value === 'devils_advocate'
+                    ? settings.devilsAdvocateParticipantId
+                    : undefined,
+              })
+            }
+            disabled={disabled}
+          >
+            {STYLE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label} - {option.description}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className={styles.settingRow}>
+          <label className={styles.settingLabel}>
+            Tone
+            <span className={styles.settingHint}>
+              Intensity of discourse
+            </span>
+          </label>
+          <select
+            className={styles.styleSelect}
+            value={settings.tone ?? INFORMAL_DEFAULTS.tone}
+            onChange={(e) =>
+              onChange({ ...settings, tone: e.target.value as DiscussionTone })
+            }
+            disabled={disabled}
+          >
+            {TONE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label} - {option.description}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Devil's Advocate Selector - only shown when style is devils_advocate */}
+        {(settings.discussionStyle ?? INFORMAL_DEFAULTS.discussionStyle) === 'devils_advocate' && (
+          <div className={styles.settingRow}>
+            <label className={styles.settingLabel}>
+              Devil's Advocate
+              <span className={styles.settingHint}>
+                Which participant will challenge all positions
+              </span>
+            </label>
+            <select
+              className={styles.styleSelect}
+              value={settings.devilsAdvocateParticipantId ?? ''}
+              onChange={(e) =>
+                onChange({
+                  ...settings,
+                  devilsAdvocateParticipantId: e.target.value || undefined,
+                })
+              }
+              disabled={disabled}
+            >
+              <option value="">Select participant...</option>
+              {settings.participants.map((p, index) => (
+                <option key={index} value={`participant_${index + 1}`}>
+                  {p.name || `Participant ${index + 1}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       <div className={styles.header}>
         <span className={styles.sectionLabel}>Discussion Participants</span>
         <span className={styles.participantCount}>

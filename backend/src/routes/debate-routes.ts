@@ -361,6 +361,9 @@ async function startDebateOrchestrator(
           endDetectionEnabled: informalSettings.endDetectionEnabled,
           endDetectionInterval: informalSettings.endDetectionInterval,
           endDetectionThreshold: informalSettings.endDetectionThreshold,
+          discussionStyle: informalSettings.discussionStyle,
+          tone: informalSettings.tone,
+          devilsAdvocateParticipantId: informalSettings.devilsAdvocateParticipantId,
         }
       );
 

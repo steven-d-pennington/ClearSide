@@ -400,6 +400,12 @@ export interface Debate {
     }>;
     generatedAt: string;
   };
+  /** Discussion style: collaborative, natural_disagreement, or devils_advocate (informal mode) */
+  discussionStyle?: 'collaborative' | 'natural_disagreement' | 'devils_advocate';
+  /** Discussion tone: respectful or spirited (informal mode) */
+  discussionTone?: 'respectful' | 'spirited';
+  /** Participant ID assigned as devil's advocate (informal mode) */
+  devilsAdvocateParticipantId?: string;
 }
 
 /**

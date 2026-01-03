@@ -26,6 +26,7 @@ import {
   selectInformalParticipants,
   selectExchangeCount,
   selectMaxExchanges,
+  selectDevilsAdvocateParticipantId,
 } from '../../stores/debate-store';
 import { Speaker, DebatePhase } from '../../types/debate';
 import { SpeakerPanel } from './SpeakerPanel';
@@ -59,6 +60,7 @@ export const DebateStage: React.FC<DebateStageProps> = ({ className }) => {
   const informalParticipants = useDebateStore(selectInformalParticipants);
   const exchangeCount = useDebateStore(selectExchangeCount);
   const maxExchanges = useDebateStore(selectMaxExchanges);
+  const devilsAdvocateParticipantId = useDebateStore(selectDevilsAdvocateParticipantId);
 
   // Get speaker states from lively state
   const getSpeakerState = (speaker: Speaker) => {
@@ -218,7 +220,14 @@ export const DebateStage: React.FC<DebateStageProps> = ({ className }) => {
               style={{ '--participant-color': getParticipantColor(index) } as React.CSSProperties}
             >
               <div className={styles.participantHeader}>
-                <span className={styles.participantName}>{participant.name}</span>
+                <span className={styles.participantName}>
+                  {participant.name}
+                  {devilsAdvocateParticipantId === participant.id && (
+                    <span className={styles.devilIcon} title="Devil's Advocate">
+                      😈
+                    </span>
+                  )}
+                </span>
                 <span className={styles.participantModel}>
                   {participant.modelId.split('/').pop()}
                 </span>
