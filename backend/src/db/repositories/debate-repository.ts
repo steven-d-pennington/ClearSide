@@ -43,6 +43,8 @@ function rowToDebate(row: DebateRow): Debate {
     proModelId: row.pro_model_id ?? null,
     conModelId: row.con_model_id ?? null,
     moderatorModelId: row.moderator_model_id ?? null,
+    // Debate mode
+    debateMode: (row.debate_mode as 'turn_based' | 'lively' | 'informal' | 'duelogic') || 'turn_based',
     // Timestamp fields
     startedAt: row.started_at,
     completedAt: row.completed_at,

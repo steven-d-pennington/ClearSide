@@ -118,6 +118,27 @@ export const DebateModeSelector: React.FC<DebateModeSelectorProps> = ({
               <span className={styles.betaBadge}>New</span>
             </div>
           </label>
+
+          <label
+            className={`${styles.modeOption} ${mode === 'duelogic' ? styles.active : ''}`}
+          >
+            <input
+              type="radio"
+              name="debateMode"
+              value="duelogic"
+              checked={mode === 'duelogic'}
+              onChange={() => onModeChange('duelogic')}
+              disabled={disabled}
+            />
+            <div className={styles.modeContent}>
+              <span className={styles.modeIcon}>🎭</span>
+              <div className={styles.modeText}>
+                <strong>Duelogic</strong>
+                <small>Philosophical chairs with steel-manning</small>
+              </div>
+              <span className={styles.betaBadge}>New</span>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -286,6 +307,29 @@ export const DebateModeSelector: React.FC<DebateModeSelectorProps> = ({
               <li>Intelligent end detection when topic is exhausted</li>
               <li>Auto-generated summary at the end</li>
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Duelogic mode info */}
+      {mode === 'duelogic' && (
+        <div className={styles.livelySettings}>
+          <div className={styles.livelyInfo}>
+            <p>
+              <strong>What is Duelogic?</strong> A philosophical debate format where
+              2-6 "chairs" represent different philosophical frameworks (utilitarian,
+              deontological, virtue ethics, etc.) and argue a proposition.
+            </p>
+            <ul className={styles.informalFeatures}>
+              <li>2-6 philosophical chairs with distinct frameworks</li>
+              <li>Mandatory steel-manning of opposing views</li>
+              <li>Required self-critique of own blind spots</li>
+              <li>Arbiter-hosted with podcast-style presentation</li>
+              <li>Chair-to-chair interruptions for dynamic debates</li>
+            </ul>
+            <p className={styles.duelogicNote}>
+              Configure chairs and settings in the panel below.
+            </p>
           </div>
         </div>
       )}

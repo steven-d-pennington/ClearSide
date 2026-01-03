@@ -117,6 +117,9 @@ export interface Debate {
   /** Model ID used for Moderator */
   moderatorModelId: string | null;
 
+  /** Debate mode (turn_based, lively, informal, duelogic) */
+  debateMode: 'turn_based' | 'lively' | 'informal' | 'duelogic';
+
   /** Timestamp when debate started (ISO 8601) */
   startedAt: Date | null;
 
@@ -227,6 +230,7 @@ export interface DebateRow {
   pro_model_id: string | null;
   con_model_id: string | null;
   moderator_model_id: string | null;
+  debate_mode: string;
   started_at: Date | null;
   completed_at: Date | null;
   total_duration_ms: number | null;
@@ -265,6 +269,8 @@ export interface UserInterventionRow {
  * Create debate input (omits auto-generated fields)
  */
 export interface CreateDebateInput {
+  /** Optional custom ID (auto-generated if not provided) */
+  id?: string;
   propositionText: string;
   propositionContext?: Record<string, unknown>;
   flowMode?: FlowMode;
@@ -281,6 +287,10 @@ export interface CreateDebateInput {
   proModelId?: string | null;
   conModelId?: string | null;
   moderatorModelId?: string | null;
+  /** Debate mode */
+  debateMode?: 'turn_based' | 'lively' | 'informal' | 'duelogic';
+  /** Duelogic configuration (only for duelogic mode) */
+  duelogicConfig?: Record<string, unknown>;
 }
 
 /**
