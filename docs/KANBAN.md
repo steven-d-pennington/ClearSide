@@ -511,10 +511,11 @@ Automated research pipeline using Perplexity to discover trending topics, genera
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| DUELOGIC-001 | Database Schema & Types for Research System | P0 | S | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-001.md) |
-| DUELOGIC-002 | Perplexity Integration via OpenRouter | P0 | M | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-002.md) |
-| DUELOGIC-003 | Episode Generator Service | P0 | L | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-003.md) |
-| DUELOGIC-004 | Research Job Scheduler | P1 | M | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-004.md) |
+| DUELOGIC-CORE | Implement Duelogic Core & Frontend | P0 | XL | ✅ DONE | [View Task](../../../tasks/DUELOGIC-001.md) |
+| DUELOGIC-001 | Database Schema & Types for Research System | P0 | S | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-001.md) |
+| DUELOGIC-002 | Perplexity Integration via OpenRouter | P0 | M | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-002.md) |
+| DUELOGIC-003 | Episode Generator Service | P0 | L | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-003.md) |
+| DUELOGIC-004 | Research Job Scheduler | P1 | M | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-004.md) |
 | DUELOGIC-005 | Vector Database Integration for RAG | P1 | L | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-005.md) |
 | DUELOGIC-006 | Admin Research Dashboard | P1 | L | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-006.md) |
 | DUELOGIC-007 | Debate Orchestrator RAG Integration | P1 | M | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-007.md) |

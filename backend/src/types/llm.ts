@@ -110,6 +110,8 @@ export interface LLMResponse {
   finishReason: FinishReason;
   /** Provider that generated the response */
   provider: LLMProviderName;
+  /** Optional citations for research results (e.g. from Perplexity) */
+  citations?: string[];
 }
 
 /**
