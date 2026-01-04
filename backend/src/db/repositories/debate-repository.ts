@@ -45,6 +45,8 @@ function rowToDebate(row: DebateRow): Debate {
     moderatorModelId: row.moderator_model_id ?? null,
     // Debate mode
     debateMode: (row.debate_mode as 'turn_based' | 'lively' | 'informal' | 'duelogic') || 'turn_based',
+    // Duelogic config
+    duelogicConfig: (row.duelogic_config as Record<string, unknown>) || null,
     // Timestamp fields
     startedAt: row.started_at,
     completedAt: row.completed_at,
@@ -67,27 +69,30 @@ export async function create(input: CreateDebateInput): Promise<Debate> {
   const maxTokensPerResponse = input.maxTokensPerResponse ?? DEFAULT_CONFIGURATION.llmSettings.maxTokensPerResponse;
   const requireCitations = input.requireCitations ?? DEFAULT_CONFIGURATION.requireCitations;
 
-  const query = `
-    INSERT INTO debates (
-      proposition_text,
-      proposition_context,
-      flow_mode,
-      preset_mode,
-      brevity_level,
-      llm_temperature,
-      max_tokens_per_response,
-      require_citations,
-      pro_persona_id,
-      con_persona_id,
-      pro_model_id,
-      con_model_id,
-      moderator_model_id
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-    RETURNING *
-  `;
+  // Build query dynamically to handle optional ID
+  const hasCustomId = input.id !== undefined;
+
+  const columns = [
+    ...(hasCustomId ? ['id'] : []),
+    'proposition_text',
+    'proposition_context',
+    'flow_mode',
+    'preset_mode',
+    'brevity_level',
+    'llm_temperature',
+    'max_tokens_per_response',
+    'require_citations',
+    'pro_persona_id',
+    'con_persona_id',
+    'pro_model_id',
+    'con_model_id',
+    'moderator_model_id',
+    'debate_mode',
+    'duelogic_config',
+  ];
 
   const values = [
+    ...(hasCustomId ? [input.id] : []),
     input.propositionText,
     JSON.stringify(input.propositionContext || {}),
     input.flowMode || 'auto',
@@ -101,7 +106,17 @@ export async function create(input: CreateDebateInput): Promise<Debate> {
     input.proModelId ?? null,
     input.conModelId ?? null,
     input.moderatorModelId ?? null,
+    input.debateMode || 'turn_based',
+    input.duelogicConfig ? JSON.stringify(input.duelogicConfig) : null,
   ];
+
+  const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+
+  const query = `
+    INSERT INTO debates (${columns.join(', ')})
+    VALUES (${placeholders})
+    RETURNING *
+  `;
 
   try {
     const result = await pool.query<DebateRow>(query, values);

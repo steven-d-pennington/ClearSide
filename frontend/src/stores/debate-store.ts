@@ -1149,6 +1149,114 @@ export const useDebateStore = create<DebateState>()(
             break;
           }
 
+          // ============================================================
+          // DUELOGIC MODE EVENTS
+          // ============================================================
+
+          case 'duelogic_debate_started': {
+            // Duelogic debate has started - update status
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'live',
+                  }
+                : null,
+            }));
+            break;
+          }
+
+          case 'utterance': {
+            // Duelogic utterance - similar to turn_complete but with different structure
+            const data = message.data as {
+              speaker: string;
+              segment: string;
+              content: string;
+              timestampMs: number;
+              evaluation?: unknown;
+            };
+
+            // Map duelogic speaker/segment to our types
+            const turn: DebateTurn = {
+              id: `utterance-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              debateId: get().debate?.id || '',
+              phase: data.segment as DebatePhase,
+              speaker: data.speaker as Speaker,
+              content: data.content,
+              turnNumber: (get().debate?.turns.length || 0) + 1,
+              timestamp: new Date(),
+              metadata: data.evaluation ? { evaluation: data.evaluation } : undefined,
+            };
+
+            // Clear streaming turn and add completed turn
+            set({ streamingTurn: null });
+            get()._completeTurn(turn);
+            break;
+          }
+
+          case 'debate_complete': {
+            // Duelogic debate complete (note: different from 'debate_completed')
+            set((state) => ({
+              debate: state.debate
+                ? {
+                    ...state.debate,
+                    status: 'completed',
+                    currentPhase: DebatePhase.COMPLETED,
+                    completedAt: new Date(),
+                  }
+                : null,
+              streamingTurn: null,
+            }));
+            get().disconnectFromDebate();
+            break;
+          }
+
+          case 'token': {
+            // Duelogic streaming token - accumulate for display
+            const data = message.data as {
+              speaker: string;
+              segment: string;
+              token: string;
+            };
+
+            // Update or create streaming turn for duelogic
+            set((state) => {
+              const existingTurn = state.streamingTurn;
+              if (existingTurn && existingTurn.speaker === data.speaker) {
+                // Append to existing streaming turn
+                return {
+                  streamingTurn: {
+                    ...existingTurn,
+                    content: existingTurn.content + data.token,
+                  },
+                };
+              }
+              // New speaker - start new streaming turn
+              return {
+                streamingTurn: {
+                  id: `streaming-${Date.now()}`,
+                  debateId: state.debate?.id || '',
+                  phase: data.segment as DebatePhase,
+                  speaker: data.speaker as Speaker,
+                  content: data.token,
+                  turnNumber: (state.debate?.turns.length || 0) + 1,
+                  timestamp: new Date(),
+                },
+              };
+            });
+            break;
+          }
+
+          case 'chair_interrupt':
+          case 'arbiter_interjection':
+          case 'segment_start':
+          case 'segment_complete':
+          case 'speaker_started': {
+            // Duelogic informational events - log but don't require action
+            console.log(`[SSE] Duelogic event: ${message.type}`, message.data);
+            break;
+          }
+
           case 'intervention_received': {
             const data = message.data as Intervention;
             set((state) => ({

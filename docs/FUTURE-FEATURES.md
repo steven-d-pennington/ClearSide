@@ -550,6 +550,395 @@ interface InformalDiscussionConfig {
 
 ---
 
+## 9. Export Podcast Script
+
+**Priority:** P1
+**Complexity:** Medium
+**Status:** Planned
+
+Use an LLM to refine debate outputs and format them for optimal synthesis with the ElevenLabs Voice API, producing broadcast-quality podcast audio.
+
+### Concept
+
+Debate transcripts aren't directly suitable for TTS—they contain markdown, abrupt transitions, and lack the conversational polish listeners expect. This feature adds an intelligent "script refinement" step that:
+
+1. Transforms raw debate content into natural spoken dialogue
+2. Adds podcast-appropriate transitions, intros, and outros
+3. Formats output to maximize ElevenLabs voice quality
+4. Preserves speaker attribution for multi-voice synthesis
+
+### Requirements
+
+- **LLM Refinement Pipeline**: Use an LLM to polish debate text for audio
+- **Speaker Voice Mapping**: Assign distinct ElevenLabs voices to each speaker
+- **Format Optimization**: Structure output for ElevenLabs API requirements
+- **Batch Processing**: Handle long debates with character limit awareness
+- **Preview Mode**: Allow script review before TTS generation
+- **Voice Settings Per Speaker**: Different stability/style settings per role
+
+### ElevenLabs API Integration
+
+#### Recommended Models
+
+| Model | Use Case | Character Limit | Latency |
+|-------|----------|-----------------|---------|
+| `eleven_v3` | Best for emotional debates, multi-speaker | 5,000 | Higher |
+| `eleven_multilingual_v2` | Long-form, stable quality | 10,000 | Medium |
+| `eleven_turbo_v2_5` | Fast generation, good quality | 40,000 | ~250-300ms |
+| `eleven_flash_v2_5` | Budget-friendly, quick preview | 40,000 | ~75ms |
+
+#### Voice Settings Reference
+
+```typescript
+interface ElevenLabsVoiceSettings {
+  stability: number;        // 0-1: Lower = more expressive, Higher = more consistent
+  similarity_boost: number; // 0-1: Voice clarity and similarity to original
+  style: number;            // 0-1: Style exaggeration (v2+ models only)
+  speed: number;            // 0.5-2.0: Playback speed
+  use_speaker_boost: boolean; // Enhanced clarity for speech
+}
+
+// Recommended settings by speaker role
+const SPEAKER_VOICE_PRESETS: Record<string, ElevenLabsVoiceSettings> = {
+  moderator: {
+    stability: 0.7,          // Consistent, professional
+    similarity_boost: 0.8,
+    style: 0.3,
+    speed: 1.0,
+    use_speaker_boost: true,
+  },
+  pro_advocate: {
+    stability: 0.5,          // More expressive for passionate arguments
+    similarity_boost: 0.75,
+    style: 0.5,
+    speed: 1.0,
+    use_speaker_boost: true,
+  },
+  con_advocate: {
+    stability: 0.5,
+    similarity_boost: 0.75,
+    style: 0.5,
+    speed: 1.0,
+    use_speaker_boost: true,
+  },
+  // Duelogic philosophical chairs
+  philosophical_chair: {
+    stability: 0.6,          // Thoughtful, measured
+    similarity_boost: 0.7,
+    style: 0.4,
+    speed: 0.95,             // Slightly slower for philosophical content
+    use_speaker_boost: true,
+  },
+};
+```
+
+#### Text-to-Speech API Request
+
+```typescript
+// POST /v1/text-to-speech/{voice_id}
+interface ElevenLabsTTSRequest {
+  text: string;                    // The refined script segment
+  model_id: string;                // e.g., "eleven_multilingual_v2"
+  voice_settings?: {
+    stability: number;
+    similarity_boost: number;
+    style?: number;
+    speed?: number;
+    use_speaker_boost?: boolean;
+  };
+  pronunciation_dictionary_locators?: Array<{
+    pronunciation_dictionary_id: string;
+    version_id?: string;
+  }>;
+  previous_text?: string;          // Context for natural flow
+  next_text?: string;              // Context for natural flow
+}
+```
+
+#### Podcast Project API (Alternative)
+
+For full podcast production, ElevenLabs offers a dedicated Podcast API:
+
+```typescript
+// POST /v1/studio/podcasts
+interface ElevenLabsPodcastRequest {
+  model_id: string;
+  mode: {
+    type: 'conversation';
+    conversation: {
+      host_voice_id: string;       // Moderator voice
+      guest_voice_id: string;      // For 2-person format
+    };
+  };
+  source: {
+    type: 'text';
+    text: string;                  // The refined script
+  };
+}
+```
+
+### Script Refinement Pipeline
+
+#### Step 1: Raw Debate → Refined Script
+
+The LLM transforms debate turns into spoken dialogue:
+
+```typescript
+interface ScriptRefinementPrompt {
+  systemPrompt: `You are a podcast script editor. Transform debate transcripts
+    into natural spoken dialogue suitable for text-to-speech synthesis.
+
+    Guidelines:
+    - Remove markdown formatting (**, *, #, etc.)
+    - Convert bullet points to flowing sentences
+    - Add natural transitions between speakers ("And now, let's hear from...")
+    - Insert pause markers [pause] for dramatic effect
+    - Expand abbreviations (e.g., AI → "A.I." or "artificial intelligence")
+    - Add speaker introductions at the start
+    - Include a brief intro and outro
+    - Break long paragraphs into digestible segments
+    - Preserve the intellectual content and arguments
+    - Keep each segment under 5,000 characters for TTS processing`;
+
+  userPrompt: string; // The raw debate transcript
+}
+```
+
+#### Step 2: Script Segmentation
+
+Break refined script into TTS-compatible chunks:
+
+```typescript
+interface PodcastSegment {
+  index: number;
+  speaker: 'moderator' | 'pro_advocate' | 'con_advocate' | string;
+  voiceId: string;                 // ElevenLabs voice ID
+  text: string;                    // Max 5,000-10,000 chars depending on model
+  voiceSettings: ElevenLabsVoiceSettings;
+  previousText?: string;           // For context continuity
+  nextText?: string;
+}
+
+interface RefinedPodcastScript {
+  title: string;
+  duration_estimate_seconds: number;
+  segments: PodcastSegment[];
+  intro: PodcastSegment;
+  outro: PodcastSegment;
+}
+```
+
+#### Step 3: Voice Assignment
+
+```typescript
+interface VoiceAssignment {
+  speakerId: string;
+  voiceId: string;                 // ElevenLabs voice ID
+  voiceName: string;               // e.g., "Rachel", "Josh"
+  settings: ElevenLabsVoiceSettings;
+}
+
+const DEFAULT_VOICE_ASSIGNMENTS: Record<string, string> = {
+  moderator: 'EXAVITQu4vr4xnSDxMaL',     // "Bella" - professional, clear
+  pro_advocate: 'pNInz6obpgDQGcFmaJgB',  // "Adam" - confident, engaging
+  con_advocate: 'yoZ06aMxZJJ28mfd3POQ',  // "Sam" - articulate, measured
+  narrator: 'ThT5KcBeYPX3keUQqHPh',       // "Nicole" - warm, inviting
+};
+```
+
+### Data Model
+
+```typescript
+interface PodcastExportConfig {
+  // Script refinement
+  refinementModel: string;           // LLM for script polish (e.g., "gpt-4o")
+  includeIntro: boolean;
+  includeOutro: boolean;
+  addTransitions: boolean;
+
+  // ElevenLabs settings
+  elevenLabsModel: 'eleven_v3' | 'eleven_multilingual_v2' | 'eleven_turbo_v2_5' | 'eleven_flash_v2_5';
+  outputFormat: 'mp3_44100_128' | 'mp3_22050_32' | 'pcm_44100';
+
+  // Voice assignments
+  voiceAssignments: Record<string, VoiceAssignment>;
+
+  // Advanced
+  useCustomPronunciation: boolean;
+  pronunciationDictionaryId?: string;
+  normalizeVolume: boolean;
+}
+
+interface PodcastExportJob {
+  id: string;
+  debateId: string;
+  status: 'pending' | 'refining' | 'generating' | 'complete' | 'error';
+  config: PodcastExportConfig;
+
+  // Progress tracking
+  refinedScript?: RefinedPodcastScript;
+  currentSegment?: number;
+  totalSegments?: number;
+
+  // Output
+  audioUrl?: string;
+  durationSeconds?: number;
+  characterCount?: number;
+  estimatedCost?: number;
+}
+```
+
+### UI Workflow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Export to Podcast                                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Step 1: Configure Voices                                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Moderator    [▼ Bella - Professional    ]  [⚙ Settings]│    │
+│  │ Pro Advocate [▼ Adam - Confident        ]  [⚙ Settings]│    │
+│  │ Con Advocate [▼ Sam - Articulate        ]  [⚙ Settings]│    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  Step 2: Script Options                                      │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ [✓] Add podcast intro & outro                       │    │
+│  │ [✓] Add speaker transitions                         │    │
+│  │ [✓] Polish for natural speech                       │    │
+│  │ [ ] Use custom pronunciation dictionary             │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  Step 3: Quality Settings                                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Model:  [▼ Eleven Multilingual v2 - Recommended   ] │    │
+│  │ Format: [▼ MP3 44.1kHz 128kbps                    ] │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  Estimated: ~12 minutes | ~45,000 characters | ~$2.25       │
+│                                                              │
+│                    [Preview Script]  [Generate Podcast]      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Script Preview Modal
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Refined Podcast Script                          [Edit] [✕] │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  🎙 INTRO (Narrator)                                         │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Welcome to ClearSide Debates. Today we're exploring │    │
+│  │ whether A.I. data centers should be subject to a    │    │
+│  │ moratorium. Let's hear from both sides...           │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  👤 MODERATOR                                                │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Good afternoon. Our proposition today asks whether  │    │
+│  │ the rapid expansion of A.I. data centers should be  │    │
+│  │ paused. We'll begin with opening statements...      │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  🟢 PRO ADVOCATE (Adam)                                      │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ [pause] Thank you. The environmental impact of A.I. │    │
+│  │ infrastructure demands immediate attention...        │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│                              [Approve & Generate] [Edit More]│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Implementation Steps
+
+1. **Backend: Script Refinement Service**
+   - Create `PodcastScriptRefiner` class using LLM
+   - Handle debate mode differences (turn-based, lively, duelogic, informal)
+   - Segment output for TTS character limits
+   - Add intro/outro generation
+
+2. **Backend: ElevenLabs Integration**
+   - Create `ElevenLabsClient` wrapper
+   - Implement TTS generation with retries
+   - Handle voice settings per speaker
+   - Support streaming for long content
+   - Track character usage for cost estimation
+
+3. **Database: Export Jobs**
+   - Add `podcast_export_jobs` table
+   - Store refined scripts for preview/editing
+   - Track generation progress
+
+4. **Frontend: Export UI**
+   - Voice assignment interface
+   - Script preview/edit modal
+   - Progress tracking during generation
+   - Cost estimation display
+
+5. **Admin: Voice Management**
+   - Configure default voice assignments
+   - Preview voices
+   - Manage pronunciation dictionaries
+
+### API Endpoints
+
+```typescript
+// Generate refined script (preview before TTS)
+POST /api/exports/podcast/refine
+{
+  debateId: string;
+  config: Partial<PodcastExportConfig>;
+}
+// Returns: RefinedPodcastScript
+
+// Update refined script
+PUT /api/exports/podcast/:jobId/script
+{
+  segments: PodcastSegment[];
+}
+
+// Start TTS generation
+POST /api/exports/podcast/generate
+{
+  debateId: string;
+  script?: RefinedPodcastScript;  // Optional: use pre-refined script
+  config: PodcastExportConfig;
+}
+// Returns: PodcastExportJob
+
+// Get job status
+GET /api/exports/podcast/:jobId
+
+// Download completed podcast
+GET /api/exports/podcast/:jobId/download
+```
+
+### Cost Considerations
+
+ElevenLabs pricing is per character. Estimated costs for a typical debate:
+
+| Debate Length | Characters | Cost (Starter) | Cost (Creator) |
+|---------------|------------|----------------|----------------|
+| Short (10 min audio) | ~15,000 | ~$1.50 | ~$0.75 |
+| Medium (20 min audio) | ~30,000 | ~$3.00 | ~$1.50 |
+| Long (45 min audio) | ~70,000 | ~$7.00 | ~$3.50 |
+
+*Prices based on ElevenLabs 2024 rates; verify current pricing*
+
+### Technical Notes
+
+- **Character Limits**: Segment scripts to stay under model limits (5K-40K depending on model)
+- **Context Continuity**: Use `previous_text` and `next_text` params for natural flow between segments
+- **Pronunciation**: Consider custom dictionaries for technical terms, proper nouns
+- **Rate Limiting**: ElevenLabs has rate limits; implement queuing for large exports
+- **Caching**: Cache refined scripts to avoid re-LLM-processing on regeneration
+
+---
+
 ## Future Considerations
 
 ### Multi-User Support
@@ -579,4 +968,4 @@ interface InformalDiscussionConfig {
 
 ---
 
-*Last Updated: 2026-01-01*
+*Last Updated: 2026-01-03*

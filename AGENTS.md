@@ -1,4 +1,4 @@
-# CLAUDE.md - AI Agent Guide for ClearSide Development
+# AGENTS.md - AI Agent Guide for ClearSide Development
 
 > **Last Updated:** 2026-01-03
 > **Version:** 4.0.0

@@ -120,6 +120,9 @@ export interface Debate {
   /** Debate mode (turn_based, lively, informal, duelogic) */
   debateMode: 'turn_based' | 'lively' | 'informal' | 'duelogic';
 
+  /** Duelogic configuration (only for duelogic mode) */
+  duelogicConfig: Record<string, unknown> | null;
+
   /** Timestamp when debate started (ISO 8601) */
   startedAt: Date | null;
 
@@ -231,6 +234,7 @@ export interface DebateRow {
   con_model_id: string | null;
   moderator_model_id: string | null;
   debate_mode: string;
+  duelogic_config: unknown | null;
   started_at: Date | null;
   completed_at: Date | null;
   total_duration_ms: number | null;

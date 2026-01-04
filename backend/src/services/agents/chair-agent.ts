@@ -276,7 +276,7 @@ export class ChairAgent {
     const prompt = buildDirectChallengePrompt(this.chair, challenger, challengeContent);
 
     try {
-      const content = await this.generate(prompt, 'challenge_response', 0.7, 350);
+      const content = await this.generate(prompt, 'challenge_response', 0.7, 600);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
 
@@ -318,10 +318,10 @@ export class ChairAgent {
     const prompt = buildInterruptionResponsePrompt(this.chair, interrupter, interruptionContent);
 
     try {
-      // Interruption responses are shorter, don't stream
+      // Interruption responses - allow enough room for complete thoughts
       const response = await this.llmClient.chat(
         [...this.conversationHistory, { role: 'user', content: prompt }],
-        { temperature: 0.7, maxTokens: 250 }
+        { temperature: 0.7, maxTokens: 450 }
       );
 
       this.addToHistory('user', prompt);

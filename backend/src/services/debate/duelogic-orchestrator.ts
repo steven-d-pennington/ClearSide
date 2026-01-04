@@ -47,6 +47,7 @@ import {
 } from '../../db/repositories/duelogic-repository.js';
 import type { DebatePhase } from '../../types/database.js';
 import * as utteranceRepo from '../../db/repositories/utterance-repository.js';
+import * as debateRepo from '../../db/repositories/debate-repository.js';
 
 const logger = pino({
   name: 'duelogic-orchestrator',
@@ -210,6 +211,10 @@ export class DuelogicOrchestrator {
     try {
       // Save initial configuration
       await this.saveInitialState();
+
+      // Set debate status to 'live' - required for SSE clients to connect
+      await debateRepo.updateStatus(this.debateId, { status: 'live' });
+      logger.info({ debateId: this.debateId }, 'Debate status set to live');
 
       // Broadcast debate start
       this.broadcastEvent('duelogic_debate_started', {
@@ -524,7 +529,7 @@ export class DuelogicOrchestrator {
     const candidate = await this.interruptionEngine.evaluateInterrupt({
       currentSpeaker: currentChair,
       otherChairs,
-      recentContent: currentContent.slice(0, 500),
+      recentContent: currentContent.slice(0, 1500),
       debateSoFar: this.getTranscriptText(),
       topic: this.proposition,
     });
@@ -738,6 +743,9 @@ export class DuelogicOrchestrator {
    */
   private async broadcastComplete(): Promise<void> {
     const stats = this.calculateStats();
+
+    // Set debate status to 'completed'
+    await debateRepo.updateStatus(this.debateId, { status: 'completed' });
 
     logger.info(
       {

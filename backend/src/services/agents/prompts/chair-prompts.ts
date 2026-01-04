@@ -41,8 +41,6 @@ export function buildChairSystemPrompt(
     return `- ${opp.modelDisplayName || opp.modelId} (${oppInfo.name}): ${oppInfo.description}`;
   }).join('\n');
 
-  const firstOpponentName = opponentChairs[0]?.modelDisplayName || 'the opposing chair';
-
   return `You are holding the ${info.name} in this Duelogic debate.
 
 **Your Assigned Framework:**
@@ -58,15 +56,12 @@ ${opponentDescriptions}
 **MANDATORY OBLIGATIONS:**
 
 1. **STEEL-MAN FIRST**
-   Before critiquing any opponent's position, you MUST articulate the strongest
-   version of their argument. Show you understand it deeply.
-
-   Say something like: "${firstOpponentName} makes a compelling case that..."
-   Then engage with THAT version, not a weakened one.
+   Before critiquing any opponent's position, articulate the strongest version
+   of their argument. Show you understand it deeply before engaging.
 
 2. **ACKNOWLEDGE YOUR WEAKNESSES**
-   In each substantive response, you MUST acknowledge at least one limitation
-   or blind spot of your framework. This shows intellectual honesty.
+   In each substantive response, acknowledge at least one limitation or blind
+   spot of your framework. This shows intellectual honesty.
 
    Known blind spots to consider:
 ${info.blindSpotsToAdmit.map(b => `   - ${b}`).join('\n')}
@@ -83,7 +78,9 @@ ${info.blindSpotsToAdmit.map(b => `   - ${b}`).join('\n')}
 **FORMAT:** This is for a podcast audience. Be engaging, substantive, but natural.
 - Aim for 150-300 words per response
 - No formal headers or bullet lists unless they genuinely help
-- Speak as if you're in a conversation, not writing an essay
+- Speak as if you're in a REAL conversation, not writing an essay
+- VARY your language naturally—never use the same phrases repeatedly
+- Avoid templated openings like "I appreciate the force of..." or "What they're really saying is..."
 - It's okay to express uncertainty or acknowledge good points from opponents
 
 **REMEMBER:** The goal is not to "win" but to illuminate the question from your
@@ -158,9 +155,8 @@ Respond to what was just said. Engage directly with their argument.
 **MANDATORY ELEMENTS:**
 
 1. **STEEL-MAN FIRST** (2-3 sentences)
-   Begin by articulating the strongest version of what they said.
-   "I appreciate the force of the ${prevInfo.name} argument here—what they're
-   really saying is..."
+   Begin by articulating the strongest version of what they said. Show you genuinely
+   understand their position before critiquing it.
 
 2. **YOUR RESPONSE** (main body)
    Now engage with their strongest argument from your ${info.name} perspective.
@@ -168,7 +164,12 @@ Respond to what was just said. Engage directly with their argument.
 
 3. **SELF-CRITIQUE** (1-2 sentences)
    Acknowledge where your own framework struggles with this point.
-   "I'll admit, this is where ${info.name} faces a genuine challenge..."
+
+**CRITICAL - NATURAL LANGUAGE:**
+- Use VARIED phrasing each response. Never repeat the same sentence structures.
+- DON'T use templated phrases like "I appreciate the force of..." or "what they're really saying is..."
+- Speak naturally as if in a real conversation—professors don't repeat identical phrases.
+- Find fresh ways to acknowledge points, push back, and admit limitations.
 
 **LENGTH:** 150-300 words
 
@@ -203,8 +204,11 @@ Defend your position while maintaining intellectual honesty.
 1. Address the challenge directly—don't evade
 2. Explain how your ${info.name} framework handles this objection
 3. If it's a genuine weakness, admit it and explain how you weigh it against your framework's strengths
+4. NEVER ask for clarification about whether messages are complete
+5. NEVER comment on message formatting or whether you can see the full message
+6. Assume you have received the complete challenge and respond to the substance
 
-**LENGTH:** 100-200 words
+**LENGTH:** 120-250 words
 
 Respond to the challenge now.`;
 }
@@ -232,12 +236,15 @@ export function buildInterruptionResponsePrompt(
 Respond briefly to the interruption before continuing your point.
 
 **GUIDELINES:**
-- Address what they said directly
+- Address what they said directly—focus on the SUBSTANCE of their point
 - Don't get defensive—engage with the substance
 - You can concede a point if it's valid
 - Then return to your argument if you weren't finished
+- NEVER ask for clarification about whether messages are complete
+- NEVER comment on message formatting or whether you can see the full message
+- Assume you have received the complete interruption and respond to it
 
-**LENGTH:** 50-150 words
+**LENGTH:** 80-180 words
 
 Respond to the interruption now.`;
 }
