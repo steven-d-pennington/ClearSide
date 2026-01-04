@@ -1,5 +1,26 @@
 import { PodcastTTSClient } from './podcast-tts-client.js';
 import { VoiceAssignment, DEFAULT_VOICE_ASSIGNMENTS } from '../../types/podcast-export.js';
+import pino from 'pino';
+
+const logger = pino({
+    name: 'voice-validator',
+    level: process.env.LOG_LEVEL || 'info',
+});
+
+// Fallback voices when API is unavailable or key lacks permissions
+// These are ElevenLabs' commonly available premade voices
+const FALLBACK_VOICES = [
+    { voice_id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', category: 'premade' },
+    { voice_id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', category: 'premade' },
+    { voice_id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', category: 'premade' },
+    { voice_id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', category: 'premade' },
+    { voice_id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', category: 'premade' },
+    { voice_id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', category: 'premade' },
+    { voice_id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', category: 'premade' },
+    { voice_id: 'CYw3kZ02Hs0563khs1Fj', name: 'Dave', category: 'premade' },
+    { voice_id: 'IKne3meq5aSn9XLyUdCD', name: 'Fin', category: 'premade' },
+    { voice_id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', category: 'premade' },
+];
 
 export class VoiceValidator {
     private ttsClient: PodcastTTSClient;
@@ -54,13 +75,25 @@ export class VoiceValidator {
 
     /**
      * Get list of recommended voices for debate roles
+     * Falls back to hardcoded list if API call fails (e.g., missing permissions)
      */
     async getRecommendedVoices(): Promise<Record<string, Array<{
         voiceId: string;
         name: string;
         recommended: boolean;
     }>>> {
-        const voices = await this.ttsClient.getVoices();
+        let voices: Array<{ voice_id: string; name: string; category: string }>;
+
+        try {
+            voices = await this.ttsClient.getVoices();
+        } catch (error: any) {
+            // Fall back to hardcoded voices if API fails
+            logger.warn(
+                { error: error.message },
+                'Failed to fetch voices from ElevenLabs API, using fallback list'
+            );
+            voices = FALLBACK_VOICES;
+        }
 
         // Filter to premade voices (most reliable)
         const premadeVoices = voices.filter(v => v.category === 'premade');

@@ -1,0 +1,50 @@
+/**
+ * VoicePreviewPlayer Styles
+ */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.playButton {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  color: var(--color-primary);
+}
+
+.playButton:hover:not(:disabled) {
+  background: var(--color-primary-alpha-10);
+}
+
+.playButton:disabled {
+  color: var(--color-text-tertiary);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  color: var(--color-error);
+  display: flex;
+  align-items: center;
+  cursor: help;
+}

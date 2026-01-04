@@ -489,14 +489,14 @@ export class VoiceValidator {
 
 ### Definition of Done
 
-- [ ] TTS client supports all four ElevenLabs models
-- [ ] Voice settings are correctly applied per segment
-- [ ] Rate limiting prevents API quota exhaustion
-- [ ] Retry logic handles transient errors gracefully
-- [ ] Cost tracking is accurate to within 5%
-- [ ] Context fields (previous_text, next_text) improve audio flow
-- [ ] Unit tests pass with >90% coverage
-- [ ] Voice validation catches invalid configurations
+- [x] TTS client supports all four ElevenLabs models
+- [x] Voice settings are correctly applied per segment
+- [x] Rate limiting prevents API quota exhaustion
+- [x] Retry logic handles transient errors gracefully
+- [x] Cost tracking is accurate to within 5%
+- [x] Context fields (previous_text, next_text) improve audio flow
+- [x] Unit tests pass with >90% coverage
+- [x] Voice validation catches invalid configurations
 
 ---
 

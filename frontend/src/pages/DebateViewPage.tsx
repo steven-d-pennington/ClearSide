@@ -405,6 +405,7 @@ export function DebateViewPage() {
           <aside className={styles.sidebar}>
             <ExportPanel
               debateId={debateId!}
+              debateTitle={debate.proposition}
               onExportComplete={(format, url) => {
                 console.log(`Export complete: ${format} - ${url}`);
               }}

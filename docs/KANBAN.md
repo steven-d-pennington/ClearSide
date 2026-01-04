@@ -175,12 +175,12 @@ OpenRouter provides unified API to 100+ models. This builds on the Persona syste
 
 | Task | Description | Estimate | Status |
 |------|-------------|----------|--------|
-| PODCAST-001 | Database Schema & Types for Podcast Export | S | 🟢 Ready |
-| PODCAST-002 | Script Refinement Service (LLM polish) | L | 🟢 Ready |
-| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | M | 🟢 Ready |
-| PODCAST-004 | Script Preview & Edit API | M | 🟢 Ready |
-| PODCAST-005 | Podcast Generation Pipeline | L | 🟢 Ready |
-| PODCAST-006 | Frontend Podcast Export UI | L | 🟢 Ready |
+| PODCAST-001 | Database Schema & Types for Podcast Export | S | ✅ Done |
+| PODCAST-002 | Script Refinement Service (LLM polish) | L | ✅ Done |
+| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | M | ✅ Done |
+| PODCAST-004 | Script Preview & Edit API | M | ✅ Done |
+| PODCAST-005 | Podcast Generation Pipeline | L | ✅ Done |
+| PODCAST-006 | Frontend Podcast Export UI | L | ✅ Done |
 
 **Key Features:**
 - LLM refines debate transcripts into natural spoken dialogue
@@ -458,9 +458,9 @@ Transform debate transcripts into broadcast-quality podcast audio using LLM scri
 | PODCAST-001 | Database Schema & Types for Podcast Export | P0 | S | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-001.md) |
 | PODCAST-002 | Script Refinement Service | P0 | L | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-002.md) |
 | PODCAST-003 | ElevenLabs TTS Client for Podcast Export | P0 | M | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-003.md) |
-| PODCAST-004 | Script Preview & Edit API | P1 | M | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-004.md) |
-| PODCAST-005 | Podcast Generation Pipeline | P0 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-005.md) |
-| PODCAST-006 | Frontend Podcast Export UI | P1 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-006.md) |
+| PODCAST-004 | Script Preview & Edit API | P1 | M | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-004.md) |
+| PODCAST-005 | Podcast Generation Pipeline | P0 | L | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-005.md) |
+| PODCAST-006 | Frontend Podcast Export UI | P1 | L | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-006.md) |
 
 **Dependencies:**
 - PODCAST-001 can start immediately

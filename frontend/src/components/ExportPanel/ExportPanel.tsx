@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Card, Badge, Alert } from '../ui';
 import { TTSProviderSelector } from './TTSProviderSelector';
+import { PodcastExportModal } from '../PodcastExport';
 import type {
   ExportFormat,
   TTSProvider,
@@ -18,8 +19,12 @@ import type {
 } from '../../types/export';
 import styles from './ExportPanel.module.css';
 
+// Extended export format to include podcast
+type ExtendedExportFormat = ExportFormat | 'podcast';
+
 interface ExportPanelProps {
   debateId: string;
+  debateTitle?: string;
   className?: string;
   onExportComplete?: (format: ExportFormat, url: string) => void;
 }
@@ -29,11 +34,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({
   debateId,
+  debateTitle = 'Debate',
   className = '',
   onExportComplete,
 }) => {
   // State
-  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('markdown');
+  const [selectedFormat, setSelectedFormat] = useState<ExtendedExportFormat>('markdown');
+  const [isPodcastModalOpen, setIsPodcastModalOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<TTSProvider>('edge');
   const [providers, setProviders] = useState<TTSProviderInfo[]>([]);
   const [defaultProvider, setDefaultProvider] = useState<TTSProvider>('edge');
@@ -151,6 +158,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       handleMarkdownExport();
     } else if (selectedFormat === 'audio') {
       handleAudioExport();
+    } else if (selectedFormat === 'podcast') {
+      setIsPodcastModalOpen(true);
     }
   }, [selectedFormat, handleMarkdownExport, handleAudioExport]);
 
@@ -263,6 +272,19 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           </button>
 
           <button
+            className={`${styles.formatButton} ${selectedFormat === 'podcast' ? styles.active : ''}`}
+            onClick={() => setSelectedFormat('podcast')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="10" r="3" />
+              <path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8z" />
+              <path d="M7 10a5 5 0 0 1 5-5" />
+              <path d="M17 10a5 5 0 0 0-5-5" />
+            </svg>
+            <span>Podcast</span>
+          </button>
+
+          <button
             className={`${styles.formatButton} ${styles.disabled}`}
             disabled
             title="Coming soon"
@@ -329,6 +351,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
               <span className={styles.spinner} />
               Exporting...
             </>
+          ) : selectedFormat === 'podcast' ? (
+            'Create Podcast'
           ) : (
             <>
               Export as {selectedFormat === 'markdown' ? 'Markdown' : 'Audio'}
@@ -336,6 +360,14 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           )}
         </Button>
       )}
+
+      {/* Podcast Export Modal */}
+      <PodcastExportModal
+        debateId={debateId}
+        debateTitle={debateTitle}
+        isOpen={isPodcastModalOpen}
+        onClose={() => setIsPodcastModalOpen(false)}
+      />
     </Card>
   );
 };

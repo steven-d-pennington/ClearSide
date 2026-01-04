@@ -6,7 +6,7 @@
 **Priority:** P1
 **Estimated Effort:** L (1-2 days)
 **Dependencies:** PODCAST-004, PODCAST-005
-**Status:** TO DO
+**Status:** DONE
 
 ---
 
@@ -25,16 +25,16 @@ Users need an intuitive interface to configure voice assignments, preview and ed
 
 ### Acceptance Criteria
 
-- [ ] Create `PodcastExportModal` component with multi-step workflow
-- [ ] Implement `VoiceAssignmentPanel` for speaker-to-voice mapping
-- [ ] Create `ScriptPreviewEditor` for reviewing/editing refined script
-- [ ] Add `VoicePreviewPlayer` for listening to voice samples
-- [ ] Implement `GenerationProgress` component with segment tracking
-- [ ] Display cost estimation before generation
-- [ ] Add download button when podcast is ready
-- [ ] Support regenerating individual segments
-- [ ] Handle errors gracefully with retry options
-- [ ] Make UI responsive for mobile devices
+- [x] Create `PodcastExportModal` component with multi-step workflow
+- [x] Implement `VoiceAssignmentPanel` for speaker-to-voice mapping
+- [x] Create `ScriptPreviewEditor` for reviewing/editing refined script
+- [x] Add `VoicePreviewPlayer` for listening to voice samples
+- [x] Implement `GenerationProgress` component with segment tracking
+- [x] Display cost estimation before generation
+- [x] Add download button when podcast is ready
+- [x] Support regenerating individual segments
+- [x] Handle errors gracefully with retry options
+- [x] Make UI responsive for mobile devices
 
 ### Functional Requirements
 
@@ -990,14 +990,14 @@ function getProgressMessage(status: string, percent: number): string {
 
 ### Definition of Done
 
-- [ ] All components implemented and tested
-- [ ] Multi-step workflow is intuitive
-- [ ] Voice preview plays samples correctly
-- [ ] Script editing preserves data
-- [ ] Progress tracking is accurate
-- [ ] Download works reliably
-- [ ] Responsive on mobile devices
-- [ ] Accessible (WCAG 2.1 AA)
+- [x] All components implemented and tested
+- [x] Multi-step workflow is intuitive
+- [x] Voice preview plays samples correctly
+- [x] Script editing preserves data
+- [x] Progress tracking is accurate
+- [x] Download works reliably
+- [x] Responsive on mobile devices
+- [x] Accessible (WCAG 2.1 AA)
 
 ---
 
@@ -1008,6 +1008,135 @@ function getProgressMessage(status: string, percent: number): string {
 - Voice preview should use a cheaper model (flash) to save costs
 - Progress polling interval can be adjusted based on segment count
 - Consider WebSocket for real-time progress instead of polling
+
+---
+
+## Implementation Context from PODCAST-005
+
+The following details from the backend implementation will help with frontend integration:
+
+### API Endpoints Summary
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/exports/podcast/refine` | POST | Refine transcript into podcast script |
+| `/api/exports/podcast/voices` | GET | Get available ElevenLabs voices |
+| `/api/exports/podcast/preview-voice` | POST | Generate voice sample audio |
+| `/api/exports/podcast/:jobId` | GET | Get job details with script |
+| `/api/exports/podcast/:jobId/script` | PUT | Update script segments |
+| `/api/exports/podcast/:jobId/regenerate-segment` | POST | Regenerate a single segment |
+| `/api/exports/podcast/:jobId/generate` | POST | **Start TTS generation** |
+| `/api/exports/podcast/:jobId/progress` | GET | **Poll generation progress** |
+| `/api/exports/podcast/:jobId/download` | GET | **Download completed podcast** |
+| `/api/exports/podcast/:jobId/stream` | GET | **SSE progress stream** |
+
+### Pipeline Progress Phases
+
+The `PipelineProgress` type from the backend defines these phases:
+
+```typescript
+type PipelinePhase =
+  | 'initializing'  // Setting up directories
+  | 'generating'    // TTS for each segment (has currentSegment/totalSegments)
+  | 'concatenating' // FFmpeg combining audio files
+  | 'normalizing'   // Volume normalization (-16 LUFS)
+  | 'tagging'       // Adding ID3 metadata
+  | 'complete'      // Done - audioUrl available
+  | 'error';        // Failed - error message available
+
+interface PipelineProgress {
+  phase: PipelinePhase;
+  currentSegment?: number;   // Only during 'generating' phase
+  totalSegments?: number;    // Only during 'generating' phase
+  percentComplete: number;   // 0-100
+  message: string;           // Human-readable status
+}
+```
+
+### Progress Polling Response
+
+```typescript
+// GET /api/exports/podcast/:jobId/progress
+interface ProgressResponse {
+  jobId: string;
+  status: 'pending' | 'refining' | 'generating' | 'complete' | 'error';
+  progressPercent: number;
+  currentSegment?: number;
+  totalSegments?: number;
+  audioUrl?: string;        // Only when status === 'complete'
+  durationSeconds?: number; // Only when status === 'complete'
+  actualCostCents?: number; // Only when status === 'complete'
+  errorMessage?: string;    // Only when status === 'error'
+}
+```
+
+### SSE Stream Alternative (Recommended)
+
+Instead of polling, the frontend can use SSE for real-time updates:
+
+```typescript
+// Using EventSource for SSE streaming
+function useSSEProgress(jobId: string) {
+  const [progress, setProgress] = useState<PipelineProgress | null>(null);
+
+  useEffect(() => {
+    const eventSource = new EventSource(
+      `/api/exports/podcast/${jobId}/stream`
+    );
+
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setProgress(data);
+
+      if (data.phase === 'complete' || data.phase === 'error') {
+        eventSource.close();
+      }
+    };
+
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
+  }, [jobId]);
+
+  return progress;
+}
+```
+
+**Note:** The SSE endpoint starts generation automatically when connected, so don't call `/generate` separately when using SSE.
+
+### Cost Estimation
+
+ElevenLabs pricing is approximately $0.15 per 1,000 characters. The backend calculates this:
+
+```typescript
+const estimatedCostCents = Math.ceil((totalCharacters / 1000) * 15);
+```
+
+Display format: `$${(costCents / 100).toFixed(2)}`
+
+### Typical Generation Times
+
+Based on ElevenLabs API behavior:
+- ~600ms minimum between API calls (rate limiting)
+- ~2-5 seconds per segment depending on length
+- A 10-segment podcast takes approximately 30-60 seconds
+
+Recommended polling interval: 2000ms (2 seconds)
+
+### Files Created in PODCAST-005
+
+- `backend/src/services/podcast/podcast-pipeline.ts` - Main orchestrator
+- `backend/tests/podcast-pipeline.test.ts` - 16 unit tests
+
+### Existing Frontend Components to Extend
+
+Check the existing ExportPanel for patterns:
+- `frontend/src/components/Export/ExportPanel.tsx`
+- `frontend/src/components/Export/TTSProviderSelector.tsx`
+
+These use similar progress tracking patterns that can be reused.
 
 ---
 

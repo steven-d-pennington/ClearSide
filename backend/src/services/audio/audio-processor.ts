@@ -94,8 +94,15 @@ export class AudioProcessor {
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
 
     // Create concat list file
+    // FFmpeg expects paths in the list file to be either absolute or relative to the list file
     const listFile = path.join(path.dirname(outputPath), 'concat-list.txt');
-    const listContent = segmentPaths.map((p) => `file '${p}'`).join('\n');
+    const listDir = path.dirname(listFile);
+    const listContent = segmentPaths.map((p) => {
+      // Convert to absolute path, then make relative to list file directory
+      const absPath = path.resolve(p);
+      const relPath = path.relative(listDir, absPath);
+      return `file '${relPath}'`;
+    }).join('\n');
     await fs.writeFile(listFile, listContent, 'utf-8');
 
     const encoding = ENCODING_SETTINGS[format];

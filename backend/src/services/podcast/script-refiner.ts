@@ -481,14 +481,22 @@ Output ONLY the outro text.`,
 
     /**
      * Map debate speaker to voice assignment role
+     * Handles both formal debate mode and informal/lively debate mode speakers
      */
     private mapSpeakerRole(speaker: string): string {
         const mapping: Record<string, string> = {
+            // Formal debate mode
             'pro': 'pro_advocate',
             'pro_advocate': 'pro_advocate',
             'con': 'con_advocate',
             'con_advocate': 'con_advocate',
             'moderator': 'moderator',
+            // Informal/lively debate mode
+            'arbiter': 'moderator',
+            'chair_1': 'pro_advocate',
+            'chair_2': 'con_advocate',
+            // Narrator for intro/outro
+            'narrator': 'narrator',
         };
 
         return mapping[speaker] || 'narrator';
