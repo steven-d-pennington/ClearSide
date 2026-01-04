@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** L (1-2 days)
 **Dependencies:** PODCAST-001
-**Status:** TO DO
+**Status:** DONE
 
 ---
 
@@ -25,17 +25,17 @@ Debate transcripts contain markdown formatting, abrupt transitions, and lack the
 
 ### Acceptance Criteria
 
-- [ ] Create `PodcastScriptRefiner` class for LLM-based script polish
-- [ ] Remove markdown formatting (**, *, #, bullet points)
-- [ ] Add natural spoken transitions between speakers
-- [ ] Generate podcast intro and outro segments
-- [ ] Segment output for TTS character limits (max 5,000 chars per segment)
-- [ ] Handle all debate modes (turn-based, lively, duelogic, informal)
-- [ ] Preserve speaker attribution for voice mapping
-- [ ] Expand abbreviations (AI -> "A.I.", etc.)
-- [ ] Add pause markers [pause] for dramatic effect
-- [ ] Include context fields (previousText, nextText) for natural flow
-- [ ] Estimate total duration based on word count
+- [x] Create `PodcastScriptRefiner` class for LLM-based script polish
+- [x] Remove markdown formatting (**, *, #, bullet points)
+- [x] Add natural spoken transitions between speakers
+- [x] Generate podcast intro and outro segments
+- [x] Segment output for TTS character limits (max 5,000 chars per segment)
+- [x] Handle all debate modes (turn-based, lively, duelogic, informal)
+- [x] Preserve speaker attribution for voice mapping
+- [x] Expand abbreviations (AI -> "A.I.", etc.)
+- [x] Add pause markers [pause] for dramatic effect
+- [x] Include context fields (previousText, nextText) for natural flow
+- [x] Estimate total duration based on word count
 
 ### Functional Requirements
 
@@ -551,15 +551,15 @@ async function refineDebateForPodcast(debateId: string, config: PodcastExportCon
 
 ### Definition of Done
 
-- [ ] Script refiner removes all markdown formatting
-- [ ] Segments respect 5,000 character limit
-- [ ] Intro and outro are generated when configured
-- [ ] Phase transitions are natural and professional
-- [ ] Speaker roles map to correct voice assignments
-- [ ] Context fields populated for natural TTS flow
-- [ ] Duration estimates are reasonably accurate
-- [ ] Unit tests pass with >85% coverage
-- [ ] Works with all debate modes
+- [x] Script refiner removes all markdown formatting
+- [x] Segments respect 5,000 character limit
+- [x] Intro and outro are generated when configured
+- [x] Phase transitions are natural and professional
+- [x] Speaker roles map to correct voice assignments
+- [x] Context fields populated for natural TTS flow
+- [x] Duration estimates are reasonably accurate
+- [x] Unit tests pass with >85% coverage
+- [x] Works with all debate modes
 
 ---
 

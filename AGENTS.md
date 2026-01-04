@@ -14,7 +14,7 @@ Start with **PODCAST-001** in `tasks/phase4/podcast-export/PODCAST-001.md`
 | Task | Description | Status | File |
 |------|-------------|--------|------|
 | PODCAST-001 | Database Schema & Types | In Progress → Done | [View](tasks/phase4/podcast-export/PODCAST-001.md) |
-| PODCAST-002 | Script Refinement Service | Ready | [View](tasks/phase4/podcast-export/PODCAST-002.md) |
+| PODCAST-002 | Script Refinement Service | Ready → Done | [View](tasks/phase4/podcast-export/PODCAST-002.md) |
 | PODCAST-003 | ElevenLabs TTS Client | Ready | [View](tasks/phase4/podcast-export/PODCAST-003.md) |
 | PODCAST-004 | Script Preview & Edit API | Ready | [View](tasks/phase4/podcast-export/PODCAST-004.md) |
 | PODCAST-005 | Podcast Generation Pipeline | Ready | [View](tasks/phase4/podcast-export/PODCAST-005.md) |
