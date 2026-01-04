@@ -14,11 +14,13 @@ export { runMigrationsOnStartup, isDatabaseReady } from './runMigrations.js';
 export * as debateRepository from './repositories/debate-repository.js';
 export * as utteranceRepository from './repositories/utterance-repository.js';
 export * as interventionRepository from './repositories/intervention-repository.js';
+export * as podcastExportRepository from './repositories/podcast-export-repository.js';
 
 // Re-export repository defaults for convenience
 export { default as DebateRepository } from './repositories/debate-repository.js';
 export { default as UtteranceRepository } from './repositories/utterance-repository.js';
 export { default as InterventionRepository } from './repositories/intervention-repository.js';
+export { default as PodcastExportRepository } from './repositories/podcast-export-repository.js';
 
 // Types (re-exported for convenience)
 export type {
@@ -34,3 +36,13 @@ export type {
   CreateInterventionInput,
   UpdateDebateStatusInput,
 } from '../types/database.js';
+
+export type {
+  PodcastExportJob,
+  PodcastExportConfig,
+  RefinedPodcastScript,
+  PodcastJobStatus,
+  PodcastSegment,
+  VoiceAssignment,
+  ElevenLabsVoiceSettings,
+} from '../types/podcast-export.js';
