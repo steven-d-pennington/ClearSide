@@ -457,7 +457,7 @@ Transform debate transcripts into broadcast-quality podcast audio using LLM scri
 |---------|-----------|----------|----------|--------|-----------|
 | PODCAST-001 | Database Schema & Types for Podcast Export | P0 | S | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-001.md) |
 | PODCAST-002 | Script Refinement Service | P0 | L | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-002.md) |
-| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | P0 | M | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-003.md) |
+| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | P0 | M | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-003.md) |
 | PODCAST-004 | Script Preview & Edit API | P1 | M | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-004.md) |
 | PODCAST-005 | Podcast Generation Pipeline | P0 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-005.md) |
 | PODCAST-006 | Frontend Podcast Export UI | P1 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-006.md) |
