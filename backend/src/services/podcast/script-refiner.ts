@@ -23,7 +23,9 @@ const WORDS_PER_MINUTE = 150;   // Average speaking rate
 type PhraseIntensity = 'polite' | 'moderate' | 'aggressive';
 
 /**
- * Interruption phrases categorized by intensity, with V3 audio tags
+ * Interruption phrases categorized by intensity
+ * Uses only officially documented ElevenLabs V3 audio tags:
+ * [pause], [loudly], [sigh], [stammers], [whispers], [deadpan], [flatly]
  */
 const INTERRUPTION_PHRASES: Record<PhraseIntensity, string[]> = {
     polite: [
@@ -36,28 +38,29 @@ const INTERRUPTION_PHRASES: Record<PhraseIntensity, string[]> = {
         'One moment, please — ',
     ],
     moderate: [
-        '[cuts in] Hold on — ',
-        '[interrupting] Wait — ',
+        'Hold on — ',
+        'Wait — ',
         'Actually — ',
         'But — ',
-        '[cuts in] I have to stop you there — ',
+        'I have to stop you there — ',
         'Let me jump in — ',
         '[pause] Hang on — ',
         'Sorry, but — ',
     ],
     aggressive: [
         '[loudly] No, no, no — ',
-        '[interrupting] That\'s simply not true — ',
-        '[cuts in] Absolutely not — ',
-        '[frustrated] This is exactly the problem — ',
-        '[cuts in] I can\'t let that stand — ',
+        'That\'s simply not true — ',
+        'Absolutely not — ',
+        '[sigh] This is exactly the problem — ',
+        'I can\'t let that stand — ',
         '[loudly] Hold on a second — ',
-        '[interrupting] That completely misses the point — ',
+        '[loudly] That completely misses the point — ',
     ],
 };
 
 /**
  * Response phrases for acknowledging interruptions, categorized by intensity
+ * Uses only officially documented ElevenLabs V3 audio tags
  */
 const RESPONSE_PHRASES: Record<PhraseIntensity, string[]> = {
     polite: [
@@ -79,12 +82,12 @@ const RESPONSE_PHRASES: Record<PhraseIntensity, string[]> = {
         'I hear you, but ',
     ],
     aggressive: [
-        '[frustrated] That completely misses my point — ',
+        '[sigh] That completely misses my point — ',
         '[sigh] We keep going in circles here — ',
-        '[matter-of-fact] Look, the evidence is clear — ',
+        '[flatly] Look, the evidence is clear — ',
         '[loudly] This is exactly what I\'m talking about — ',
         '[deadpan] I\'ve addressed this three times already — ',
-        '[frustrated] No, that\'s not what I said — ',
+        '[sigh] No, that\'s not what I said — ',
         '[sigh] Once again — ',
     ],
 };
@@ -379,12 +382,11 @@ export class PodcastScriptRefiner {
 Transform the debate transcript into expressive, natural spoken dialogue.
 
 ## V3 Audio Tags Available (use naturally where appropriate):
-EMOTIONAL: [excited], [frustrated], [curious], [sarcastic]
-REACTIONS: [sigh], [laughs], [gasps], [clears throat], [stammers]
-DELIVERY: [whispers], [loudly], [deadpan], [playfully]
-PACING: [pause], [short pause], [long pause], [hesitates], [rushed], [slows down]
-DIALOGUE: [interrupting], [cuts in]
-TONE: [dramatic tone], [serious tone], [matter-of-fact]
+EMOTIONAL: [excited], [curious], [sarcastic], [mischievously], [cheerfully]
+REACTIONS: [sigh], [sighing], [laughs], [gasps], [clears throat], [gulps], [breathes]
+DELIVERY: [whispers], [loudly], [shouts], [deadpan], [playfully], [flatly], [timidly]
+PACING: [pause], [stammers], [rushed], [slows down], [drawn out]
+Note: Use [pause] for all pauses. Use ellipsis ... for longer pauses or trailing off.
 
 ## Debate Tone: ${this.tone.toUpperCase()}
 ${toneGuidance}
@@ -420,7 +422,7 @@ Refined spoken version:`,
         const guidance: Record<DebateTone, string> = {
             respectful: `Maintain professional, measured delivery. Use [pause] for thoughtful beats.
 Use [curious] when genuinely engaging with the other side.
-Avoid aggressive tags like [frustrated] or [loudly].
+Avoid aggressive tags like [loudly] or [shouts].
 Prefer diplomatic language: "I would suggest..." over "That's wrong..."
 Keep a collegial, academic atmosphere.`,
 
@@ -428,14 +430,13 @@ Keep a collegial, academic atmosphere.`,
 Add [sigh] for moments of concession or frustration.
 Use [laughs] for irony or disbelief.
 Be direct: "Here's the problem with that..." with emphasis.
-Include occasional [cuts in] for dynamic exchanges.
 Balance passion with respect.`,
 
             heated: `Maximum intensity and passion. Use emotional tags frequently.
-Use [frustrated], [loudly], [cuts in] liberally.
+Use [sigh], [loudly], [shouts] liberally.
 Add [sarcastic] for pointed rejoinders.
 Emphasize disagreements: "That is EXACTLY backwards."
-Use [dramatic tone] for key arguments.
+Use [deadpan] or [flatly] for dry, cutting remarks.
 Include [gasps] and [stammers] for authentic reactions.
 Don't hold back - this is a passionate debate.`,
         };
@@ -802,8 +803,8 @@ Output ONLY the outro text.`,
             turns: phase.turns.reduce((merged, turn) => {
                 const last = merged[merged.length - 1];
                 if (last && last.speaker === turn.speaker) {
-                    // Merge: add short pause between content
-                    last.content += ' [short pause] ' + turn.content;
+                    // Merge: add pause between content (V3 documented tag)
+                    last.content += ' [pause] ' + turn.content;
                 } else {
                     merged.push({ ...turn });
                 }
@@ -814,12 +815,18 @@ Output ONLY the outro text.`,
 
     /**
      * Convert pause syntax based on ElevenLabs model
-     * V3 uses text tags, other models need SSML break tags
+     * V3 uses only [pause] - normalize all pause variants to that
+     * Other models need SSML break tags
      */
     private convertPauseSyntax(text: string): string {
         if (this.elevenLabsModel === 'eleven_v3') {
-            // V3 uses text-based tags - already correct, just normalize
-            return text;
+            // V3: Normalize all pause variants to documented [pause] tag
+            // Also convert any SSML-style tags that might have slipped through
+            return text
+                .replace(/\[long pause\]/gi, '[pause] ... ')   // Long pause = pause + ellipsis
+                .replace(/\[short pause\]/gi, '[pause]')       // Short pause = pause
+                .replace(/<break[^>]*>/gi, '[pause]')          // Remove any SSML breaks
+                .replace(/\[hesitates\]/gi, '[stammers]');     // Use documented tag
         }
         // Other models need SSML break tags
         return text
