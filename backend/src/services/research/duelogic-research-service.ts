@@ -241,7 +241,7 @@ Find up to ${maxTopics} topics. Quality over quantity - only include genuinely d
 
             // Try to extract JSON from code blocks
             const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (jsonMatch) {
+            if (jsonMatch && jsonMatch[1]) {
                 jsonStr = jsonMatch[1].trim();
             }
 
