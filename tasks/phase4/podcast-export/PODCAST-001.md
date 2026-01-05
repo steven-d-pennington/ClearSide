@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** S (2-4 hours)
 **Dependencies:** AUDIO-001 (ElevenLabs TTS basic integration)
-**Status:** TO DO
+**Status:** DONE
 
 ---
 
@@ -25,14 +25,14 @@ The podcast export feature requires database schema to track export jobs, store 
 
 ### Acceptance Criteria
 
-- [ ] Create TypeScript interfaces for all podcast export types
-- [ ] Create database migration for `podcast_export_jobs` table
-- [ ] Create database migration for `podcast_scripts` table (stores refined scripts)
-- [ ] Create `PodcastExportRepository` for database operations
-- [ ] Add voice assignment types with ElevenLabs voice IDs
-- [ ] Include job status tracking (pending, refining, generating, complete, error)
-- [ ] Add cost estimation tracking fields
-- [ ] Write unit tests for repository operations
+- [x] Create TypeScript interfaces for all podcast export types
+- [x] Create database migration for `podcast_export_jobs` table
+- [x] Create database migration for `podcast_scripts` table (stores refined scripts)
+- [x] Create `PodcastExportRepository` for database operations
+- [x] Add voice assignment types with ElevenLabs voice IDs
+- [x] Include job status tracking (pending, refining, generating, complete, error)
+- [x] Add cost estimation tracking fields
+- [x] Write unit tests for repository operations
 
 ### Functional Requirements
 
@@ -402,12 +402,12 @@ export class PodcastExportRepository {
 
 ### Definition of Done
 
-- [ ] All TypeScript types are defined and exported
-- [ ] Database migration creates tables and indexes
-- [ ] Repository implements CRUD operations
-- [ ] Unit tests pass with >90% coverage
-- [ ] Types match the specification in FUTURE-FEATURES.md
-- [ ] Default voice assignments are configured
+- [x] All TypeScript types are defined and exported
+- [x] Database migration creates tables and indexes
+- [x] Repository implements CRUD operations
+- [x] Unit tests pass with >90% coverage
+- [x] Types match the specification in FUTURE-FEATURES.md
+- [x] Default voice assignments are configured
 
 ---
 

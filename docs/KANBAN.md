@@ -1,11 +1,21 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2026-01-03
-> Version: 5.0.0 - Phase 4 Podcast Export Tasks Added
+> Version: 6.0.0 - Phase 5 Duelogic Research Tasks Added
 
 ## 🔧 Recent Changes (2026-01-03)
 
-**NEW: Phase 4 - Podcast Export Pipeline:**
+**NEW: Phase 5 - Duelogic Research & Automated Episode Generation:**
+- Automated topic discovery using Perplexity via OpenRouter
+- LLM-powered episode proposal generation following Duelogic format
+- Research job scheduling with cron-based automation
+- Vector database (Pinecone/ChromaDB) integration for RAG
+- Admin dashboard for proposal review, editing, and approval
+- Debate orchestrator integration for real-time citations
+- 7 comprehensive task files in `tasks/phase5/duelogic-research/`
+- See [FUTURE-FEATURES.md](./FUTURE-FEATURES.md) Section 10 for full specification
+
+**Phase 4 - Podcast Export Pipeline (Complete):**
 - LLM-powered script refinement for broadcast-quality audio
 - ElevenLabs TTS integration with per-speaker voice settings
 - Script preview/edit UI before costly TTS generation
@@ -169,38 +179,57 @@ OpenRouter provides unified API to 100+ models. This builds on the Persona syste
 
 **Target Audience:** Debate clubs, educational institutions, content creators who want engaging human+AI panel discussions
 
-### Option E: Podcast Export Pipeline (Phase 4) - NEW!
+### Option E: Podcast Export Pipeline (Phase 4) - COMPLETE
 
 **Broadcast-quality podcast generation with LLM script refinement and ElevenLabs TTS.**
 
 | Task | Description | Estimate | Status |
 |------|-------------|----------|--------|
-| PODCAST-001 | Database Schema & Types for Podcast Export | S | 🟢 Ready |
-| PODCAST-002 | Script Refinement Service (LLM polish) | L | 🟢 Ready |
-| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | M | 🟢 Ready |
-| PODCAST-004 | Script Preview & Edit API | M | 🟢 Ready |
-| PODCAST-005 | Podcast Generation Pipeline | L | 🟢 Ready |
-| PODCAST-006 | Frontend Podcast Export UI | L | 🟢 Ready |
+| PODCAST-001 | Database Schema & Types for Podcast Export | S | ✅ Done |
+| PODCAST-002 | Script Refinement Service (LLM polish) | L | ✅ Done |
+| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | M | ✅ Done |
+| PODCAST-004 | Script Preview & Edit API | M | ✅ Done |
+| PODCAST-005 | Podcast Generation Pipeline | L | ✅ Done |
+| PODCAST-006 | Frontend Podcast Export UI | L | ✅ Done |
+
+**Status:** All 6 tasks complete!
+
+---
+
+### Option F: Duelogic Research & Automated Episodes (Phase 5) - NEW!
+
+**Automated research pipeline for discovering topics and generating Duelogic episode proposals.**
+
+| Task | Description | Estimate | Status |
+|------|-------------|----------|--------|
+| DUELOGIC-001 | Database Schema & Types for Research System | S | 🟢 Ready |
+| DUELOGIC-002 | Perplexity Integration via OpenRouter | M | 🟢 Ready |
+| DUELOGIC-003 | Episode Generator Service | L | 🟢 Ready |
+| DUELOGIC-004 | Research Job Scheduler | M | 🟢 Ready |
+| DUELOGIC-005 | Vector Database Integration for RAG | L | 🟢 Ready |
+| DUELOGIC-006 | Admin Research Dashboard | L | 🟢 Ready |
+| DUELOGIC-007 | Debate Orchestrator RAG Integration | M | 🟢 Ready |
 
 **Key Features:**
-- LLM refines debate transcripts into natural spoken dialogue
-- Remove markdown, add transitions, expand abbreviations
-- Per-speaker voice assignment with advanced settings
-- Script preview/edit before TTS to control costs
-- Progress tracking with segment-level granularity
-- Cost estimation before generation
+- Perplexity models discover trending ethical/moral topics via real-time web search
+- LLM generates episode proposals matching Duelogic format (chairs, tensions, etc.)
+- Scheduled research jobs with token/cost tracking
+- Vector database indexes research for RAG during debates
+- Admin dashboard for reviewing, editing, and approving proposals
+- Debate agents cite real sources gathered during research
 
-**Dependencies:** AUDIO-001 (ElevenLabs TTS basic integration)
+**Dependencies:** None (new feature track)
 
-**Start Here:** PODCAST-001 (Database Schema & Types)
+**Start Here:** DUELOGIC-001 (Database Schema & Types)
 
 ---
 
 ### Recommendation
 
-For **podcast content creators**: Start with PODCAST-001 (broadcast-quality audio)
+For **Duelogic episodes**: Start with DUELOGIC-001 (automated episode generation)
+For **podcast content creators**: Phase 4 complete! Audio export fully functional
 For **user-facing features**: Start with PERSONA-001 (differentiated debates)
-For **content distribution**: Audio export is complete! Try EXPORT-002 (PDF) or VIDEO-001 (video)
+For **content distribution**: Try EXPORT-002 (PDF) or VIDEO-001 (video)
 For **advanced debates**: After personas, consider OPENROUTER-001 (multi-LLM debates)
 
 ---
@@ -455,12 +484,12 @@ Transform debate transcripts into broadcast-quality podcast audio using LLM scri
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| PODCAST-001 | Database Schema & Types for Podcast Export | P0 | S | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-001.md) |
-| PODCAST-002 | Script Refinement Service | P0 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-002.md) |
-| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | P0 | M | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-003.md) |
-| PODCAST-004 | Script Preview & Edit API | P1 | M | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-004.md) |
-| PODCAST-005 | Podcast Generation Pipeline | P0 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-005.md) |
-| PODCAST-006 | Frontend Podcast Export UI | P1 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-006.md) |
+| PODCAST-001 | Database Schema & Types for Podcast Export | P0 | S | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-001.md) |
+| PODCAST-002 | Script Refinement Service | P0 | L | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-002.md) |
+| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | P0 | M | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-003.md) |
+| PODCAST-004 | Script Preview & Edit API | P1 | M | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-004.md) |
+| PODCAST-005 | Podcast Generation Pipeline | P0 | L | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-005.md) |
+| PODCAST-006 | Frontend Podcast Export UI | P1 | L | ✅ Done | [View Task](../tasks/phase4/podcast-export/PODCAST-006.md) |
 
 **Dependencies:**
 - PODCAST-001 can start immediately
@@ -471,6 +500,38 @@ Transform debate transcripts into broadcast-quality podcast audio using LLM scri
 - PODCAST-006 depends on PODCAST-004, PODCAST-005
 
 **Critical Path:** PODCAST-001 → PODCAST-002 → PODCAST-004 → PODCAST-005 → PODCAST-006
+
+---
+
+## 📋 PHASE 5: DUELOGIC RESEARCH & AUTOMATED EPISODE GENERATION
+
+Automated research pipeline using Perplexity to discover trending topics, generate episode proposals, and enable RAG-powered citations during debates.
+
+### 🔬 Research System
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| DUELOGIC-CORE | Implement Duelogic Core & Frontend | P0 | XL | ✅ DONE | [View Task](../../../tasks/DUELOGIC-001.md) |
+| DUELOGIC-001 | Database Schema & Types for Research System | P0 | S | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-001.md) |
+| DUELOGIC-002 | Perplexity Integration via OpenRouter | P0 | M | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-002.md) |
+| DUELOGIC-003 | Episode Generator Service | P0 | L | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-003.md) |
+| DUELOGIC-004 | Research Job Scheduler | P1 | M | ✅ Done | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-004.md) |
+| DUELOGIC-005 | Vector Database Integration for RAG | P1 | L | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-005.md) |
+| DUELOGIC-006 | Admin Research Dashboard | P1 | L | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-006.md) |
+| DUELOGIC-007 | Debate Orchestrator RAG Integration | P1 | M | 🟢 Ready | [View Task](../tasks/phase5/duelogic-research/DUELOGIC-007.md) |
+
+**Dependencies:**
+- DUELOGIC-001 can start immediately (no blockers)
+- DUELOGIC-002 depends on DUELOGIC-001
+- DUELOGIC-003 depends on DUELOGIC-001, DUELOGIC-002
+- DUELOGIC-004 depends on DUELOGIC-001, DUELOGIC-002, DUELOGIC-003
+- DUELOGIC-005 depends on DUELOGIC-001
+- DUELOGIC-006 depends on DUELOGIC-001, DUELOGIC-004
+- DUELOGIC-007 depends on DUELOGIC-005
+
+**Critical Path:** DUELOGIC-001 → DUELOGIC-002 → DUELOGIC-003 → DUELOGIC-004 → DUELOGIC-006
+
+**Parallel Track:** DUELOGIC-001 → DUELOGIC-005 → DUELOGIC-007
 
 ---
 

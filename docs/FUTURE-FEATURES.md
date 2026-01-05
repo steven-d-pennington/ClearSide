@@ -939,6 +939,676 @@ ElevenLabs pricing is per character. Estimated costs for a typical debate:
 
 ---
 
+## 10. Duelogic Research & Automated Episode Generation
+
+**Priority:** P2
+**Complexity:** High
+**Status:** Planned
+
+Automated research pipeline using Perplexity models through OpenRouter to discover trending topics, current events, and controversial issues, then generate Duelogic episode proposals for admin review.
+
+### Concept
+
+Duelogic episodes thrive on timely, controversial moral questions. Rather than manually crafting episode ideas, this feature creates an AI-powered research pipeline that:
+
+1. **Researches** current news, hot topics, and world events using Perplexity's real-time search capabilities
+2. **Generates** episode proposals following the established Duelogic format (see `duelogic-season1-episodes.md`)
+3. **Stores** proposals in the database for admin review and approval
+4. **Indexes** research data in a vector database for RAG retrieval during actual debates
+5. **Enables** debating agents to cite real sources and current events during episodes
+
+### Requirements
+
+#### Research Pipeline
+- **Perplexity Integration**: Use Perplexity models (`perplexity/sonar-pro`, `perplexity/sonar-reasoning-pro`) via OpenRouter for real-time web research
+- **Topic Discovery**: Automatically identify trending moral/ethical debates from news, social media, and academic sources
+- **Source Collection**: Gather relevant articles, studies, statistics, and expert opinions
+- **Scheduled Research**: Run research jobs on configurable schedules (daily, weekly)
+- **Research Categories**: Support multiple focus areas (tech ethics, climate, politics, bioethics, economics, etc.)
+
+#### Episode Generation
+- **Format Compliance**: Generate episodes matching the exact structure in `duelogic-season1-episodes.md`:
+  - Title with provocative subtitle
+  - Description (compelling hook)
+  - Debate Proposition (clear binary stance)
+  - Context for AI Panel
+  - Philosophical Chairs (two frameworks with internal challenges)
+  - Key Tensions to Explore
+- **Quality Filtering**: Only propose topics with sufficient depth and genuine controversy
+- **Freshness Detection**: Avoid regenerating episodes on recently covered topics
+- **Seasonal Awareness**: Consider current events (elections, major legislation, anniversaries)
+
+#### Admin Approval Workflow
+- **Proposal Queue**: All generated episodes start as "pending" proposals
+- **Admin Review UI**: Interface to review, edit, approve, or reject proposals
+- **Batch Operations**: Approve/reject multiple proposals at once
+- **Scheduling**: Approved episodes can be scheduled for specific release dates
+- **Editing**: Admins can refine AI-generated content before approval
+
+#### Vector Database & RAG
+- **Research Indexing**: Store all gathered research in a vector database (e.g., Pinecone, Qdrant, ChromaDB)
+- **Episode Classification**: Index research by episode ID for targeted retrieval
+- **Source Metadata**: Track source URLs, publication dates, credibility scores
+- **Agent Instructions**: Debating agents instructed to use RAG as primary citation source
+- **Citation Format**: Agents cite sources naturally (e.g., "According to a January 2026 Reuters report...")
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Research Pipeline                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────┐     ┌──────────────────┐     ┌──────────────┐ │
+│  │   Scheduler │────▶│ Research Service  │────▶│  Perplexity  │ │
+│  │   (Cron)    │     │                  │     │  via OpenRouter│ │
+│  └─────────────┘     └────────┬─────────┘     └──────────────┘ │
+│                               │                                  │
+│                               ▼                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                 Research Results                          │  │
+│  │  • News articles    • Expert opinions   • Statistics      │  │
+│  │  • Academic papers  • Social trends     • Policy debates  │  │
+│  └───────────────────────────┬───────────────────────────────┘  │
+│                               │                                  │
+│              ┌────────────────┼────────────────┐                │
+│              ▼                ▼                ▼                │
+│  ┌───────────────┐  ┌─────────────────┐  ┌─────────────────┐   │
+│  │ Vector DB     │  │ Episode         │  │ Raw Research    │   │
+│  │ (RAG Index)   │  │ Generator       │  │ Archive         │   │
+│  └───────────────┘  └────────┬────────┘  └─────────────────┘   │
+│                               │                                  │
+│                               ▼                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │               Episode Proposals (Pending)                 │  │
+│  └───────────────────────────┬───────────────────────────────┘  │
+│                               │                                  │
+│                               ▼                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                    Admin Review                           │  │
+│  │    [View] [Edit] [Approve] [Reject] [Schedule]            │  │
+│  └───────────────────────────┬───────────────────────────────┘  │
+│                               │                                  │
+│                               ▼                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                  Approved Episodes                        │  │
+│  │            Ready for Production                           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Data Models
+
+```typescript
+// Research configuration
+interface ResearchConfig {
+  id: string;
+  name: string;
+  schedule: string;                    // Cron expression
+  enabled: boolean;
+  categories: ResearchCategory[];
+  perplexityModel: string;             // e.g., "perplexity/sonar-pro"
+  maxTopicsPerRun: number;
+  minControversyScore: number;         // 0-1, filter boring topics
+  searchQueries: string[];             // Custom research prompts
+  excludeTopics: string[];             // Topics to avoid
+}
+
+type ResearchCategory = 
+  | 'technology_ethics'
+  | 'climate_environment'
+  | 'politics_governance'
+  | 'bioethics_medicine'
+  | 'economics_inequality'
+  | 'ai_automation'
+  | 'social_justice'
+  | 'international_relations'
+  | 'privacy_surveillance'
+  | 'education_culture';
+
+// Research job execution
+interface ResearchJob {
+  id: string;
+  configId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  startedAt?: Date;
+  completedAt?: Date;
+  topicsDiscovered: number;
+  episodesGenerated: number;
+  tokensUsed: number;
+  error?: string;
+}
+
+// Research result - raw gathered data
+interface ResearchResult {
+  id: string;
+  jobId: string;
+  topic: string;
+  category: ResearchCategory;
+  sources: ResearchSource[];
+  summary: string;
+  controversyScore: number;           // 0-1, how debatable is this?
+  timeliness: number;                 // 0-1, how current?
+  depth: number;                      // 0-1, enough for episode?
+  rawPerplexityResponse: string;
+  createdAt: Date;
+}
+
+interface ResearchSource {
+  url: string;
+  title: string;
+  domain: string;
+  publishedAt?: Date;
+  excerpt: string;
+  credibilityScore?: number;          // Optional: domain reputation
+}
+
+// Generated episode proposal
+interface EpisodeProposal {
+  id: string;
+  researchResultId: string;
+  status: 'pending' | 'approved' | 'rejected' | 'scheduled';
+  
+  // Episode content (matches duelogic-season1-episodes.md format)
+  episodeNumber?: number;              // Assigned on approval
+  title: string;                       // e.g., "The Algorithm's Gavel"
+  subtitle: string;                    // e.g., "Can Code Be Fairer Than Conscience?"
+  description: string;                 // Compelling 2-3 sentence hook
+  proposition: string;                 // Clear binary debate proposition
+  contextForPanel: string;             // Background for AI debaters
+  
+  chairs: PhilosophicalChair[];
+  keyTensions: string[];
+  
+  // Metadata
+  generatedAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  scheduledFor?: Date;
+  adminNotes?: string;
+  
+  // Edits tracking
+  wasEdited: boolean;
+  editHistory?: EpisodeEdit[];
+}
+
+interface PhilosophicalChair {
+  name: string;                        // e.g., "Utilitarian Chair"
+  position: string;                    // Main argument
+  mustAcknowledge: string;            // Required self-critique
+}
+
+interface EpisodeEdit {
+  field: string;
+  oldValue: string;
+  newValue: string;
+  editedAt: Date;
+  editedBy: string;
+}
+
+// Vector database entry for RAG
+interface ResearchVectorEntry {
+  id: string;
+  episodeId: string;                  // Links to approved episode
+  researchResultId: string;
+  sourceUrl: string;
+  content: string;                    // Chunk of source content
+  embedding: number[];                // Vector embedding
+  metadata: {
+    sourceTitle: string;
+    sourceDomain: string;
+    publishedAt?: Date;
+    category: ResearchCategory;
+  };
+}
+
+// RAG retrieval result
+interface RAGCitation {
+  content: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  sourceDomain: string;
+  publishedAt?: Date;
+  relevanceScore: number;
+}
+```
+
+### Perplexity Integration via OpenRouter
+
+```typescript
+// Research service using Perplexity models
+class DuelogicResearchService {
+  private openRouterClient: OpenRouterLLMClient;
+
+  async discoverTopics(config: ResearchConfig): Promise<ResearchResult[]> {
+    const results: ResearchResult[] = [];
+
+    for (const category of config.categories) {
+      const prompt = this.buildResearchPrompt(category);
+      
+      const response = await this.openRouterClient.generate({
+        model: config.perplexityModel,  // "perplexity/sonar-pro"
+        messages: [
+          {
+            role: 'system',
+            content: `You are a research assistant for Duelogic, an AI debate podcast 
+              focused on controversial moral and ethical questions. Your job is to 
+              identify current, genuinely debatable topics that would make compelling 
+              episodes. Focus on topics with:
+              - Clear binary tension (not just "it's complicated")
+              - Current relevance (recent news, ongoing debates)
+              - Philosophical depth (can sustain 45-60 min debate)
+              - Multiple valid perspectives (not strawman vs. reason)
+              
+              Return structured JSON with discovered topics.`
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        // Perplexity-specific: enable citations
+        extra_body: {
+          return_citations: true,
+          search_recency_filter: 'week'  // Focus on recent news
+        }
+      });
+
+      // Parse and score topics
+      const topics = this.parseTopics(response, category);
+      results.push(...topics);
+    }
+
+    return results.filter(r => r.controversyScore >= config.minControversyScore);
+  }
+
+  private buildResearchPrompt(category: ResearchCategory): string {
+    const categoryPrompts: Record<ResearchCategory, string> = {
+      technology_ethics: `Search for current debates about AI ethics, algorithm 
+        accountability, tech regulation, digital rights, and automation's impact 
+        on society. Focus on recent news and emerging controversies.`,
+      climate_environment: `Find current environmental debates: climate policy 
+        conflicts, environmental justice issues, resource allocation, and 
+        technology vs. nature tensions.`,
+      // ... other categories
+    };
+    return categoryPrompts[category];
+  }
+}
+```
+
+### Episode Generator
+
+```typescript
+class EpisodeGenerator {
+  private llmClient: OpenRouterLLMClient;
+
+  async generateProposal(research: ResearchResult): Promise<EpisodeProposal> {
+    const prompt = `Based on the following research, generate a Duelogic episode 
+      proposal following this exact format:
+
+      RESEARCH TOPIC: ${research.topic}
+      CATEGORY: ${research.category}
+      SOURCES: ${research.sources.map(s => s.title).join(', ')}
+      SUMMARY: ${research.summary}
+
+      Generate an episode with:
+      1. A provocative title with subtitle (style: "The X: Can Y?")
+      2. A 2-3 sentence description that hooks the listener
+      3. A clear binary debate proposition
+      4. Context paragraph for the AI panel
+      5. Two philosophical chairs with positions AND self-critiques they must acknowledge
+      6. 4-5 key tensions to explore
+
+      Match the tone and format of these example episodes:
+      - "The Algorithm's Gavel: Can Code Be Fairer Than Conscience?"
+      - "The Consent Dilemma: Who Decides What's Best for a Child's Future Self?"
+      - "The Immortality Gap: Should We Cure Death If Only the Rich Survive?"
+
+      Return as JSON.`;
+
+    const response = await this.llmClient.generate({
+      model: 'anthropic/claude-sonnet-4',  // Use strong model for quality
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8
+    });
+
+    return this.parseEpisodeProposal(response, research.id);
+  }
+}
+```
+
+### Vector Database Integration
+
+```typescript
+interface VectorDBClient {
+  upsert(entries: ResearchVectorEntry[]): Promise<void>;
+  query(episodeId: string, query: string, topK: number): Promise<RAGCitation[]>;
+  deleteByEpisode(episodeId: string): Promise<void>;
+}
+
+// Integration with debate orchestrators
+class RAGEnhancedDebateContext {
+  private vectorDB: VectorDBClient;
+  private episodeId: string;
+
+  async buildContextWithCitations(currentTurn: string): Promise<string> {
+    // Query vector DB for relevant sources
+    const citations = await this.vectorDB.query(
+      this.episodeId,
+      currentTurn,
+      5  // Top 5 most relevant sources
+    );
+
+    return `
+      ## Available Research & Citations
+      
+      Use these sources to support your arguments. Cite them naturally in your response.
+      
+      ${citations.map(c => `
+        **${c.sourceTitle}** (${c.sourceDomain}, ${c.publishedAt})
+        "${c.content}"
+        Source: ${c.sourceUrl}
+      `).join('\n\n')}
+      
+      When citing, use natural language like:
+      - "According to a recent ${citations[0]?.sourceDomain} report..."
+      - "A ${citations[0]?.publishedAt?.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} study found..."
+      - "As reported in ${citations[0]?.sourceTitle}..."
+    `;
+  }
+}
+```
+
+### Admin UI
+
+#### Research Dashboard
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Duelogic Research Dashboard                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ Pending      │  │ Approved     │  │ Rejected     │           │
+│  │     12       │  │      8       │  │      5       │           │
+│  └──────────────┘  └──────────────┘  └──────────────┘           │
+│                                                                  │
+│  Recent Research Jobs                              [Run Now ▶]   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ Job ID     Status      Topics    Episodes    Tokens       │  │
+│  │ #247       Completed   15        12          45,230       │  │
+│  │ #246       Completed   18        14          52,100       │  │
+│  │ #245       Failed      --        --          --           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  Pending Episode Proposals                          [Bulk Edit]  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ ☐ The Data Hunger: Should AI Models Pay for Training?    │  │
+│  │   Generated: Jan 3, 2026 | Category: AI/Tech Ethics       │  │
+│  │   Score: ★★★★☆ (0.89)                                     │  │
+│  │   [View] [Edit] [✓ Approve] [✗ Reject]                    │  │
+│  ├───────────────────────────────────────────────────────────┤  │
+│  │ ☐ The Fertility Freeze: Should Employers Fund Egg Bank?  │  │
+│  │   Generated: Jan 3, 2026 | Category: Bioethics            │  │
+│  │   Score: ★★★★★ (0.94)                                     │  │
+│  │   [View] [Edit] [✓ Approve] [✗ Reject]                    │  │
+│  ├───────────────────────────────────────────────────────────┤  │
+│  │ ☐ The Deepfake Defense: Is Synthetic Alibi Valid?        │  │
+│  │   Generated: Jan 2, 2026 | Category: Technology/Law       │  │
+│  │   Score: ★★★☆☆ (0.72)                                     │  │
+│  │   [View] [Edit] [✓ Approve] [✗ Reject]                    │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Episode Proposal Detail View
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Episode Proposal: The Data Hunger                    [Edit] [✕] │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Title: The Data Hunger                                          │
+│  Subtitle: Should AI Models Pay for What They Learned?           │
+│                                                                  │
+│  Description:                                                    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ Every AI model is trained on the internet - your posts, │    │
+│  │ your art, your code. But did anyone ask? As lawsuits    │    │
+│  │ mount and artists revolt, a fundamental question        │    │
+│  │ emerges: Is training on public data fair use or theft?  │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  Proposition:                                                    │
+│  "AI companies should be legally required to compensate          │
+│   creators whose work was used to train their models."           │
+│                                                                  │
+│  Philosophical Chairs:                                           │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ 🔷 Property Rights Chair                                │    │
+│  │ Position: Intellectual property rights extend to AI      │    │
+│  │ training; using work without consent is theft.          │    │
+│  │ Must Acknowledge: Strict licensing could make AI         │    │
+│  │ development prohibitively expensive, concentrating       │    │
+│  │ power in wealthy corporations.                          │    │
+│  ├─────────────────────────────────────────────────────────┤    │
+│  │ 🔶 Commons Chair                                        │    │
+│  │ Position: Public data should fuel public benefit; AI    │    │
+│  │ learning mirrors how humans learn from culture.          │    │
+│  │ Must Acknowledge: "Public" often means "posted without  │    │
+│  │ meaningful consent to AI training" and primarily        │    │
+│  │ benefits corporations, not the public.                   │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  Research Sources (12):                           [View All ▼]   │
+│  • NYT: "Artists Sue AI Companies Over Training Data"            │
+│  • ArsTechnica: "Getty Images lawsuit expands"                   │
+│  • MIT Tech Review: "The data problem AI can't solve"            │
+│                                                                  │
+│  Admin Notes:                                                    │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ Good topic, timely with the recent lawsuits. Consider   │    │
+│  │ scheduling for mid-January when NYT v OpenAI ruling     │    │
+│  │ expected.                                                │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+│  Schedule for: [Jan 15, 2026 ▼]                                  │
+│                                                                  │
+│              [Save Draft]  [Reject]  [Approve & Schedule]        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Database Schema
+
+```sql
+-- Research configuration
+CREATE TABLE research_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  schedule TEXT NOT NULL,  -- Cron expression
+  enabled BOOLEAN DEFAULT true,
+  categories TEXT[] NOT NULL,
+  perplexity_model TEXT NOT NULL,
+  max_topics_per_run INTEGER DEFAULT 20,
+  min_controversy_score REAL DEFAULT 0.6,
+  search_queries TEXT[],
+  exclude_topics TEXT[],
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Research job executions
+CREATE TABLE research_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  config_id UUID REFERENCES research_configs(id),
+  status TEXT NOT NULL DEFAULT 'pending',
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  topics_discovered INTEGER DEFAULT 0,
+  episodes_generated INTEGER DEFAULT 0,
+  tokens_used INTEGER DEFAULT 0,
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Raw research results
+CREATE TABLE research_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID REFERENCES research_jobs(id),
+  topic TEXT NOT NULL,
+  category TEXT NOT NULL,
+  sources JSONB NOT NULL,
+  summary TEXT NOT NULL,
+  controversy_score REAL NOT NULL,
+  timeliness REAL NOT NULL,
+  depth REAL NOT NULL,
+  raw_perplexity_response TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Episode proposals
+CREATE TABLE episode_proposals (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  research_result_id UUID REFERENCES research_results(id),
+  status TEXT NOT NULL DEFAULT 'pending',
+  episode_number INTEGER,
+  title TEXT NOT NULL,
+  subtitle TEXT NOT NULL,
+  description TEXT NOT NULL,
+  proposition TEXT NOT NULL,
+  context_for_panel TEXT NOT NULL,
+  chairs JSONB NOT NULL,
+  key_tensions TEXT[] NOT NULL,
+  generated_at TIMESTAMPTZ DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by TEXT,
+  scheduled_for DATE,
+  admin_notes TEXT,
+  was_edited BOOLEAN DEFAULT false,
+  edit_history JSONB
+);
+
+-- Indexes
+CREATE INDEX idx_proposals_status ON episode_proposals(status);
+CREATE INDEX idx_proposals_scheduled ON episode_proposals(scheduled_for) 
+  WHERE status = 'approved';
+CREATE INDEX idx_research_results_job ON research_results(job_id);
+```
+
+### API Endpoints
+
+```typescript
+// Research Configuration
+GET    /api/duelogic/research/configs
+POST   /api/duelogic/research/configs
+PUT    /api/duelogic/research/configs/:id
+DELETE /api/duelogic/research/configs/:id
+
+// Research Jobs
+GET    /api/duelogic/research/jobs
+POST   /api/duelogic/research/jobs/run          // Trigger manual run
+GET    /api/duelogic/research/jobs/:id
+
+// Episode Proposals
+GET    /api/duelogic/proposals                  // ?status=pending,approved,rejected
+GET    /api/duelogic/proposals/:id
+PUT    /api/duelogic/proposals/:id              // Update proposal
+POST   /api/duelogic/proposals/:id/approve
+POST   /api/duelogic/proposals/:id/reject
+POST   /api/duelogic/proposals/bulk-action      // Bulk approve/reject
+
+// Approved Episodes
+GET    /api/duelogic/episodes
+GET    /api/duelogic/episodes/:id/research      // Get RAG-indexed research
+
+// Vector Database Management
+POST   /api/duelogic/episodes/:id/index         // Index research for RAG
+DELETE /api/duelogic/episodes/:id/index         // Remove from vector DB
+GET    /api/duelogic/episodes/:id/citations     // Preview available citations
+```
+
+### Implementation Steps
+
+1. **Backend: Perplexity Integration**
+   - Add Perplexity model support to OpenRouter client
+   - Implement citation extraction from Perplexity responses
+   - Create `DuelogicResearchService` class
+
+2. **Backend: Episode Generator**
+   - Create `EpisodeGenerator` for proposal creation
+   - Implement quality scoring (controversy, depth, timeliness)
+   - Add format validation against episode template
+
+3. **Backend: Scheduler**
+   - Implement cron-based research job scheduling
+   - Add job queue for research execution
+   - Track token usage and costs
+
+4. **Database: Schema & Repos**
+   - Add migration for research tables
+   - Create repositories for configs, jobs, proposals
+
+5. **Backend: Vector Database**
+   - Integrate vector DB (Pinecone/Qdrant/ChromaDB)
+   - Implement research indexing on episode approval
+   - Create RAG retrieval service for debates
+
+6. **Frontend: Admin UI**
+   - Create research dashboard at `/admin/duelogic/research`
+   - Build proposal review interface
+   - Add episode scheduling calendar
+
+7. **Integration: Debate Orchestrator**
+   - Modify Duelogic orchestrator to query RAG
+   - Inject citation context into debate prompts
+   - Ensure natural citation formatting
+
+### Configuration Example
+
+```yaml
+# Default research configuration
+duelogic_research:
+  enabled: true
+  schedule: "0 6 * * MON,THU"  # 6 AM Monday & Thursday
+  
+  perplexity:
+    model: "perplexity/sonar-pro"
+    fallback_model: "perplexity/sonar"
+    
+  categories:
+    - technology_ethics
+    - climate_environment  
+    - bioethics_medicine
+    - ai_automation
+    - economics_inequality
+    
+  quality_thresholds:
+    min_controversy_score: 0.65
+    min_timeliness: 0.4
+    min_depth: 0.7
+    
+  limits:
+    max_topics_per_run: 25
+    max_episodes_per_run: 15
+    max_tokens_per_run: 100000
+    
+  vector_db:
+    provider: "pinecone"
+    index_name: "duelogic-research"
+    embedding_model: "text-embedding-3-small"
+```
+
+### Success Metrics
+
+- **Topic Freshness**: >80% of proposed episodes reference events <7 days old
+- **Approval Rate**: >50% of proposals approved by admin
+- **Citation Usage**: >90% of debate turns include at least one RAG citation
+- **Source Quality**: Average credibility score >0.7
+
+---
+
 ## Future Considerations
 
 ### Multi-User Support

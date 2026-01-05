@@ -31,6 +31,11 @@ export default defineConfig({
         target: process.env.VITE_PROXY_TARGET || 'http://localhost:3001',
         changeOrigin: true,
       },
+      // Proxy static exports (podcasts, etc.) to backend
+      '/exports': {
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:3001',
+        changeOrigin: true,
+      },
     },
   },
   build: {

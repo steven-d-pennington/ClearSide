@@ -34,6 +34,10 @@ export const DebatePhase = {
   INFORMAL: 'informal',
   /** Informal discussion mode - wrap-up phase */
   WRAPUP: 'wrapup',
+  /** Duelogic / Backend Phase Names (snake_case) */
+  OPENING_STATEMENTS: 'opening_statements',
+  REBUTTALS: 'rebuttals',
+  SYNTHESIS_SC: 'synthesis',
 } as const;
 
 export type DebatePhase = (typeof DebatePhase)[keyof typeof DebatePhase];
@@ -56,6 +60,15 @@ export const Speaker = {
   PARTICIPANT_2: 'participant_2',
   PARTICIPANT_3: 'participant_3',
   PARTICIPANT_4: 'participant_4',
+  /** Duelogic Arbiter (Host) */
+  ARBITER: 'arbiter',
+  /** Duelogic Chairs */
+  CHAIR_1: 'chair_1',
+  CHAIR_2: 'chair_2',
+  CHAIR_3: 'chair_3',
+  CHAIR_4: 'chair_4',
+  CHAIR_5: 'chair_5',
+  CHAIR_6: 'chair_6',
 } as const;
 
 export type Speaker = (typeof Speaker)[keyof typeof Speaker];
@@ -166,6 +179,28 @@ export const PHASE_INFO: Record<DebatePhase, PhaseInfo> = {
     durationMinutes: 0,
     description: 'Participants sharing final thoughts',
   },
+  // Duelogic / Backend Phase Names
+  [DebatePhase.OPENING_STATEMENTS]: {
+    phase: DebatePhase.OPENING_STATEMENTS,
+    name: 'Opening Statements',
+    shortName: 'Opening',
+    durationMinutes: 4,
+    description: 'Initial presentation of frameworks',
+  },
+  [DebatePhase.REBUTTALS]: {
+    phase: DebatePhase.REBUTTALS,
+    name: 'Exchange',
+    shortName: 'Exchange',
+    durationMinutes: 10,
+    description: 'Interactive debate exchange',
+  },
+  [DebatePhase.SYNTHESIS_SC]: {
+    phase: DebatePhase.SYNTHESIS_SC,
+    name: 'Synthesis',
+    shortName: 'Synthesis',
+    durationMinutes: 3,
+    description: 'Arbiter synthesis of the debate',
+  },
 };
 
 /**
@@ -239,6 +274,56 @@ export const SPEAKER_INFO: Record<Speaker, SpeakerInfo> = {
     color: 'var(--color-participant-4, #14b8a6)',
     bgColor: 'var(--color-participant-4-bg, rgba(20, 184, 166, 0.1))',
   },
+  // Duelogic Speakers
+  [Speaker.ARBITER]: {
+    speaker: Speaker.ARBITER,
+    name: 'The Arbiter',
+    shortName: 'Arbiter',
+    color: 'var(--color-arbiter, #8b5cf6)',
+    bgColor: 'var(--color-arbiter-bg, rgba(139, 92, 246, 0.1))',
+  },
+  [Speaker.CHAIR_1]: {
+    speaker: Speaker.CHAIR_1,
+    name: 'First Chair',
+    shortName: 'Chair 1',
+    color: 'var(--color-chair-1, #3b82f6)',
+    bgColor: 'var(--color-chair-1-bg, rgba(59, 130, 246, 0.1))',
+  },
+  [Speaker.CHAIR_2]: {
+    speaker: Speaker.CHAIR_2,
+    name: 'Second Chair',
+    shortName: 'Chair 2',
+    color: 'var(--color-chair-2, #ef4444)',
+    bgColor: 'var(--color-chair-2-bg, rgba(239, 68, 68, 0.1))',
+  },
+  [Speaker.CHAIR_3]: {
+    speaker: Speaker.CHAIR_3,
+    name: 'Third Chair',
+    shortName: 'Chair 3',
+    color: 'var(--color-chair-3, #10b981)',
+    bgColor: 'var(--color-chair-3-bg, rgba(16, 185, 129, 0.1))',
+  },
+  [Speaker.CHAIR_4]: {
+    speaker: Speaker.CHAIR_4,
+    name: 'Fourth Chair',
+    shortName: 'Chair 4',
+    color: 'var(--color-chair-4, #f59e0b)',
+    bgColor: 'var(--color-chair-4-bg, rgba(245, 158, 11, 0.1))',
+  },
+  [Speaker.CHAIR_5]: {
+    speaker: Speaker.CHAIR_5,
+    name: 'Fifth Chair',
+    shortName: 'Chair 5',
+    color: 'var(--color-chair-5, #6366f1)',
+    bgColor: 'var(--color-chair-5-bg, rgba(99, 102, 241, 0.1))',
+  },
+  [Speaker.CHAIR_6]: {
+    speaker: Speaker.CHAIR_6,
+    name: 'Sixth Chair',
+    shortName: 'Chair 6',
+    color: 'var(--color-chair-6, #ec4899)',
+    bgColor: 'var(--color-chair-6-bg, rgba(236, 72, 153, 0.1))',
+  },
 };
 
 /**
@@ -265,6 +350,17 @@ export interface DebateTurn {
     interruptionEnergy?: 'low' | 'medium' | 'high';
     // Human participation mode
     isHumanGenerated?: boolean;
+    // Duelogic mode metadata
+    evaluation?: {
+      adherenceScore: number;
+      steelManning: { attempted: boolean; quality: string; notes?: string };
+      selfCritique: { attempted: boolean; quality: string; notes?: string };
+      frameworkConsistency: { consistent: boolean; violations?: string[] };
+      intellectualHonesty: { score: string; issues?: string[] };
+      requiresInterjection: boolean;
+      interjectionReason?: string;
+    };
+    interruptionReason?: string;
   };
 }
 

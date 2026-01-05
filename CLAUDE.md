@@ -1,24 +1,25 @@
 # CLAUDE.md - AI Agent Guide for ClearSide Development
 
 > **Last Updated:** 2026-01-03
-> **Version:** 4.0.0
+> **Version:** 5.0.0
 
 ---
 
 ## Quick Start: What to Work On
 
-### Current Priority: Phase 4 - Podcast Export Pipeline
+### Current Priority: Phase 5 - Duelogic Research & Automated Episode Generation
 
-Start with **PODCAST-001** in `tasks/phase4/podcast-export/PODCAST-001.md`
+Start with **DUELOGIC-001** in `tasks/phase5/duelogic-research/DUELOGIC-001.md`
 
 | Task | Description | Status | File |
 |------|-------------|--------|------|
-| PODCAST-001 | Database Schema & Types | Ready | [View](tasks/phase4/podcast-export/PODCAST-001.md) |
-| PODCAST-002 | Script Refinement Service | Ready | [View](tasks/phase4/podcast-export/PODCAST-002.md) |
-| PODCAST-003 | ElevenLabs TTS Client | Ready | [View](tasks/phase4/podcast-export/PODCAST-003.md) |
-| PODCAST-004 | Script Preview & Edit API | Ready | [View](tasks/phase4/podcast-export/PODCAST-004.md) |
-| PODCAST-005 | Podcast Generation Pipeline | Ready | [View](tasks/phase4/podcast-export/PODCAST-005.md) |
-| PODCAST-006 | Frontend Podcast Export UI | Ready | [View](tasks/phase4/podcast-export/PODCAST-006.md) |
+| DUELOGIC-001 | Database Schema & Types for Research | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-001.md) |
+| DUELOGIC-002 | Perplexity Integration via OpenRouter | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-002.md) |
+| DUELOGIC-003 | Episode Generator Service | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-003.md) |
+| DUELOGIC-004 | Research Job Scheduler | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-004.md) |
+| DUELOGIC-005 | Vector Database Integration for RAG | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-005.md) |
+| DUELOGIC-006 | Admin Research Dashboard | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-006.md) |
+| DUELOGIC-007 | Debate Orchestrator RAG Integration | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-007.md) |
 
 ### Alternative Options
 
@@ -124,14 +125,17 @@ ClearSide/
 ├── tasks/
 │   ├── phase1/               # MVP tasks (complete)
 │   ├── phase2/               # Media export tasks
-│   └── phase4/               # Podcast export tasks (NEW)
-│       └── podcast-export/
-│           ├── PODCAST-001.md
-│           ├── PODCAST-002.md
-│           ├── PODCAST-003.md
-│           ├── PODCAST-004.md
-│           ├── PODCAST-005.md
-│           └── PODCAST-006.md
+│   ├── phase4/               # Podcast export tasks (complete)
+│   │   └── podcast-export/
+│   └── phase5/               # Duelogic Research tasks (NEW)
+│       └── duelogic-research/
+│           ├── DUELOGIC-001.md  # Database Schema & Types
+│           ├── DUELOGIC-002.md  # Perplexity Integration
+│           ├── DUELOGIC-003.md  # Episode Generator
+│           ├── DUELOGIC-004.md  # Research Scheduler
+│           ├── DUELOGIC-005.md  # Vector DB / RAG
+│           ├── DUELOGIC-006.md  # Admin Dashboard
+│           └── DUELOGIC-007.md  # Orchestrator RAG
 ├── backend/                  # Node.js/TypeScript backend
 └── frontend/                 # React/Vite frontend
 ```
@@ -174,11 +178,12 @@ ClearSide/
 ### Complete
 - Phase 1: Live Debate Engine (36/36 tasks)
 - Phase 2 Audio: ElevenLabs TTS, podcast generation
+- Phase 4: Podcast Export Pipeline (6/6 tasks)
 - Informal Discussion Mode
 - Human Participation Mode
 
 ### In Progress
-- Phase 4: Podcast Export Pipeline (0/6 tasks)
+- Phase 5: Duelogic Research & Automated Episode Generation (0/7 tasks)
 
 ### Planned
 - Phase 2 Video: Remotion video export

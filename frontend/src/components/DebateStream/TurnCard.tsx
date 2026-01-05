@@ -2,6 +2,7 @@ import React from 'react';
 import type { DebateTurn } from '../../types/debate';
 import { PHASE_INFO } from '../../types/debate';
 import { SpeakerBadge } from './SpeakerBadge';
+import { EvaluationDisplay } from '../DuelogicDebate/EvaluationDisplay';
 import styles from './TurnCard.module.css';
 
 interface TurnCardProps {
@@ -73,6 +74,18 @@ export const TurnCard: React.FC<TurnCardProps> = ({
 
       {turn.metadata && (
         <footer className={styles.metadata}>
+          {turn.metadata.evaluation && (
+            <div className={styles.evaluation}>
+              <EvaluationDisplay evaluation={turn.metadata.evaluation} />
+            </div>
+          )}
+
+          {isInterjection && turn.metadata.interruptionReason && (
+            <div className={styles.interjectionReason}>
+              <strong>Interruption Reason:</strong> {(turn.metadata.interruptionReason as string).replace(/_/g, ' ')}
+            </div>
+          )}
+
           {turn.metadata.assumptions && turn.metadata.assumptions.length > 0 && (
             <div className={styles.assumptions}>
               <span className={styles.metaLabel}>Assumptions:</span>
