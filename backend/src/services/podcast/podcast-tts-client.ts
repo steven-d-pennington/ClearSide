@@ -151,11 +151,22 @@ export class PodcastTTSClient {
                 },
             };
 
+            // Handle V3 model constraints
+            const isV3Model = request.modelId === 'eleven_v3';
+            if (isV3Model) {
+                // V3 only accepts stability values of 0.0, 0.5, or 1.0
+                const validStabilities = [0.0, 0.5, 1.0];
+                body.voice_settings.stability = validStabilities.reduce((prev, curr) =>
+                    Math.abs(curr - request.voiceSettings.stability) < Math.abs(prev - request.voiceSettings.stability) ? curr : prev
+                );
+            }
+
             // Add context for natural flow (optional)
-            if (request.previousText) {
+            // Note: V3 model doesn't support previous_text/next_text yet
+            if (!isV3Model && request.previousText) {
                 body.previous_text = request.previousText;
             }
-            if (request.nextText) {
+            if (!isV3Model && request.nextText) {
                 body.next_text = request.nextText;
             }
 
@@ -251,10 +262,21 @@ export class PodcastTTSClient {
             },
         };
 
-        if (segment.previousText) {
+        // Handle V3 model constraints
+        const isV3Model = config.modelId === 'eleven_v3';
+        if (isV3Model) {
+            // V3 only accepts stability values of 0.0, 0.5, or 1.0
+            const validStabilities = [0.0, 0.5, 1.0];
+            body.voice_settings.stability = validStabilities.reduce((prev, curr) =>
+                Math.abs(curr - segment.voiceSettings.stability) < Math.abs(prev - segment.voiceSettings.stability) ? curr : prev
+            );
+        }
+
+        // Note: V3 model doesn't support previous_text/next_text yet
+        if (!isV3Model && segment.previousText) {
             body.previous_text = segment.previousText;
         }
-        if (segment.nextText) {
+        if (!isV3Model && segment.nextText) {
             body.next_text = segment.nextText;
         }
 

@@ -20,6 +20,7 @@ import {
     ElevenLabsModel,
     AudioOutputFormat
 } from '../types/podcast-export.js';
+import { REASONING_PRESETS } from '../types/openrouter.js';
 import { DebateTranscript } from '../services/transcript/transcript-recorder.js';
 
 const router = Router();
@@ -131,9 +132,13 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
+        // Extract tone from duelogic config if available
+        const duelogicConfig = debate.duelogicConfig as { tone?: 'respectful' | 'spirited' | 'heated' } | null;
+        const debateTone = config.tone || duelogicConfig?.tone || 'spirited';
+
         // Build full config with defaults
         const fullConfig: PodcastExportConfig = {
-            refinementModel: config.refinementModel || 'openai/gpt-4o-mini',
+            refinementModel: config.refinementModel || 'google/gemini-3-flash-preview',
             includeIntro: config.includeIntro ?? true,
             includeOutro: config.includeOutro ?? true,
             addTransitions: config.addTransitions ?? true,
@@ -146,6 +151,9 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             useCustomPronunciation: config.useCustomPronunciation ?? false,
             pronunciationDictionaryId: config.pronunciationDictionaryId,
             normalizeVolume: config.normalizeVolume ?? true,
+            // Tone-aware refinement settings
+            tone: debateTone,
+            debateMode: config.debateMode || debate.debateMode || 'turn_based',
         };
 
         // Create job record
@@ -171,7 +179,8 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
         if (!apiKey) {
             throw new Error('OPENROUTER_API_KEY is not configured');
         }
-        const llmClient = new OpenRouterLLMClient(fullConfig.refinementModel, apiKey);
+        // Use medium reasoning for thoughtful script refinement
+        const llmClient = new OpenRouterLLMClient(fullConfig.refinementModel, apiKey, REASONING_PRESETS.balanced);
         const refiner = new PodcastScriptRefiner(llmClient, fullConfig);
         const refinedScript = await refiner.refineTranscript(transcript);
 
@@ -218,6 +227,54 @@ router.get('/voices', async (_req: Request, res: Response): Promise<void> => {
         const errorMessage = error?.message || error?.response?.data?.detail || String(error);
         logger.error({ error: errorMessage, stack: error?.stack }, 'Get voices error');
         res.status(500).json({ error: errorMessage });
+    }
+});
+
+/**
+ * GET /api/exports/podcast/debate/:debateId
+ * Get existing podcast export jobs for a debate
+ * Used to detect resumable/retryable jobs
+ */
+router.get('/debate/:debateId', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { debateId } = req.params;
+
+        if (!debateId) {
+            res.status(400).json({ error: 'debateId is required' });
+            return;
+        }
+
+        const jobs = await podcastRepo.findByDebateId(debateId);
+
+        // Return the most recent job that can be resumed or retried
+        const resumableJob = jobs.find(job =>
+            job.status === 'error' ||
+            job.status === 'pending' ||
+            job.status === 'generating'
+        );
+
+        if (resumableJob) {
+            res.json({
+                hasResumableJob: true,
+                job: {
+                    id: resumableJob.id,
+                    status: resumableJob.status,
+                    generationPhase: resumableJob.generationPhase,
+                    errorMessage: resumableJob.errorMessage,
+                    refinedScript: resumableJob.refinedScript,
+                    config: resumableJob.config,
+                    createdAt: resumableJob.createdAt,
+                    estimatedCostCents: resumableJob.estimatedCostCents,
+                    partialCostCents: resumableJob.partialCostCents,
+                },
+            });
+        } else {
+            res.json({ hasResumableJob: false, jobs: jobs.slice(0, 5) }); // Return recent jobs for reference
+        }
+
+    } catch (error: any) {
+        logger.error({ error: error.message }, 'Get debate jobs error');
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -443,7 +500,7 @@ router.post('/:jobId/regenerate-segment', async (req: Request, res: Response): P
         if (!apiKey) {
             throw new Error('OPENROUTER_API_KEY is not configured');
         }
-        const llmClient = new OpenRouterLLMClient(job.config.refinementModel, apiKey);
+        const llmClient = new OpenRouterLLMClient(job.config.refinementModel, apiKey, REASONING_PRESETS.balanced);
 
         const prompt = instructions
             ? `Rewrite this podcast segment following these instructions: ${instructions}\n\nOriginal:\n${segment.text}`
@@ -669,11 +726,111 @@ router.get('/:jobId/download', async (req: Request, res: Response): Promise<void
 });
 
 /**
+ * PUT /api/exports/podcast/:jobId/config
+ * Update job configuration (e.g., change ElevenLabs model before regenerating)
+ */
+router.put('/:jobId/config', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { jobId } = req.params;
+        const updates = req.body as Partial<PodcastExportConfig>;
+
+        const job = await podcastRepo.findById(jobId!);
+        if (!job) {
+            res.status(404).json({ error: 'Job not found' });
+            return;
+        }
+
+        // Merge with existing config
+        const updatedConfig: PodcastExportConfig = {
+            ...job.config,
+            ...updates,
+            voiceAssignments: {
+                ...job.config.voiceAssignments,
+                ...updates.voiceAssignments,
+            },
+        };
+
+        // Update in database
+        await podcastRepo.updateConfig(jobId!, updatedConfig);
+
+        logger.info({ jobId, updates: Object.keys(updates) }, 'Updated job config');
+
+        res.json({
+            jobId,
+            config: updatedConfig,
+            message: 'Configuration updated successfully',
+        });
+
+    } catch (error: any) {
+        logger.error({ error }, 'Update config error');
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/exports/podcast/:jobId/reset-generation
+ * Reset generation state to allow regenerating all audio from scratch
+ * Keeps the refined script but clears segment files and statuses
+ */
+router.post('/:jobId/reset-generation', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { jobId } = req.params;
+
+        const job = await podcastRepo.findById(jobId!);
+        if (!job) {
+            res.status(404).json({ error: 'Job not found' });
+            return;
+        }
+
+        if (!job.refinedScript) {
+            res.status(400).json({ error: 'No refined script to regenerate' });
+            return;
+        }
+
+        // Clear temp files
+        const tempDir = process.env.TEMP_DIR || './temp/podcasts';
+        const workDir = path.join(tempDir, jobId!);
+
+        try {
+            const fsPromises = await import('fs/promises');
+            const files = await fsPromises.readdir(workDir);
+            for (const file of files) {
+                await fsPromises.unlink(path.join(workDir, file));
+            }
+            await fsPromises.rmdir(workDir);
+            logger.info({ jobId, filesDeleted: files.length }, 'Cleared temp files for regeneration');
+        } catch (error: any) {
+            if (error.code !== 'ENOENT') {
+                logger.warn({ jobId, error: error.message }, 'Failed to clear temp files');
+            }
+        }
+
+        // Reset job state
+        await podcastRepo.resetGenerationState(jobId!);
+
+        logger.info({ jobId }, 'Reset generation state for fresh start');
+
+        res.json({
+            jobId,
+            message: 'Generation state reset. Ready to regenerate all audio.',
+            status: 'pending',
+        });
+
+    } catch (error: any) {
+        logger.error({ error }, 'Reset generation error');
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * GET /api/exports/podcast/:jobId/stream
  * Stream generation progress via SSE
+ * Query params:
+ *   - restart=true: Clear existing segments and start fresh
  */
 router.get('/:jobId/stream', async (req: Request, res: Response): Promise<void> => {
     const { jobId } = req.params;
+    const restart = req.query.restart === 'true';
 
     // Check job exists first
     const job = await podcastRepo.findById(jobId!);
@@ -685,6 +842,31 @@ router.get('/:jobId/stream', async (req: Request, res: Response): Promise<void> 
     if (!job.refinedScript) {
         res.status(400).json({ error: 'No refined script - call /refine first' });
         return;
+    }
+
+    // If restart requested, clear existing segments first
+    if (restart) {
+        logger.info({ jobId }, 'Restart requested - clearing existing segments');
+
+        // Clear temp files
+        const tempDir = process.env.TEMP_DIR || './temp/podcasts';
+        const workDir = path.join(tempDir, jobId!);
+
+        try {
+            const fsPromises = await import('fs/promises');
+            const files = await fsPromises.readdir(workDir);
+            for (const file of files) {
+                await fsPromises.unlink(path.join(workDir, file));
+            }
+            await fsPromises.rmdir(workDir);
+        } catch (error: any) {
+            if (error.code !== 'ENOENT') {
+                logger.warn({ jobId, error: error.message }, 'Failed to clear temp files for restart');
+            }
+        }
+
+        // Reset generation state in DB
+        await podcastRepo.resetGenerationState(jobId!);
     }
 
     // Set up SSE headers

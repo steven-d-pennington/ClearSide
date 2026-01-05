@@ -125,7 +125,7 @@ const INTERRUPT_PATTERNS: Array<{ pattern: RegExp; reason: ChairInterruptReason;
   // Pivotal claims
   { pattern: /the (real|fundamental|core|central) (issue|question|problem|disagreement) is/i, reason: 'pivotal_point', confidence: 0.75 },
   { pattern: /this is (exactly|precisely) (where|why|what)/i, reason: 'pivotal_point', confidence: 0.7 },
-  { pattern: /here('s| is) (the crux|where we differ|our fundamental)/i, reason: 'pivotal_point', confidence: 0.8 },
+  { pattern: /here('s| is) (the heart|the core|where we differ|our fundamental)/i, reason: 'pivotal_point', confidence: 0.8 },
 
   // Strong claims warranting challenge
   { pattern: /(obviously|clearly|undeniably|certainly|unquestionably) (wrong|false|mistaken|incorrect)/i, reason: 'direct_challenge', confidence: 0.85 },
@@ -523,7 +523,7 @@ ${context.debateSoFar.slice(-800)}
    - Use rarely, only for exceptional insights
 
 6. **pivotal_point** - The core disagreement is being crystallized
-   - "This is exactly the crux of our disagreement..."
+   - "This cuts right to the heart of our disagreement..."
    - Use when the fundamental tension is revealed
 
 ---

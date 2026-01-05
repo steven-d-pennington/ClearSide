@@ -422,6 +422,10 @@ export class DuelogicOrchestrator {
           exchangeNumber: this.exchangeNumber,
         });
 
+        // Capture timestamp at START of this chair's turn (before generation)
+        // This ensures the main utterance has an earlier timestamp than any interruptions
+        const utteranceTimestamp = this.getElapsedMs();
+
         // Generate response
         const fallbackChair = this.config.chairs[0];
         if (!fallbackChair && !previousSpeaker) {
@@ -433,12 +437,7 @@ export class DuelogicOrchestrator {
           this.getTranscriptText()
         );
 
-        // Check for interruption opportunity
-        if (this.config.interruptions.enabled && this.config.interruptions.allowChairInterruptions) {
-          await this.checkAndExecuteInterruption(chair, content);
-        }
-
-        // Evaluate response
+        // Evaluate response (before saving, so evaluation is included)
         let evaluation: ResponseEvaluation | undefined;
         if (previousSpeaker && this.shouldEvaluate()) {
           const result = await this.evaluator.evaluate({
@@ -453,23 +452,30 @@ export class DuelogicOrchestrator {
 
           // Track evaluation
           this.evaluations.get(chair.position)!.push(evaluation);
-
-          // Check for arbiter interjection
-          if (this.config.mandates.arbiterCanInterject && evaluation) {
-            if (this.evaluator.shouldInterject(evaluation, true)) {
-              await this.executeArbiterInterjection(evaluation, chair);
-            }
-          }
         }
 
-        // Save utterance
+        // Save utterance FIRST with the pre-captured timestamp
+        // This ensures the main statement appears BEFORE any interruptions
         await this.saveUtterance({
           speaker: chair.position,
           segment: 'exchange',
           content,
-          timestampMs: this.getElapsedMs(),
+          timestampMs: utteranceTimestamp,
           evaluation,
         });
+
+        // Check for arbiter interjection (happens after main utterance is saved)
+        if (this.config.mandates.arbiterCanInterject && evaluation) {
+          if (this.evaluator.shouldInterject(evaluation, true)) {
+            await this.executeArbiterInterjection(evaluation, chair);
+          }
+        }
+
+        // Check for interruption opportunity (happens after main utterance is saved)
+        // Interruptions will get later timestamps, appearing AFTER the statement they interrupt
+        if (this.config.interruptions.enabled && this.config.interruptions.allowChairInterruptions) {
+          await this.checkAndExecuteInterruption(chair, content);
+        }
 
         previousSpeaker = chair;
         previousContent = content;

@@ -274,7 +274,7 @@ export type ChairInterruptReason =
   | 'direct_challenge'       // "I have to push back on that..."
   | 'clarification_needed'   // "Wait, can you clarify what you mean by..."
   | 'strong_agreement'       // "Yes! And let me build on that..."
-  | 'pivotal_point';         // "This is exactly the crux of our disagreement..."
+  | 'pivotal_point';         // "This cuts right to the heart of our disagreement..."
 
 /**
  * Candidate for a chair interruption
@@ -336,8 +336,10 @@ export const INTERRUPT_OPENERS: Record<ChairInterruptReason, string[]> = {
   pivotal_point: [
     "And this is exactly our core disagreement—",
     "This is where the real tension lies—",
-    "Let's not gloss over this—this is the crux—",
+    "We need to unpack this—this is fundamental—",
     "Here's where our frameworks truly clash—",
+    "This cuts right to the heart of it—",
+    "Let me highlight what's really at stake—",
   ],
 };
 

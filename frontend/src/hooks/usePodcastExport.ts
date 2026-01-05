@@ -23,6 +23,21 @@ import { DEFAULT_PODCAST_CONFIG } from '../types/podcast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
+/**
+ * Existing job info for resume/retry capability
+ */
+interface ExistingJobInfo {
+  id: string;
+  status: string;
+  generationPhase?: string;
+  errorMessage?: string;
+  refinedScript?: RefinedPodcastScript;
+  config?: PodcastExportConfig;
+  createdAt: string;
+  estimatedCostCents?: number;
+  partialCostCents?: number;
+}
+
 interface UsePodcastExportReturn {
   // State
   config: PodcastExportConfig;
@@ -30,19 +45,25 @@ interface UsePodcastExportReturn {
   refinedScript: RefinedPodcastScript | null;
   isRefining: boolean;
   isGenerating: boolean;
+  isCheckingExisting: boolean;
   progress: PipelineProgress;
   error: string | undefined;
   audioUrl: string | undefined;
   estimatedCost: number;
   actualCost: number | undefined;
+  existingJob: ExistingJobInfo | null;
 
   // Actions
   updateConfig: (updates: Partial<PodcastExportConfig>) => void;
+  checkExistingJob: () => Promise<void>;
   refineScript: () => Promise<void>;
+  resumeExistingJob: () => void;
   updateScript: (update: { segments?: PodcastSegment[]; intro?: PodcastSegment; outro?: PodcastSegment }) => Promise<void>;
   regenerateSegment: (segmentIndex: number, instructions?: string) => Promise<void>;
   startGeneration: () => Promise<void>;
   startGenerationWithSSE: () => void;
+  updateJobConfig: (updates: Partial<PodcastExportConfig>) => Promise<void>;
+  regenerateAllAudio: (configOverrides?: Partial<PodcastExportConfig>, jobIdOverride?: string) => void;
   downloadPodcast: () => void;
   reset: () => void;
 }
@@ -87,6 +108,10 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
   // Loading states
   const [isRefining, setIsRefining] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isCheckingExisting, setIsCheckingExisting] = useState(false);
+
+  // Existing job for resume
+  const [existingJob, setExistingJob] = useState<ExistingJobInfo | null>(null);
 
   // Progress tracking
   const [progress, setProgress] = useState<PipelineProgress>({
@@ -123,6 +148,49 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
   const updateConfig = useCallback((updates: Partial<PodcastExportConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }));
   }, []);
+
+  /**
+   * Check for existing jobs that can be resumed
+   */
+  const checkExistingJob = useCallback(async () => {
+    setIsCheckingExisting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/exports/podcast/debate/${debateId}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasResumableJob && data.job) {
+          setExistingJob(data.job);
+        } else {
+          setExistingJob(null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check existing jobs:', err);
+      setExistingJob(null);
+    } finally {
+      setIsCheckingExisting(false);
+    }
+  }, [debateId]);
+
+  /**
+   * Resume an existing job (load its state)
+   */
+  const resumeExistingJob = useCallback(() => {
+    if (!existingJob) return;
+
+    setJobId(existingJob.id);
+    if (existingJob.refinedScript) {
+      setRefinedScript(existingJob.refinedScript);
+    }
+    if (existingJob.config) {
+      setConfig(existingJob.config);
+    }
+    if (existingJob.estimatedCostCents) {
+      setEstimatedCost(existingJob.estimatedCostCents);
+    }
+    // Clear the existing job state so UI shows normal flow
+    setExistingJob(null);
+  }, [existingJob]);
 
   /**
    * Refine the debate transcript into a podcast script
@@ -357,6 +425,130 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
   }, [jobId]);
 
   /**
+   * Update job configuration on the server
+   * Useful for changing settings before regenerating
+   */
+  const updateJobConfig = useCallback(async (updates: Partial<PodcastExportConfig>) => {
+    if (!jobId) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/exports/podcast/${jobId}/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update config');
+      }
+
+      // Update local config state
+      setConfig(prev => ({ ...prev, ...updates }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update config';
+      setError(message);
+    }
+  }, [jobId]);
+
+  /**
+   * Regenerate all audio from scratch with current config
+   * Clears existing segments and starts fresh
+   * @param configOverrides - Optional config updates to apply before regenerating
+   * @param jobIdOverride - Optional jobId to use (for when state hasn't updated yet)
+   */
+  const regenerateAllAudio = useCallback((configOverrides?: Partial<PodcastExportConfig>, jobIdOverride?: string) => {
+    const targetJobId = jobIdOverride || jobId;
+    if (!targetJobId) return;
+
+    setIsGenerating(true);
+    setError(undefined);
+    setProgress({
+      phase: 'initializing',
+      percentComplete: 0,
+      message: 'Resetting generation state...',
+    });
+
+    // Close any existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    // If config overrides provided, update server config first
+    const startGeneration = async () => {
+      if (configOverrides) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/exports/podcast/${targetJobId}/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(configOverrides),
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.error || 'Failed to update config');
+          }
+
+          // Update local config and jobId
+          setConfig(prev => ({ ...prev, ...configOverrides }));
+          setJobId(targetJobId);
+        } catch (err: unknown) {
+          setIsGenerating(false);
+          const message = err instanceof Error ? err.message : 'Failed to update config';
+          setError(message);
+          return;
+        }
+      }
+
+      // Connect to SSE stream with restart=true to clear existing segments
+      const eventSource = new EventSource(
+        `${API_BASE_URL}/api/exports/podcast/${targetJobId}/stream?restart=true`
+      );
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          setProgress({
+            phase: data.phase,
+            percentComplete: data.percentComplete,
+            currentSegment: data.currentSegment,
+            totalSegments: data.totalSegments,
+            message: data.message || getProgressMessage(data.phase, data.percentComplete),
+          });
+
+          if (data.phase === 'complete') {
+            eventSource.close();
+            eventSourceRef.current = null;
+            setIsGenerating(false);
+            setAudioUrl(data.audioUrl);
+            setActualCost(data.actualCostCents);
+          }
+
+          if (data.phase === 'error') {
+            eventSource.close();
+            eventSourceRef.current = null;
+            setIsGenerating(false);
+            setError(data.error || data.message || 'Generation failed');
+          }
+        } catch (parseErr) {
+          console.error('SSE parse error:', parseErr);
+        }
+      };
+
+      eventSource.onerror = () => {
+        eventSource.close();
+        eventSourceRef.current = null;
+        setIsGenerating(false);
+        setError('Connection lost. Please check the generation status.');
+      };
+    };
+
+    startGeneration();
+  }, [jobId]);
+
+  /**
    * Download the completed podcast
    */
   const downloadPodcast = useCallback(() => {
@@ -373,6 +565,8 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
     setRefinedScript(null);
     setIsRefining(false);
     setIsGenerating(false);
+    setIsCheckingExisting(false);
+    setExistingJob(null);
     setProgress({ phase: 'idle', percentComplete: 0, message: '' });
     setError(undefined);
     setAudioUrl(undefined);
@@ -396,19 +590,25 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
     refinedScript,
     isRefining,
     isGenerating,
+    isCheckingExisting,
     progress,
     error,
     audioUrl,
     estimatedCost,
     actualCost,
+    existingJob,
 
     // Actions
     updateConfig,
+    checkExistingJob,
     refineScript,
+    resumeExistingJob,
     updateScript,
     regenerateSegment,
     startGeneration,
     startGenerationWithSSE,
+    updateJobConfig,
+    regenerateAllAudio,
     downloadPodcast,
     reset,
   };

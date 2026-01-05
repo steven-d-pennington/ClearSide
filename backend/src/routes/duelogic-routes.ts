@@ -289,6 +289,20 @@ router.get('/duelogic/models', async (_req: Request, res: Response) => {
   const models = [
     // Anthropic Models
     {
+      id: 'anthropic/claude-opus-4.5',
+      displayName: 'Claude Opus 4.5',
+      provider: 'Anthropic',
+      capabilities: ['flagship', 'deep-reasoning', 'creative'],
+      costTier: 'high',
+    },
+    {
+      id: 'anthropic/claude-sonnet-4.5',
+      displayName: 'Claude Sonnet 4.5',
+      provider: 'Anthropic',
+      capabilities: ['fast', 'intelligent', 'nuanced'],
+      costTier: 'medium',
+    },
+    {
       id: 'anthropic/claude-sonnet-4',
       displayName: 'Claude Sonnet 4',
       provider: 'Anthropic',
@@ -296,13 +310,41 @@ router.get('/duelogic/models', async (_req: Request, res: Response) => {
       costTier: 'medium',
     },
     {
-      id: 'anthropic/claude-opus-4',
-      displayName: 'Claude Opus 4',
+      id: 'anthropic/claude-haiku-4.5',
+      displayName: 'Claude Haiku 4.5',
       provider: 'Anthropic',
-      capabilities: ['flagship', 'deep-reasoning'],
-      costTier: 'high',
+      capabilities: ['fast', 'cost-effective'],
+      costTier: 'low',
     },
     // OpenAI Models
+    {
+      id: 'openai/gpt-5.2-pro',
+      displayName: 'GPT-5.2 Pro',
+      provider: 'OpenAI',
+      capabilities: ['flagship', 'reasoning', '400k-context'],
+      costTier: 'high',
+    },
+    {
+      id: 'openai/gpt-5.2',
+      displayName: 'GPT-5.2',
+      provider: 'OpenAI',
+      capabilities: ['adaptive-reasoning', 'multimodal'],
+      costTier: 'high',
+    },
+    {
+      id: 'openai/o3',
+      displayName: 'o3',
+      provider: 'OpenAI',
+      capabilities: ['reasoning', 'STEM', 'mathematical'],
+      costTier: 'high',
+    },
+    {
+      id: 'openai/o3-mini',
+      displayName: 'o3 Mini',
+      provider: 'OpenAI',
+      capabilities: ['reasoning', 'efficient'],
+      costTier: 'medium',
+    },
     {
       id: 'openai/gpt-4o',
       displayName: 'GPT-4o',
@@ -316,13 +358,6 @@ router.get('/duelogic/models', async (_req: Request, res: Response) => {
       provider: 'OpenAI',
       capabilities: ['fast', 'cost-effective'],
       costTier: 'low',
-    },
-    {
-      id: 'openai/o3-mini',
-      displayName: 'o3 Mini',
-      provider: 'OpenAI',
-      capabilities: ['reasoning', 'efficient'],
-      costTier: 'medium',
     },
     // xAI Models
     {
@@ -341,17 +376,31 @@ router.get('/duelogic/models', async (_req: Request, res: Response) => {
     },
     // Google Models
     {
+      id: 'google/gemini-3-pro-preview',
+      displayName: 'Gemini 3 Pro',
+      provider: 'Google',
+      capabilities: ['flagship', 'multimodal', 'reasoning'],
+      costTier: 'high',
+    },
+    {
+      id: 'google/gemini-3-flash-preview',
+      displayName: 'Gemini 3 Flash',
+      provider: 'Google',
+      capabilities: ['fast', 'agentic', 'multimodal'],
+      costTier: 'medium',
+    },
+    {
+      id: 'google/gemini-2.5-pro',
+      displayName: 'Gemini 2.5 Pro',
+      provider: 'Google',
+      capabilities: ['deep-reasoning', 'multimodal'],
+      costTier: 'medium',
+    },
+    {
       id: 'google/gemini-2.5-flash',
       displayName: 'Gemini 2.5 Flash',
       provider: 'Google',
       capabilities: ['fast', 'efficient', 'agentic'],
-      costTier: 'low',
-    },
-    {
-      id: 'google/gemini-2.0-flash-001',
-      displayName: 'Gemini 2.0 Flash',
-      provider: 'Google',
-      capabilities: ['fast', 'efficient'],
       costTier: 'low',
     },
     // Meta Models

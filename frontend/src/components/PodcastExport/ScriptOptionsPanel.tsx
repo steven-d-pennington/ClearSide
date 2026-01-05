@@ -16,6 +16,11 @@ interface ScriptOptionsPanelProps {
 
 const REFINEMENT_MODELS = [
   {
+    id: 'google/gemini-3-flash-preview',
+    name: 'Gemini 3 Flash',
+    description: 'Fast with reasoning (default)',
+  },
+  {
     id: 'openai/gpt-4o-mini',
     name: 'GPT-4o Mini',
     description: 'Fast and cost-effective',

@@ -42,27 +42,64 @@ export function PodcastExportModal({
     refinedScript,
     isRefining,
     isGenerating,
+    isCheckingExisting,
     progress,
     error,
     audioUrl,
     estimatedCost,
     actualCost,
+    existingJob,
+    checkExistingJob,
     refineScript,
+    resumeExistingJob,
     updateScript,
     regenerateSegment,
     startGenerationWithSSE,
+    regenerateAllAudio,
     downloadPodcast,
     reset,
   } = usePodcastExport(debateId);
 
-  // Reset state when modal opens
+  // Check for existing jobs and reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setStep('configure');
       setActiveTab('voices');
       reset();
+      // Check for existing resumable jobs
+      checkExistingJob();
     }
-  }, [isOpen, reset]);
+  }, [isOpen, reset, checkExistingJob]);
+
+  // Handle resuming an existing job
+  const handleResumeJob = () => {
+    resumeExistingJob();
+    // If the job has a refined script, go to preview; otherwise stay on configure
+    if (existingJob?.refinedScript) {
+      setStep('preview');
+    }
+  };
+
+  // Handle retrying generation for a failed job (resume from where it left off)
+  const handleRetryGeneration = () => {
+    resumeExistingJob();
+    setStep('generate');
+    // Small delay to ensure state is updated before starting generation
+    setTimeout(() => {
+      startGenerationWithSSE();
+    }, 100);
+  };
+
+  // Handle regenerating all audio from scratch with correct settings
+  const handleRegenerateAll = () => {
+    if (!existingJob) return;
+
+    const targetJobId = existingJob.id;
+    resumeExistingJob();
+    setStep('generate');
+    // Pass the jobId directly since state update is async
+    regenerateAllAudio({ elevenLabsModel: 'eleven_v3' }, targetJobId);
+  };
 
   // Handle refine and preview
   const handleRefineAndPreview = async () => {
@@ -116,9 +153,104 @@ export function PodcastExportModal({
     </div>
   );
 
+  // Render existing job banner
+  const renderExistingJobBanner = () => {
+    if (isCheckingExisting) {
+      return (
+        <div className={styles.existingJobBanner}>
+          <span className={styles.spinner} /> Checking for existing jobs...
+        </div>
+      );
+    }
+
+    if (!existingJob) return null;
+
+    const statusLabels: Record<string, string> = {
+      error: 'Failed',
+      pending: 'Pending',
+      generating: 'In Progress',
+    };
+
+    const phaseLabels: Record<string, string> = {
+      tts: 'Speech generation',
+      concat: 'Audio concatenation',
+      normalize: 'Audio normalization',
+      tag: 'Metadata tagging',
+    };
+
+    const statusLabel = statusLabels[existingJob.status] || existingJob.status;
+    const phaseLabel = existingJob.generationPhase
+      ? phaseLabels[existingJob.generationPhase] || existingJob.generationPhase
+      : null;
+
+    const createdDate = new Date(existingJob.createdAt).toLocaleDateString();
+    const hasScript = !!existingJob.refinedScript;
+    const canRetryGeneration = existingJob.status === 'error' && hasScript;
+    const existingModel = existingJob.config?.elevenLabsModel || 'unknown';
+    const needsModelUpdate = existingModel !== 'eleven_v3';
+
+    return (
+      <div className={`${styles.existingJobBanner} ${styles[existingJob.status]}`}>
+        <div className={styles.bannerContent}>
+          <div className={styles.bannerInfo}>
+            <strong>Previous Job Found</strong>
+            <span className={styles.bannerMeta}>
+              {statusLabel}
+              {phaseLabel && ` (${phaseLabel})`}
+              {' • '}
+              {createdDate}
+              {' • '}
+              Model: {existingModel}
+              {existingJob.partialCostCents !== undefined && existingJob.partialCostCents > 0 && (
+                <> • Partial cost: ${(existingJob.partialCostCents / 100).toFixed(2)}</>
+              )}
+            </span>
+            {existingJob.errorMessage && (
+              <span className={styles.bannerError}>{existingJob.errorMessage}</span>
+            )}
+            {needsModelUpdate && (
+              <span className={styles.bannerWarning}>
+                Using older model. Use "Regenerate All (V3)" to use the latest model with audio tags.
+              </span>
+            )}
+          </div>
+          <div className={styles.bannerActions}>
+            {canRetryGeneration ? (
+              <>
+                <Button variant="secondary" size="sm" onClick={handleRetryGeneration}>
+                  Retry
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleRegenerateAll}>
+                  Regenerate All (V3)
+                </Button>
+              </>
+            ) : hasScript ? (
+              <>
+                <Button variant="secondary" size="sm" onClick={handleResumeJob}>
+                  Resume
+                </Button>
+                {needsModelUpdate && (
+                  <Button variant="primary" size="sm" onClick={handleRegenerateAll}>
+                    Regenerate (V3)
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button variant="secondary" size="sm" onClick={handleResumeJob}>
+                View
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render configuration step
   const renderConfigureStep = () => (
     <div className={styles.configureStep}>
+      {renderExistingJobBanner()}
+
       {renderConfigTabs()}
 
       <div className={styles.tabContent}>
@@ -159,7 +291,7 @@ export function PodcastExportModal({
               Refining Script...
             </>
           ) : (
-            'Preview Script'
+            existingJob ? 'Start New' : 'Preview Script'
           )}
         </Button>
       </div>

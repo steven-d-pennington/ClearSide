@@ -272,11 +272,11 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
  * Default podcast export configuration
  */
 export const DEFAULT_PODCAST_CONFIG: PodcastExportConfig = {
-  refinementModel: 'openai/gpt-4o-mini',
+  refinementModel: 'google/gemini-3-flash-preview',
   includeIntro: true,
   includeOutro: true,
   addTransitions: true,
-  elevenLabsModel: 'eleven_multilingual_v2',
+  elevenLabsModel: 'eleven_v3',
   outputFormat: 'mp3_44100_128',
   voiceAssignments: DEFAULT_VOICE_ASSIGNMENTS,
   useCustomPronunciation: false,
@@ -298,24 +298,24 @@ export const SPEAKER_ROLES = [
  */
 export const ELEVENLABS_MODELS: Array<{ id: ElevenLabsModel; name: string; description: string }> = [
   {
-    id: 'eleven_multilingual_v2',
-    name: 'Multilingual v2',
-    description: 'Best quality, supports multiple languages',
+    id: 'eleven_v3',
+    name: 'English v3 (default)',
+    description: 'Supports audio tags [pause], [sigh], etc.',
   },
   {
-    id: 'eleven_v3',
-    name: 'English v3',
-    description: 'Latest English model with excellent quality',
+    id: 'eleven_multilingual_v2',
+    name: 'Multilingual v2',
+    description: 'Multiple languages (no audio tag support)',
   },
   {
     id: 'eleven_turbo_v2_5',
     name: 'Turbo v2.5',
-    description: 'Faster generation with good quality',
+    description: 'Faster generation (no audio tag support)',
   },
   {
     id: 'eleven_flash_v2_5',
     name: 'Flash v2.5',
-    description: 'Fastest generation, lower cost',
+    description: 'Fastest/cheapest (no audio tag support)',
   },
 ];
 

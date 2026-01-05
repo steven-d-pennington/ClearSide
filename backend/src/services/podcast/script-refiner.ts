@@ -8,9 +8,114 @@ import {
     DEFAULT_VOICE_ASSIGNMENTS
 } from '../../types/podcast-export.js';
 import { DebateTranscript } from '../transcript/transcript-recorder.js';
+import type { DebateTone } from '../../types/duelogic.js';
 
 const MAX_SEGMENT_CHARS = 4500; // Leave buffer under 5000 limit
 const WORDS_PER_MINUTE = 150;   // Average speaking rate
+
+// ============================================================================
+// ElevenLabs V3 Audio Tags and Tone-Aware Phrase Selection
+// ============================================================================
+
+/**
+ * Phrase intensity levels mapped from debate tones
+ */
+type PhraseIntensity = 'polite' | 'moderate' | 'aggressive';
+
+/**
+ * Interruption phrases categorized by intensity, with V3 audio tags
+ */
+const INTERRUPTION_PHRASES: Record<PhraseIntensity, string[]> = {
+    polite: [
+        '[pause] If I may — ',
+        '[pause] May I interject — ',
+        'Just a moment — ',
+        'I\'d like to add — ',
+        'If I could just say — ',
+        '[pause] Before we continue — ',
+        'One moment, please — ',
+    ],
+    moderate: [
+        '[cuts in] Hold on — ',
+        '[interrupting] Wait — ',
+        'Actually — ',
+        'But — ',
+        '[cuts in] I have to stop you there — ',
+        'Let me jump in — ',
+        '[pause] Hang on — ',
+        'Sorry, but — ',
+    ],
+    aggressive: [
+        '[loudly] No, no, no — ',
+        '[interrupting] That\'s simply not true — ',
+        '[cuts in] Absolutely not — ',
+        '[frustrated] This is exactly the problem — ',
+        '[cuts in] I can\'t let that stand — ',
+        '[loudly] Hold on a second — ',
+        '[interrupting] That completely misses the point — ',
+    ],
+};
+
+/**
+ * Response phrases for acknowledging interruptions, categorized by intensity
+ */
+const RESPONSE_PHRASES: Record<PhraseIntensity, string[]> = {
+    polite: [
+        'Fair point, but ',
+        'I understand, but ',
+        'That\'s a reasonable concern, however ',
+        '[pause] I hear you, and ',
+        'Granted, but ',
+        'I appreciate that, but ',
+        'Point taken, however ',
+    ],
+    moderate: [
+        '[sigh] Okay, but ',
+        'Sure, but here\'s the thing — ',
+        'I see what you mean, but ',
+        'That\'s true, however ',
+        'Right, but consider this — ',
+        '[pause] Yes, and — ',
+        'I hear you, but ',
+    ],
+    aggressive: [
+        '[frustrated] That completely misses my point — ',
+        '[sigh] We keep going in circles here — ',
+        '[matter-of-fact] Look, the evidence is clear — ',
+        '[loudly] This is exactly what I\'m talking about — ',
+        '[deadpan] I\'ve addressed this three times already — ',
+        '[frustrated] No, that\'s not what I said — ',
+        '[sigh] Once again — ',
+    ],
+};
+
+/**
+ * Map debate tones to phrase intensity
+ */
+const TONE_TO_INTENSITY: Record<DebateTone, PhraseIntensity> = {
+    respectful: 'polite',
+    spirited: 'moderate',
+    heated: 'aggressive',
+};
+
+/**
+ * Voice settings adjustments per debate tone
+ * Lower stability = more expressive/responsive to V3 audio tags
+ */
+const TONE_VOICE_ADJUSTMENTS: Record<DebateTone, Partial<ElevenLabsVoiceSettings>> = {
+    respectful: {
+        stability: 0.5,    // More stable for measured discourse
+        style: 0.4,        // Less dramatic
+    },
+    spirited: {
+        stability: 0.35,   // Default V3 expressiveness
+        style: 0.6,        // Punchy delivery
+    },
+    heated: {
+        stability: 0.25,   // Maximum expressiveness
+        style: 0.75,       // Dramatic emphasis
+    },
+};
 
 export interface TurnData {
     speaker: string;
@@ -31,11 +136,13 @@ export class PodcastScriptRefiner {
     private llmClient: OpenRouterLLMClient;
     private config: PodcastExportConfig;
     private elevenLabsModel: ElevenLabsModel;
+    private tone: DebateTone;
 
     constructor(llmClient: OpenRouterLLMClient, config: PodcastExportConfig) {
         this.llmClient = llmClient;
         this.config = config;
         this.elevenLabsModel = config.elevenLabsModel || 'eleven_v3';
+        this.tone = config.tone || 'spirited';  // Default to spirited
     }
 
     /**
@@ -121,12 +228,19 @@ export class PodcastScriptRefiner {
      */
     private formatPhaseName(phase: string): string {
         const phaseMap: Record<string, string> = {
+            // Formal debate phases
             phase_1_opening: 'Opening Statements',
             phase_2_constructive: 'Evidence Presentation',
             phase_3_crossexam: 'Clarifying Questions',
             phase_4_rebuttal: 'Rebuttals',
             phase_5_closing: 'Closing Statements',
             phase_6_synthesis: 'Moderator Synthesis',
+            // Duelogic segments
+            introduction: 'Introduction',
+            opening: 'Opening',
+            exchange: 'Exchange',
+            synthesis: 'Synthesis',
+            // Informal discussion
             informal_discussion: 'Informal Discussion',
             informal_wrapup: 'Wrap-up',
         };
@@ -250,39 +364,42 @@ export class PodcastScriptRefiner {
 
     /**
      * Build the refinement prompt for polishing debate content
-     * Optimized for ElevenLabs V3 expressive TTS
+     * Optimized for ElevenLabs V3 expressive TTS with tone awareness
      */
     private buildRefinementPrompt(
         content: string,
         speaker: string,
         proposition: string
     ): RefinementPrompt {
+        const toneGuidance = this.getToneGuidance();
+
         return {
             systemPrompt: `You are a podcast script editor optimizing debate content for ElevenLabs V3 text-to-speech.
 
 Transform the debate transcript into expressive, natural spoken dialogue.
 
-## V3 Expressive Syntax to Use:
-- [pause] or [short pause] for dramatic beats and transitions
-- [sigh] when expressing frustration or resignation
-- [laughs] for moments of irony or disbelief
-- Ellipses ... for trailing off or building tension
-- CAPITALIZATION for emphasized words (sparingly)
+## V3 Audio Tags Available (use naturally where appropriate):
+EMOTIONAL: [excited], [frustrated], [curious], [sarcastic]
+REACTIONS: [sigh], [laughs], [gasps], [clears throat], [stammers]
+DELIVERY: [whispers], [loudly], [deadpan], [playfully]
+PACING: [pause], [short pause], [long pause], [hesitates], [rushed], [slows down]
+DIALOGUE: [interrupting], [cuts in]
+TONE: [dramatic tone], [serious tone], [matter-of-fact]
+
+## Debate Tone: ${this.tone.toUpperCase()}
+${toneGuidance}
 
 ## Guidelines:
 - Remove ALL markdown formatting (**, *, #, bullets, numbered lists)
 - Convert structured arguments into flowing conversational prose
+- Add V3 audio tags naturally where they enhance delivery
 - Expand abbreviations naturally (AI → "A.I.", US → "the United States")
 - Use contractions where natural (it's, we're, that's)
-- Break long sentences into natural phrases
+- Break long sentences into natural phrases with appropriate pauses
 - Remove citations and footnote markers
 - Keep intellectual content intact - don't change arguments
-- Match speaker personality: Pro should sound confident, Con should sound thoughtful
-
-## For Debate Dynamics:
-- When responding to a point, add energy: "Wait — " or "Hold on — "
-- When making a strong counterpoint, use emphasis: "But HERE'S the thing..."
-- For concessions, soften: "[sigh] Fair point, but..."
+- Use CAPITALIZATION sparingly for emphasized words
+- Ellipses ... for trailing off or building tension
 
 Output ONLY the refined spoken text. No explanations.`,
 
@@ -294,6 +411,36 @@ ${content}
 
 Refined spoken version:`,
         };
+    }
+
+    /**
+     * Get tone-specific guidance for the refinement prompt
+     */
+    private getToneGuidance(): string {
+        const guidance: Record<DebateTone, string> = {
+            respectful: `Maintain professional, measured delivery. Use [pause] for thoughtful beats.
+Use [curious] when genuinely engaging with the other side.
+Avoid aggressive tags like [frustrated] or [loudly].
+Prefer diplomatic language: "I would suggest..." over "That's wrong..."
+Keep a collegial, academic atmosphere.`,
+
+            spirited: `Deliver with energy and conviction. Use varied pacing tags.
+Add [sigh] for moments of concession or frustration.
+Use [laughs] for irony or disbelief.
+Be direct: "Here's the problem with that..." with emphasis.
+Include occasional [cuts in] for dynamic exchanges.
+Balance passion with respect.`,
+
+            heated: `Maximum intensity and passion. Use emotional tags frequently.
+Use [frustrated], [loudly], [cuts in] liberally.
+Add [sarcastic] for pointed rejoinders.
+Emphasize disagreements: "That is EXACTLY backwards."
+Use [dramatic tone] for key arguments.
+Include [gasps] and [stammers] for authentic reactions.
+Don't hold back - this is a passionate debate.`,
+        };
+
+        return guidance[this.tone];
     }
 
     /**
@@ -347,15 +494,27 @@ Output ONLY the outro text.`,
 
     /**
      * Generate a natural transition phrase for a debate phase
+     * Supports formal debate, Duelogic, and informal discussion modes
      */
     private generatePhaseTransition(phaseName: string): string | null {
         const transitions: Record<string, string> = {
+            // Formal debate phases
             'Opening Statements': '[pause] Let us begin with opening statements from each side.',
             'Evidence Presentation': '[pause] Moving now to evidence presentation.',
             'Clarifying Questions': '[pause] We now enter clarifying questions, where each side may challenge the other.',
             'Rebuttals': '[pause] Time for rebuttals.',
             'Closing Statements': '[pause] We conclude with closing statements.',
             'Moderator Synthesis': '[pause] Finally, our moderator offers a balanced synthesis of the debate.',
+
+            // Duelogic segment types
+            'Introduction': '[dramatic tone] Welcome to Duelogic. [pause] Let me set the stage for today\'s philosophical exploration.',
+            'Opening': '[pause] Each of our chairs will now present their opening perspective.',
+            'Exchange': '[pause] We now move into open discussion.',
+            'Synthesis': '[pause] [serious tone] Let us now bring together the threads of this debate.',
+
+            // Informal discussion
+            'Informal Discussion': '[pause] And so the conversation begins...',
+            'Wrap-up': '[pause] As we bring this discussion to a close...',
         };
 
         return transitions[phaseName] || null;
@@ -505,7 +664,7 @@ Output ONLY the outro text.`,
 
     /**
      * Map debate speaker to voice assignment role
-     * Handles both formal debate mode and informal/lively debate mode speakers
+     * Handles formal, informal, and Duelogic debate mode speakers
      */
     private mapSpeakerRole(speaker: string): string {
         const mapping: Record<string, string> = {
@@ -515,10 +674,22 @@ Output ONLY the outro text.`,
             'con': 'con_advocate',
             'con_advocate': 'con_advocate',
             'moderator': 'moderator',
-            // Informal/lively debate mode
+
+            // Duelogic mode - arbiter and chairs
             'arbiter': 'moderator',
-            'chair_1': 'pro_advocate',
-            'chair_2': 'con_advocate',
+            'chair_1': 'pro_advocate',   // Uses Adam voice
+            'chair_2': 'con_advocate',   // Uses Sam voice
+            'chair_3': 'chair_3',        // Uses Josh voice
+            'chair_4': 'chair_4',        // Uses Arnold voice
+            'chair_5': 'chair_5',        // Uses Charlie voice
+            'chair_6': 'chair_6',        // Uses Daniel voice
+
+            // Informal discussion participants
+            'participant_1': 'participant_1',  // Uses Adam voice
+            'participant_2': 'participant_2',  // Uses Sam voice
+            'participant_3': 'participant_3',  // Uses Josh voice
+            'participant_4': 'participant_4',  // Uses Arnold voice
+
             // Narrator for intro/outro
             'narrator': 'narrator',
         };
@@ -538,14 +709,23 @@ Output ONLY the outro text.`,
     }
 
     /**
-     * Get voice settings for a speaker role
+     * Get voice settings for a speaker role, adjusted for debate tone
+     * Lower stability = more expressive/responsive to V3 audio tags
      */
     private getVoiceSettings(speakerRole: string): ElevenLabsVoiceSettings {
         const assignment = this.config.voiceAssignments[speakerRole]
             || DEFAULT_VOICE_ASSIGNMENTS[speakerRole]
             || DEFAULT_VOICE_ASSIGNMENTS['narrator'];
 
-        return assignment!.settings;
+        const baseSettings = assignment!.settings;
+        const toneAdjustments = TONE_VOICE_ADJUSTMENTS[this.tone];
+
+        // Apply tone adjustments, keeping other settings from base
+        return {
+            ...baseSettings,
+            stability: toneAdjustments.stability ?? baseSettings.stability,
+            style: toneAdjustments.style ?? baseSettings.style,
+        };
     }
 
     /**
@@ -581,14 +761,32 @@ Output ONLY the outro text.`,
     /**
      * Clean interruption markers and convert to natural speech
      * Transforms lively debate markers into natural spoken phrases
+     * Uses tone-aware phrases with V3 audio tags for expressiveness
      */
     private cleanInterruptionMarkers(content: string): string {
+        // Get phrases based on debate tone intensity
+        const intensity = TONE_TO_INTENSITY[this.tone];
+        const interruptionPhrases = INTERRUPTION_PHRASES[intensity];
+        const responsePhrases = RESPONSE_PHRASES[intensity];
+
+        const getRandomPhrase = (phrases: string[]): string => {
+            return phrases[Math.floor(Math.random() * phrases.length)] ?? phrases[0]!;
+        };
+
         return content
-            // Convert [INTERRUPTION: text...] to natural phrase
-            .replace(/\[INTERRUPTION:\s*([^\]]*?)\.{3}\]/gi, 'Hold on — $1')
-            .replace(/\[INTERRUPTION:\s*([^\]]*)\]/gi, 'Wait — $1')
-            // Convert [RESPONDING TO INTERRUPTION] to natural transition
-            .replace(/\[RESPONDING TO INTERRUPTION\]\s*/gi, 'Fair point, but ')
+            // Convert [INTERRUPTION: ...] markers to natural phrases with V3 audio tags
+            // The text inside the marker is a structural placeholder - discard it entirely
+            // and replace with varied natural phrases appropriate for the debate tone
+            .replace(/\[INTERRUPTION:\s*[^\]]*?\.{3}\]/gi, () =>
+                getRandomPhrase(interruptionPhrases)
+            )
+            .replace(/\[INTERRUPTION:\s*[^\]]*\]/gi, () =>
+                getRandomPhrase(interruptionPhrases)
+            )
+            // Convert [RESPONDING TO INTERRUPTION] to natural transition with V3 tags
+            .replace(/\[RESPONDING TO INTERRUPTION\]\s*/gi, () =>
+                getRandomPhrase(responsePhrases)
+            )
             // Clean any remaining empty brackets
             .replace(/\[\s*\]/g, '')
             .trim();

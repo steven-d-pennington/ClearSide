@@ -58,6 +58,71 @@
   gap: var(--space-4);
 }
 
+/* Existing Job Banner */
+.existingJobBanner {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.existingJobBanner.error {
+  background: var(--color-error-alpha-10);
+  border-color: var(--color-error-alpha-20);
+}
+
+.existingJobBanner.pending {
+  background: var(--color-warning-alpha-10);
+  border-color: var(--color-warning-alpha-20);
+}
+
+.existingJobBanner.generating {
+  background: var(--color-primary-alpha-10);
+  border-color: var(--color-primary-alpha-20);
+}
+
+.bannerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.bannerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.bannerInfo strong {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.bannerMeta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.bannerError {
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+  margin-top: var(--space-1);
+}
+
+.bannerWarning {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+  margin-top: var(--space-1);
+}
+
+.bannerActions {
+  flex-shrink: 0;
+  display: flex;
+  gap: var(--space-2);
+}
+
 /* Tabs */
 .tabs {
   display: flex;

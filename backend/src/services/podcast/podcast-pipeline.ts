@@ -26,6 +26,16 @@ import {
   PodcastSegment,
 } from '../../types/podcast-export.js';
 
+/**
+ * Retry configuration for TTS calls
+ */
+const RETRY_CONFIG = {
+  maxAttempts: 3,
+  initialDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+};
+
 const logger = pino({
   name: 'podcast-pipeline',
   level: process.env.LOG_LEVEL || 'info',
@@ -91,6 +101,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
 
   /**
    * Execute the full podcast generation pipeline
+   * Supports resume from any phase, with segment-level granularity for TTS
    */
   async generate(jobId: string): Promise<PipelineResult> {
     const workDir = path.join(this.tempDir, jobId);
@@ -125,13 +136,20 @@ export class PodcastGenerationPipeline extends EventEmitter {
         throw new Error('Script has no segments to generate');
       }
 
-      logger.info({ jobId, totalSegments }, 'Starting podcast generation');
+      logger.info({ jobId, totalSegments, resumePhase: job.generationPhase }, 'Starting podcast generation');
+
+      // Initialize segment tracking if not resuming
+      if (!job.generationPhase || job.generationPhase === 'pending') {
+        await podcastRepo.createSegmentStatuses(jobId, totalSegments);
+      }
 
       // Phase 1: Generate TTS audio for each segment
       await podcastRepo.updateStatus(jobId, 'generating');
+      await podcastRepo.updateGenerationPhase(jobId, 'tts');
       const audioFiles = await this.generateAllAudio(jobId, allSegments, job.config, workDir);
 
       // Phase 2: Concatenate audio files
+      await podcastRepo.updateGenerationPhase(jobId, 'concat');
       this.emitProgress({
         phase: 'concatenating',
         percentComplete: 75,
@@ -142,6 +160,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
       await this.audioProcessor.concatenateSegments(audioFiles, concatenatedFile, 'mp3');
 
       // Phase 3: Normalize volume levels
+      await podcastRepo.updateGenerationPhase(jobId, 'normalize');
       this.emitProgress({
         phase: 'normalizing',
         percentComplete: 85,
@@ -152,6 +171,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
       const processingResult = await this.audioProcessor.normalizeAudio(concatenatedFile, normalizedFile);
 
       // Phase 4: Add ID3 metadata and move to exports
+      await podcastRepo.updateGenerationPhase(jobId, 'tag');
       this.emitProgress({
         phase: 'tagging',
         percentComplete: 95,
@@ -162,17 +182,20 @@ export class PodcastGenerationPipeline extends EventEmitter {
       const finalFile = path.join(this.exportsDir, finalFilename);
       await this.addID3Tags(normalizedFile, finalFile, script, job);
 
-      // Get final stats
+      // Get final stats (from DB for accuracy after resume)
       const stats = this.ttsClient.getUsageStats();
+      const dbCost = await podcastRepo.getSegmentsTotalCost(jobId);
+      const totalCost = dbCost > 0 ? dbCost : stats.estimatedCostCents;
       const audioUrl = `/exports/podcasts/${finalFilename}`;
 
-      // Complete the job
+      // Mark complete
+      await podcastRepo.updateGenerationPhase(jobId, 'complete');
       await podcastRepo.completeJob(
         jobId,
         audioUrl,
         Math.round(processingResult.durationSeconds),
         stats.totalCharacters,
-        stats.estimatedCostCents
+        totalCost
       );
 
       this.emitProgress({
@@ -186,7 +209,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
         audioUrl,
         durationSeconds: processingResult.durationSeconds,
         characterCount: stats.totalCharacters,
-        costCents: stats.estimatedCostCents,
+        costCents: totalCost,
       }, 'Podcast generation complete');
 
       // Cleanup temp files
@@ -197,12 +220,18 @@ export class PodcastGenerationPipeline extends EventEmitter {
         audioUrl,
         durationSeconds: Math.round(processingResult.durationSeconds),
         characterCount: stats.totalCharacters,
-        actualCostCents: stats.estimatedCostCents,
+        actualCostCents: totalCost,
       };
 
     } catch (error: any) {
       logger.error({ jobId, error: error.message }, 'Pipeline error');
 
+      // Record partial cost and mark as error
+      const stats = this.ttsClient.getUsageStats();
+      if (stats.estimatedCostCents > 0) {
+        await podcastRepo.updatePartialCost(jobId, stats.estimatedCostCents);
+      }
+      await podcastRepo.updateGenerationPhase(jobId, 'error');
       await podcastRepo.updateStatus(jobId, 'error', error.message);
 
       this.emitProgress({
@@ -224,6 +253,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
 
   /**
    * Generate TTS audio for all segments, skipping any that already exist (for resume)
+   * Includes segment-level status tracking and retry logic with exponential backoff
    */
   private async generateAllAudio(
     jobId: string,
@@ -283,19 +313,96 @@ export class PodcastGenerationPipeline extends EventEmitter {
 
       logger.debug({ jobId, segment: i + 1, total, speaker: segment.speaker }, 'Generating segment');
 
-      // Generate audio via ElevenLabs
-      const response = await this.ttsClient.generateSegmentAudio(segment, {
-        modelId: config.elevenLabsModel || 'eleven_multilingual_v2',
-        outputFormat: config.outputFormat || 'mp3_44100_128',
-        pronunciationDictionaryId: config.pronunciationDictionaryId,
-      });
+      // Mark segment as generating
+      await podcastRepo.updateSegmentStatus(jobId, i, 'generating');
 
-      // Save to temp file with zero-padded index for proper ordering
-      await fs.writeFile(audioFile, response.audio);
-      audioFiles.push(audioFile);
+      try {
+        // Generate audio via ElevenLabs with retry logic
+        const response = await this.withRetry(
+          () => this.ttsClient.generateSegmentAudio(segment, {
+            modelId: config.elevenLabsModel || 'eleven_multilingual_v2',
+            outputFormat: config.outputFormat || 'mp3_44100_128',
+            pronunciationDictionaryId: config.pronunciationDictionaryId,
+          }),
+          `segment ${i + 1}`
+        );
+
+        // Save to temp file with zero-padded index for proper ordering
+        await fs.writeFile(audioFile, response.audio);
+        audioFiles.push(audioFile);
+
+        // Mark segment as complete with cost info
+        const segmentCost = Math.round(segment.text.length * 0.03); // Approx cost per char
+        await podcastRepo.updateSegmentStatus(jobId, i, 'complete', {
+          characterCount: segment.text.length,
+          costCents: segmentCost,
+        });
+
+      } catch (error: any) {
+        // Mark segment as failed
+        await podcastRepo.updateSegmentStatus(jobId, i, 'error', {
+          errorMessage: error.message,
+        });
+        // Re-throw to stop the pipeline
+        throw error;
+      }
     }
 
     return audioFiles;
+  }
+
+  /**
+   * Execute a function with retry logic and exponential backoff
+   */
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    operationName: string
+  ): Promise<T> {
+    let lastError: Error | null = null;
+    let delayMs = RETRY_CONFIG.initialDelayMs;
+
+    for (let attempt = 1; attempt <= RETRY_CONFIG.maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+
+        // Don't retry on authentication or validation errors
+        const errorMessage = error.message?.toLowerCase() || '';
+        if (
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('invalid') ||
+          errorMessage.includes('authentication') ||
+          error.status === 401 ||
+          error.status === 403
+        ) {
+          throw error;
+        }
+
+        if (attempt < RETRY_CONFIG.maxAttempts) {
+          logger.warn(
+            { operationName, attempt, maxAttempts: RETRY_CONFIG.maxAttempts, delayMs, error: error.message },
+            'Retrying after error'
+          );
+
+          await this.sleep(delayMs);
+          delayMs = Math.min(delayMs * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs);
+        }
+      }
+    }
+
+    logger.error(
+      { operationName, attempts: RETRY_CONFIG.maxAttempts, error: lastError?.message },
+      'All retry attempts exhausted'
+    );
+    throw lastError;
+  }
+
+  /**
+   * Sleep for the specified duration
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**

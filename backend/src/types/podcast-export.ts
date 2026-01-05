@@ -1,4 +1,8 @@
+import type { DebateTone } from './duelogic.js';
+
 export type PodcastJobStatus = 'pending' | 'refining' | 'generating' | 'complete' | 'error';
+
+export type GenerationPhase = 'pending' | 'tts' | 'concat' | 'normalize' | 'tag' | 'complete' | 'error';
 
 export type ElevenLabsModel =
   | 'eleven_v3'
@@ -67,6 +71,10 @@ export interface PodcastExportConfig {
   useCustomPronunciation: boolean;
   pronunciationDictionaryId?: string;
   normalizeVolume: boolean;
+
+  // Debate context for tone-aware refinement
+  tone?: DebateTone;              // 'respectful' | 'spirited' | 'heated'
+  debateMode?: 'turn_based' | 'lively' | 'informal' | 'duelogic';
 }
 
 export interface PodcastExportJob {
@@ -81,6 +89,11 @@ export interface PodcastExportJob {
   totalSegments?: number;
   progressPercent: number;
 
+  // Generation phase tracking for recovery
+  generationPhase?: GenerationPhase;
+  phaseStartedAt?: Date;
+  partialCostCents?: number;    // Cost incurred even on failure
+
   // Output
   audioUrl?: string;
   durationSeconds?: number;
@@ -93,6 +106,20 @@ export interface PodcastExportJob {
   updatedAt: Date;
   completedAt?: Date;
   errorMessage?: string;
+}
+
+// Segment-level status for granular recovery
+export interface PodcastSegmentStatus {
+  id: string;
+  jobId: string;
+  segmentIndex: number;
+  status: 'pending' | 'generating' | 'complete' | 'error';
+  startedAt?: Date;
+  completedAt?: Date;
+  characterCount?: number;
+  costCents?: number;
+  errorMessage?: string;
+  retryCount: number;
 }
 
 // Default voice assignments for debate roles
@@ -142,6 +169,106 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
       stability: 0.5,           // Slightly more stable for intros (was 0.6)
       similarity_boost: 0.7,
       style: 0.5,               // Warmer style (was 0.4)
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+
+  // Duelogic extended chairs (chairs 1-2 use pro_advocate/con_advocate)
+  chair_3: {
+    speakerId: 'chair_3',
+    voiceId: 'TxGEqnHWrfWFTfGW9XjX',  // "Josh" - analytical
+    voiceName: 'Josh',
+    settings: {
+      stability: 0.35,
+      similarity_boost: 0.75,
+      style: 0.55,
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+  chair_4: {
+    speakerId: 'chair_4',
+    voiceId: 'VR6AewLTigWG4xSOukaG',  // "Arnold" - authoritative
+    voiceName: 'Arnold',
+    settings: {
+      stability: 0.4,
+      similarity_boost: 0.8,
+      style: 0.5,
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+  chair_5: {
+    speakerId: 'chair_5',
+    voiceId: 'IKne3meq5aSn9XLyUdCD',  // "Charlie" - conversational
+    voiceName: 'Charlie',
+    settings: {
+      stability: 0.35,
+      similarity_boost: 0.75,
+      style: 0.6,
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+  chair_6: {
+    speakerId: 'chair_6',
+    voiceId: 'onwK4e9ZLuTAKqWW03F9',  // "Daniel" - measured
+    voiceName: 'Daniel',
+    settings: {
+      stability: 0.45,
+      similarity_boost: 0.8,
+      style: 0.45,
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+
+  // Informal discussion participants
+  participant_1: {
+    speakerId: 'participant_1',
+    voiceId: 'pNInz6obpgDQGcFmaJgB',  // "Adam"
+    voiceName: 'Adam',
+    settings: {
+      stability: 0.35,
+      similarity_boost: 0.75,
+      style: 0.6,
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+  participant_2: {
+    speakerId: 'participant_2',
+    voiceId: 'yoZ06aMxZJJ28mfd3POQ',  // "Sam"
+    voiceName: 'Sam',
+    settings: {
+      stability: 0.35,
+      similarity_boost: 0.75,
+      style: 0.6,
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+  participant_3: {
+    speakerId: 'participant_3',
+    voiceId: 'TxGEqnHWrfWFTfGW9XjX',  // "Josh"
+    voiceName: 'Josh',
+    settings: {
+      stability: 0.35,
+      similarity_boost: 0.75,
+      style: 0.55,
+      speed: 1.0,
+      use_speaker_boost: true,
+    },
+  },
+  participant_4: {
+    speakerId: 'participant_4',
+    voiceId: 'VR6AewLTigWG4xSOukaG',  // "Arnold"
+    voiceName: 'Arnold',
+    settings: {
+      stability: 0.4,
+      similarity_boost: 0.8,
+      style: 0.5,
       speed: 1.0,
       use_speaker_boost: true,
     },
