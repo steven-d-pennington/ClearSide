@@ -2,7 +2,6 @@
   "permissions": {
     "allow": [
       "Bash(git add:*)",
-
       "Bash(git push)",
       "Bash(npm install)",
       "Bash(git commit:*)",
@@ -44,7 +43,8 @@
       "Bash(backend/src/types/sse.ts )",
       "Bash(docs/FUTURE-FEATURES.md )",
       "Bash(frontend/src/components/DebateStage/DebateStage.tsx )",
-      "Bash(frontend/src/components/ui/MarkdownRenderer.tsx)"
+      "Bash(frontend/src/components/ui/MarkdownRenderer.tsx)",
+      "Bash(npm run dev:*)"
     ]
   }
 }

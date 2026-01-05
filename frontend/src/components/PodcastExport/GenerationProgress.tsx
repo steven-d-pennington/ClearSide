@@ -5,7 +5,7 @@
  * error handling, and download functionality.
  */
 
-import React from 'react';
+// React import not needed with new JSX transform
 import { Button } from '../ui';
 import type { PipelineProgress } from '../../types/podcast';
 import styles from './GenerationProgress.module.css';
@@ -23,7 +23,7 @@ interface GenerationProgressProps {
 export function GenerationProgress({
   progress,
   error,
-  audioUrl,
+  audioUrl: _audioUrl,
   actualCost,
   onDownload,
   onRetry,
@@ -171,7 +171,7 @@ export function GenerationProgress({
               </svg>
               Download Podcast
             </Button>
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
           </>
@@ -194,7 +194,7 @@ export function GenerationProgress({
               </svg>
               Try Again
             </Button>
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
           </>

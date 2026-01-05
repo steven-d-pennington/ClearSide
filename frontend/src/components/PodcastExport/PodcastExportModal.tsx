@@ -7,7 +7,7 @@
  * 3. Generate - Track progress and download
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Button, Alert } from '../ui';
 import { VoiceAssignmentPanel } from './VoiceAssignmentPanel';
 import { ScriptOptionsPanel } from './ScriptOptionsPanel';
@@ -145,7 +145,7 @@ export function PodcastExportModal({
       )}
 
       <div className={styles.actions}>
-        <Button variant="outline" onClick={handleClose}>
+        <Button variant="secondary" onClick={handleClose}>
           Cancel
         </Button>
         <Button
@@ -208,7 +208,7 @@ export function PodcastExportModal({
           )}
 
           <div className={styles.actions}>
-            <Button variant="outline" onClick={() => setStep('configure')}>
+            <Button variant="secondary" onClick={() => setStep('configure')}>
               Back to Settings
             </Button>
             <Button variant="primary" onClick={handleStartGeneration}>
@@ -248,7 +248,7 @@ export function PodcastExportModal({
         {/* Step Indicator */}
         <div className={styles.stepIndicator}>
           <div
-            className={`${styles.stepDot} ${step === 'configure' ? styles.active : step !== 'configure' ? styles.completed : ''}`}
+            className={`${styles.stepDot} ${step === 'configure' ? styles.active : styles.completed}`}
           >
             1
           </div>

@@ -276,24 +276,24 @@ Refined spoken version:`,
      */
     private buildIntroPrompt(transcript: DebateTranscript): RefinementPrompt {
         return {
-            systemPrompt: `You are a podcast intro writer. Create welcoming, engaging introductions for debate podcasts.
+            systemPrompt: `You are a podcast intro writer for "Duelogic" - an AI debate podcast where models tackle humanity's toughest questions. Create welcoming, engaging introductions.
 
 Guidelines:
 - Keep it under 100 words
-- Welcome listeners warmly
+- Welcome listeners to "Duelogic" (the podcast name)
 - Introduce the topic clearly
-- Mention it's a structured debate format
+- Mention that AI models will debate this topic with nobody walking away with easy answers
 - Set expectations for what they'll hear
 - Sound professional but approachable
 - NO markdown formatting
 
 Output ONLY the intro text.`,
 
-            userPrompt: `Create a podcast intro for a debate on this topic:
+            userPrompt: `Create a Duelogic podcast intro for a debate on this topic:
 
 "${transcript.proposition.normalized_question}"
 
-The debate has ${transcript.transcript.length} utterances and features advocates on both sides with a moderator.`,
+The debate has ${transcript.transcript.length} utterances and features AI advocates on both sides with a moderator.`,
         };
     }
 
@@ -302,20 +302,19 @@ The debate has ${transcript.transcript.length} utterances and features advocates
      */
     private buildOutroPrompt(transcript: DebateTranscript): RefinementPrompt {
         return {
-            systemPrompt: `You are a podcast outro writer. Create brief, thoughtful closings for debate podcasts.
+            systemPrompt: `You are a podcast outro writer for "Duelogic" - an AI debate podcast. Create brief, thoughtful closings.
 
 Guidelines:
 - Keep it under 60 words
-- Thank listeners for joining
+- Thank listeners for joining this episode of Duelogic
 - Encourage reflection on both perspectives
-- Remind them the goal is clarity, not persuasion
-- Optional: mention ClearSide platform
+- Remind them the goal is understanding, not persuasion - nobody walks away with easy answers
 - Sound warm and genuine
 - NO markdown formatting
 
 Output ONLY the outro text.`,
 
-            userPrompt: `Create a podcast outro for a debate on:
+            userPrompt: `Create a Duelogic podcast outro for a debate on:
 
 "${transcript.proposition.normalized_question}"`,
         };

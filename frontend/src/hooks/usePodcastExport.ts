@@ -39,7 +39,7 @@ interface UsePodcastExportReturn {
   // Actions
   updateConfig: (updates: Partial<PodcastExportConfig>) => void;
   refineScript: () => Promise<void>;
-  updateScript: (segments: PodcastSegment[]) => Promise<void>;
+  updateScript: (update: { segments?: PodcastSegment[]; intro?: PodcastSegment; outro?: PodcastSegment }) => Promise<void>;
   regenerateSegment: (segmentIndex: number, instructions?: string) => Promise<void>;
   startGeneration: () => Promise<void>;
   startGenerationWithSSE: () => void;
@@ -158,14 +158,14 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
   /**
    * Update script segments after manual edits
    */
-  const updateScript = useCallback(async (segments: PodcastSegment[]) => {
+  const updateScript = useCallback(async (update: { segments?: PodcastSegment[]; intro?: PodcastSegment; outro?: PodcastSegment }) => {
     if (!jobId) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/exports/podcast/${jobId}/script`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segments }),
+        body: JSON.stringify(update),
       });
 
       if (!response.ok) {

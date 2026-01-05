@@ -1,7 +1,7 @@
 -- 013_add_duelogic_research.sql
 
 -- Research configuration table
-CREATE TABLE research_configs (
+CREATE TABLE IF NOT EXISTS research_configs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   schedule TEXT NOT NULL,  -- Cron expression
@@ -17,7 +17,7 @@ CREATE TABLE research_configs (
 );
 
 -- Research job executions table
-CREATE TABLE research_jobs (
+CREATE TABLE IF NOT EXISTS research_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   config_id UUID REFERENCES research_configs(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'pending',
@@ -33,7 +33,7 @@ CREATE TABLE research_jobs (
 );
 
 -- Raw research results table
-CREATE TABLE research_results (
+CREATE TABLE IF NOT EXISTS research_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID REFERENCES research_jobs(id) ON DELETE CASCADE,
   topic TEXT NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE research_results (
 );
 
 -- Episode proposals table
-CREATE TABLE episode_proposals (
+CREATE TABLE IF NOT EXISTS episode_proposals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   research_result_id UUID REFERENCES research_results(id) ON DELETE SET NULL,
   status TEXT NOT NULL DEFAULT 'pending',
@@ -81,17 +81,18 @@ CREATE TABLE episode_proposals (
   CONSTRAINT valid_proposal_status CHECK (status IN ('pending', 'approved', 'rejected', 'scheduled'))
 );
 
--- Indexes for efficient lookups
-CREATE INDEX idx_research_jobs_config ON research_jobs(config_id);
-CREATE INDEX idx_research_jobs_status ON research_jobs(status);
-CREATE INDEX idx_research_results_job ON research_results(job_id);
-CREATE INDEX idx_research_results_category ON research_results(category);
-CREATE INDEX idx_proposals_status ON episode_proposals(status);
-CREATE INDEX idx_proposals_scheduled ON episode_proposals(scheduled_for)
+-- Indexes for efficient lookups (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_research_jobs_config ON research_jobs(config_id);
+CREATE INDEX IF NOT EXISTS idx_research_jobs_status ON research_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_research_results_job ON research_results(job_id);
+CREATE INDEX IF NOT EXISTS idx_research_results_category ON research_results(category);
+CREATE INDEX IF NOT EXISTS idx_proposals_status ON episode_proposals(status);
+CREATE INDEX IF NOT EXISTS idx_proposals_scheduled ON episode_proposals(scheduled_for)
   WHERE status = 'approved' OR status = 'scheduled';
-CREATE INDEX idx_proposals_research ON episode_proposals(research_result_id);
+CREATE INDEX IF NOT EXISTS idx_proposals_research ON episode_proposals(research_result_id);
 
--- Trigger for updated_at on research_configs
+-- Trigger for updated_at on research_configs (drop first if exists)
+DROP TRIGGER IF EXISTS update_research_configs_updated_at ON research_configs;
 CREATE TRIGGER update_research_configs_updated_at
   BEFORE UPDATE ON research_configs
   FOR EACH ROW

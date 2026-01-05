@@ -1,0 +1,39 @@
+| {"level":30,"time":1767180770553,"pid":32900,"hostname":"3b698ff6286e","name":"pro-advocate-agent","debateId":"fb2b0584-ab73-45cb-aea3-a2c5838d0439","proposition":"Should a human participate in an AI Debate?","msg":"Generating opening statement"}
+clearside-backend   | {"level":30,"time":1767180770554,"pid":32900,"hostname":"3b698ff6286e","name":"llm-client","provider":"openai","model":"gpt-4-turbo-preview","messageCount":2,"temperature":0.7,"maxTokens":1024,"msg":"Starting LLM completion request"}
+clearside-backend   | {"level":50,"time":1767180771138,"pid":32900,"hostname":"3b698ff6286e","name":"llm-client","provider":"openai","model":"gpt-4-turbo-preview","duration":584,"error":{"code":"not_found","message":"404 The model `gpt-4-turbo-preview` does not exist or you do not have access to it.","retryable":false,"statusCode":404},"msg":"LLM completion failed"}
+clearside-backend   | {"level":50,"time":1767180771139,"pid":32900,"hostname":"3b698ff6286e","name":"pro-advocate-agent","error":"404 The model `gpt-4-turbo-preview` does not exist or you do not have 
+access to it.","debateId":"fb2b0584-ab73-45cb-aea3-a2c5838d0439","msg":"Failed to generate opening statement"}
+clearside-backend   | {"level":40,"time":1767180771139,"pid":32900,"hostname":"3b698ff6286e","name":"lively-orchestrator","speaker":"PRO","retries":2,"error":{"code":"not_found","retryable":false,"statusCode":404,"cause":{"status":404,"headers":{"alt-svc":"h3=\":443\"; ma=86400","cf-cache-status":"DYNAMIC","cf-ray":"9b6975681a217579-SEA","connection":"keep-alive","content-encoding":"gzip","content-type":"application/json; charset=utf-8","date":"Wed, 31 Dec 2025 11:32:51 GMT","server":"cloudflare","set-cookie":"__cf_bm=DFjGhIyu2.UkRm5d4iPs2.4qp9i6vGVQ9sHMp1JR_ug-1767180771-1.0.1.1-rIM2ZTiFXmMvXY3IwSxbcz6mWiudfMvVPFtVn85MEHSSfwshtvhA9vGmhM6aRenbrN4oFNP1nhHggy6bhu4cTi2OcHEfo8f9wGCANgIWqJU; path=/; expires=Wed, 31-Dec-25 12:02:51 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None, _cfuvid=GkT_UI8Me3Hxlg76Jrp7GO0NHhTLhKMQa9c2ByRJ9vA-1767180771126-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None","strict-transport-security":"max-age=31536000; includeSubDomains; preload","transfer-encoding":"chunked","vary":"Origin","x-content-type-options":"nosniff","x-envoy-upstream-service-time":"53","x-openai-proxy-wasm":"v0.1","x-request-id":"req_5266640e90414e4d92bf124a089cc7ee"},"request_id":"req_5266640e90414e4d92bf124a089cc7ee","error":{"message":"The model `gpt-4-turbo-preview` does not exist or you do not have access to it.","type":"invalid_request_error","param":null,"code":"model_not_found"},"code":"model_not_found","param":null,"type":"invalid_request_error"},"name":"LLMError"},"msg":"Agent call failed, retrying..."}
+clearside-backend   | {"level":30,"time":1767180773138,"pid":32900,"hostname":"3b698ff6286e","name":"pro-advocate-agent","debateId":"fb2b0584-ab73-45cb-aea3-a2c5838d0439","proposition":"Should a human participate in an AI Debate?","msg":"Generating opening statement"}
+clearside-backend   | {"level":30,"time":1767180773139,"pid":32900,"hostname":"3b698ff6286e","name":"llm-client","provider":"openai","model":"gpt-4-turbo-preview","messageCount":2,"temperature":0.7,"maxTokens":1024,"msg":"Starting LLM completion request"}
+clearside-backend   | {"level":50,"time":1767180773318,"pid":32900,"hostname":"3b698ff6286e","name":"llm-client","provider":"openai","model":"gpt-4-turbo-preview","duration":179,"error":{"code":"not_found","message":"404 The model `gpt-4-turbo-preview` does not exist or you do not have access to it.","retryable":false,"statusCode":404},"msg":"LLM completion failed"}
+clearside-backend   | {"level":50,"time":1767180773318,"pid":32900,"hostname":"3b698ff6286e","name":"pro-advocate-agent","error":"404 The model `gpt-4-turbo-preview` does not exist or you do not have 
+access to it.","debateId":"fb2b0584-ab73-45cb-aea3-a2c5838d0439","msg":"Failed to generate opening statement"}
+clearside-backend   | {"level":50,"time":1767180773318,"pid":32900,"hostname":"3b698ff6286e","name":"lively-orchestrator","speaker":"PRO","error":{"code":"not_found","retryable":false,"statusCode":404,"cause":{"status":404,"headers":{"alt-svc":"h3=\":443\"; ma=86400","cf-cache-status":"DYNAMIC","cf-ray":"9b697578395d7579-SEA","connection":"keep-alive","content-encoding":"gzip","content-type":"application/json; charset=utf-8","date":"Wed, 31 Dec 2025 11:32:53 GMT","server":"cloudflare","set-cookie":"__cf_bm=kuuGnW8u028odXEaB0NuIHJxYvvv5DE7nmu2SxGQSPk-1767180773-1.0.1.1-RTzfb.kNUM_lYDRX4R55NO0DX_qrRArJ0YXZxQtBUElzmj2zTB3UCRGiPgVkFV6ktApaVS5.byM_R9MqpKHo7rf47x9Nti23Oac8drVyrbQ; path=/; expires=Wed, 31-Dec-25 12:02:53 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None, _cfuvid=yURVjCIvBcealClO60onYnXH4mrVJypiwCi7Zo0_cwg-1767180773302-0.0.1.1-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None","strict-transport-security":"max-age=31536000; includeSubDomains; preload","transfer-encoding":"chunked","vary":"Origin","x-content-type-options":"nosniff","x-envoy-upstream-service-time":"57","x-openai-proxy-wasm":"v0.1","x-request-id":"req_4d457fc2551d4f3a95de308b723ec01a"},"request_id":"req_4d457fc2551d4f3a95de308b723ec01a","error":{"message":"The model `gpt-4-turbo-preview` does not exist or you do not have access to it.","type":"invalid_request_error","param":null,"code":"model_not_found"},"code":"model_not_found","param":null,"type":"invalid_request_error"},"name":"LLMError"},"msg":"Turn execution failed"}
+clearside-backend   | {"level":20,"time":1767180773318,"pid":32900,"hostname":"3b698ff6286e","name":"lively-orchestrator","speaker":"PRO","timestampMs":1767180773318,"msg":"Scheduler: speaker ended"} 
+clearside-backend   | [11:32:53 UTC] DEBUG: Speaker ended
+clearside-backend   |     module: "LivelyScheduler"
+clearside-backend   |     speaker: "PRO"
+clearside-backend   |     duration: 4512
+clearside-backend   | [11:32:53 UTC] INFO: Unregistering orchestrator
+clearside-backend   |     module: "OrchestratorRegistry"
+clearside-backend   |     debateId: "fb2b0584-ab73-45cb-aea3-a2c5838d0439"
+clearside-backend   | [11:32:53 UTC] ERROR: Debate orchestrator failed
+clearside-backend   |     module: "DebateRoutes"
+clearside-backend   |     debateId: "fb2b0584-ab73-45cb-aea3-a2c5838d0439"
+clearside-backend   |     error: {
+clearside-backend   |       "message": "404 The model `gpt-4-turbo-preview` does not exist or you do not have access to it.",
+clearside-backend   |       "stack":
+clearside-backend   |           LLMError: 404 The model `gpt-4-turbo-preview` does not exist or you do not have access to it.
+clearside-backend   |               at Function.fromError (/app/src/types/llm.ts:185:16)
+clearside-backend   |               at LLMClient.handleOpenAIError (/app/src/services/llm/client.ts:431:21)
+clearside-backend   |               at LLMClient.executeOpenAIRequest (/app/src/services/llm/client.ts:287:18)
+clearside-backend   |               at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+clearside-backend   |               at async LLMClient.executeWithRetry (/app/src/services/llm/client.ts:164:14)
+clearside-backend   |               at async LLMClient.complete (/app/src/services/llm/client.ts:127:24)
+clearside-backend   |               at async ProAdvocateAgent.generateOpeningStatement (/app/src/services/agents/pro-advocate-agent.ts:215:24)
+clearside-backend   |               at async LivelyDebateOrchestrator.callProAgent (/app/src/services/debate/lively-orchestrator.ts:1409:16)
+clearside-backend   |               at async LivelyDebateOrchestrator.callAgent (/app/src/services/debate/lively-orchestrator.ts:1007:20)
+clearside-backend   |               at async LivelyDebateOrchestrator.generateWithSimulatedStreaming (/app/src/services/debate/lively-orchestrator.ts:739:21)
+clearside-backend   |       "name": "LLMError"
+clearside-backend   |     }

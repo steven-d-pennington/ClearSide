@@ -5,7 +5,7 @@
  * Uses the cheaper flash model for previews to save costs.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '../ui';
 import styles from './VoicePreviewPlayer.module.css';
 

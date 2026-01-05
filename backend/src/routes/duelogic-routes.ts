@@ -284,9 +284,10 @@ router.get('/duelogic/presets', (_req: Request, res: Response) => {
  * List available models with display names and providers
  */
 router.get('/duelogic/models', async (_req: Request, res: Response) => {
-  // For now, return a static list of supported models
-  // TODO: Fetch dynamically from OpenRouter API
+  // Validated against OpenRouter API model IDs
+  // See: https://openrouter.ai/api/v1/models
   const models = [
+    // Anthropic Models
     {
       id: 'anthropic/claude-sonnet-4',
       displayName: 'Claude Sonnet 4',
@@ -301,6 +302,7 @@ router.get('/duelogic/models', async (_req: Request, res: Response) => {
       capabilities: ['flagship', 'deep-reasoning'],
       costTier: 'high',
     },
+    // OpenAI Models
     {
       id: 'openai/gpt-4o',
       displayName: 'GPT-4o',
@@ -316,6 +318,14 @@ router.get('/duelogic/models', async (_req: Request, res: Response) => {
       costTier: 'low',
     },
     {
+      id: 'openai/o3-mini',
+      displayName: 'o3 Mini',
+      provider: 'OpenAI',
+      capabilities: ['reasoning', 'efficient'],
+      costTier: 'medium',
+    },
+    // xAI Models
+    {
       id: 'x-ai/grok-3',
       displayName: 'Grok 3',
       provider: 'xAI',
@@ -323,24 +333,48 @@ router.get('/duelogic/models', async (_req: Request, res: Response) => {
       costTier: 'medium',
     },
     {
-      id: 'google/gemini-2.0-flash',
+      id: 'x-ai/grok-3-mini',
+      displayName: 'Grok 3 Mini',
+      provider: 'xAI',
+      capabilities: ['fast', 'cost-effective'],
+      costTier: 'low',
+    },
+    // Google Models
+    {
+      id: 'google/gemini-2.5-flash',
+      displayName: 'Gemini 2.5 Flash',
+      provider: 'Google',
+      capabilities: ['fast', 'efficient', 'agentic'],
+      costTier: 'low',
+    },
+    {
+      id: 'google/gemini-2.0-flash-001',
       displayName: 'Gemini 2.0 Flash',
       provider: 'Google',
       capabilities: ['fast', 'efficient'],
       costTier: 'low',
     },
+    // Meta Models
     {
-      id: 'meta-llama/llama-3.3-70b',
-      displayName: 'Llama 3.3 70B',
+      id: 'meta-llama/llama-3.3-70b-instruct',
+      displayName: 'Llama 3.3 70B Instruct',
       provider: 'Meta',
       capabilities: ['open-source', 'cost-effective'],
       costTier: 'low',
     },
+    // DeepSeek Models
     {
       id: 'deepseek/deepseek-r1',
       displayName: 'DeepSeek R1',
       provider: 'DeepSeek',
       capabilities: ['reasoning', 'mathematical'],
+      costTier: 'low',
+    },
+    {
+      id: 'deepseek/deepseek-chat',
+      displayName: 'DeepSeek Chat',
+      provider: 'DeepSeek',
+      capabilities: ['conversational', 'cost-effective'],
       costTier: 'low',
     },
   ];

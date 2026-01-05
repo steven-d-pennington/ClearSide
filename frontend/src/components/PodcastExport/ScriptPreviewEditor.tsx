@@ -5,7 +5,7 @@
  * Users can edit segment text and request regeneration.
  */
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Button, Badge, Textarea } from '../ui';
 import type {
   RefinedPodcastScript,
@@ -17,7 +17,7 @@ import styles from './ScriptPreviewEditor.module.css';
 interface ScriptPreviewEditorProps {
   script: RefinedPodcastScript;
   voiceAssignments: Record<string, VoiceAssignment>;
-  onUpdate: (segments: PodcastSegment[]) => void;
+  onUpdate: (update: { segments?: PodcastSegment[]; intro?: PodcastSegment; outro?: PodcastSegment }) => void;
   onRegenerate: (index: number, instructions?: string) => Promise<void>;
 }
 
@@ -96,20 +96,29 @@ export function ScriptPreviewEditor({
     const segment = allSegments[editingIndex];
     if (!segment) return;
 
-    // Create updated segments array
-    const updatedSegments = allSegments.map((s, i) => {
-      if (i === editingIndex) {
-        return { ...s, text: editText };
-      }
-      return s;
-    });
+    // Create updated segment with new text
+    const { type: segmentType, displayIndex: _, ...segmentWithoutMeta } = segment;
+    const updatedSegment: PodcastSegment = { ...segmentWithoutMeta, text: editText };
 
-    // Extract content segments for the update
-    const contentSegments = updatedSegments
-      .filter((s) => s.type === 'content')
-      .map(({ type: _, displayIndex: __, ...rest }) => rest);
+    // Send update based on segment type
+    if (segmentType === 'intro') {
+      onUpdate({ intro: updatedSegment });
+    } else if (segmentType === 'outro') {
+      onUpdate({ outro: updatedSegment });
+    } else {
+      // For content segments, we need to update the full array
+      const updatedSegments = allSegments
+        .filter((s) => s.type === 'content')
+        .map((s, i) => {
+          const { type: __, displayIndex: ___, ...rest } = s;
+          if (s.displayIndex === editingIndex) {
+            return { ...rest, text: editText };
+          }
+          return rest;
+        });
+      onUpdate({ segments: updatedSegments });
+    }
 
-    onUpdate(contentSegments);
     setEditingIndex(null);
     setEditText('');
   };
@@ -145,7 +154,7 @@ export function ScriptPreviewEditor({
             <div className={styles.segmentHeader}>
               <div className={styles.segmentMeta}>
                 {segment.type !== 'content' && (
-                  <Badge variant="outline" className={styles.typeBadge}>
+                  <Badge variant="secondary" className={styles.typeBadge}>
                     {segment.type === 'intro' ? 'Intro' : 'Outro'}
                   </Badge>
                 )}

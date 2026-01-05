@@ -168,10 +168,8 @@ export const RerunDebateModal: React.FC<RerunDebateModalProps> = ({
           body.livelySettings = config.livelySettings;
         } else if (config.debateMode === 'informal' && config.informalSettings) {
           body.discussionMode = 'informal';
-          body.participants = config.informalSettings.participants;
+          body.participants = config.informalSettings.participantNames;
           body.maxExchanges = config.informalSettings.maxExchanges;
-          body.discussionStyle = config.informalSettings.discussionStyle;
-          body.tone = config.informalSettings.tone;
         }
 
         response = await fetch(`${API_BASE_URL}/api/debates`, {
@@ -301,7 +299,7 @@ export const RerunDebateModal: React.FC<RerunDebateModalProps> = ({
             ['Max Exchanges', config.informalSettings.maxExchanges],
             ['Min Exchanges', config.informalSettings.minExchanges],
             ['Participants', config.informalSettings.participantNames?.length || 0],
-            ['Max Tokens/Turn', config.informalSettings.maxTokensPerTurn],
+            ['Max Tokens/Turn', config.informalSettings.maxTokensPerTurn ?? undefined],
           ])}
 
           {config.duelogicConfig && (

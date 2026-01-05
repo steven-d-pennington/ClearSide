@@ -5,7 +5,7 @@
  * with advanced voice settings (stability, similarity, speed).
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui';
 import { VoicePreviewPlayer } from './VoicePreviewPlayer';
 import type {

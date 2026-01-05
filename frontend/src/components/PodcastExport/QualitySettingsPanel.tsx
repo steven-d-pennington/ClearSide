@@ -5,7 +5,7 @@
  * including ElevenLabs model and output format.
  */
 
-import React from 'react';
+// React import not needed with new JSX transform
 import type { PodcastExportConfig } from '../../types/podcast';
 import { ELEVENLABS_MODELS, AUDIO_FORMATS } from '../../types/podcast';
 import styles from './QualitySettingsPanel.module.css';

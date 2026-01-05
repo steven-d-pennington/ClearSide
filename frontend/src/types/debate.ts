@@ -555,7 +555,14 @@ export type SSEEventType =
   | 'entering_wrapup'      // Discussion is wrapping up
   | 'end_detection_result' // AI detected natural end point
   | 'discussion_summary'   // Auto-generated summary
-  | 'discussion_complete'; // Informal discussion completed
+  | 'discussion_complete'  // Informal discussion completed
+  // Duelogic mode events
+  | 'duelogic_debate_started' // Duelogic debate has started
+  | 'token'                   // Streaming token for duelogic display
+  | 'chair_interrupt'         // Chair interrupted the debate
+  | 'arbiter_interjection'    // Arbiter interjected
+  | 'segment_start'           // Duelogic segment started
+  | 'segment_complete';       // Duelogic segment completed
 
 /**
  * SSE message structure

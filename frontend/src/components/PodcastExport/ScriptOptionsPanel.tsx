@@ -5,7 +5,7 @@
  * including intro/outro, transitions, and refinement model.
  */
 
-import React from 'react';
+// React import not needed with new JSX transform
 import type { PodcastExportConfig } from '../../types/podcast';
 import styles from './ScriptOptionsPanel.module.css';
 
