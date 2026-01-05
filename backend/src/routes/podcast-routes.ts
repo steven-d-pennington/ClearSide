@@ -137,7 +137,7 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             includeIntro: config.includeIntro ?? true,
             includeOutro: config.includeOutro ?? true,
             addTransitions: config.addTransitions ?? true,
-            elevenLabsModel: (config.elevenLabsModel || 'eleven_multilingual_v2') as ElevenLabsModel,
+            elevenLabsModel: (config.elevenLabsModel || 'eleven_v3') as ElevenLabsModel,
             outputFormat: (config.outputFormat || 'mp3_44100_128') as AudioOutputFormat,
             voiceAssignments: {
                 ...DEFAULT_VOICE_ASSIGNMENTS,

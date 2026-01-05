@@ -4,6 +4,7 @@ import {
     PodcastSegment,
     PodcastExportConfig,
     ElevenLabsVoiceSettings,
+    ElevenLabsModel,
     DEFAULT_VOICE_ASSIGNMENTS
 } from '../../types/podcast-export.js';
 import { DebateTranscript } from '../transcript/transcript-recorder.js';
@@ -29,10 +30,12 @@ interface RefinementPrompt {
 export class PodcastScriptRefiner {
     private llmClient: OpenRouterLLMClient;
     private config: PodcastExportConfig;
+    private elevenLabsModel: ElevenLabsModel;
 
     constructor(llmClient: OpenRouterLLMClient, config: PodcastExportConfig) {
         this.llmClient = llmClient;
         this.config = config;
+        this.elevenLabsModel = config.elevenLabsModel || 'eleven_v3';
     }
 
     /**
@@ -49,7 +52,10 @@ export class PodcastScriptRefiner {
         }
 
         // Group utterances by phase
-        const phases = this.groupUtterancesByPhase(transcript);
+        const rawPhases = this.groupUtterancesByPhase(transcript);
+
+        // Merge consecutive same-speaker turns for natural podcast flow
+        const phases = this.mergeConsecutiveTurns(rawPhases);
 
         // Process each phase of the debate
         for (const phase of phases) {
@@ -223,7 +229,10 @@ export class PodcastScriptRefiner {
         speaker: string,
         proposition: string
     ): Promise<string> {
-        const prompt = this.buildRefinementPrompt(content, speaker, proposition);
+        // Clean interruption markers before sending to LLM
+        const cleanedContent = this.cleanInterruptionMarkers(content);
+
+        const prompt = this.buildRefinementPrompt(cleanedContent, speaker, proposition);
 
         const response = await this.llmClient.complete({
             messages: [
@@ -234,11 +243,14 @@ export class PodcastScriptRefiner {
             maxTokens: 2000,
         });
 
-        return this.cleanText(response.content);
+        // Apply model-specific pause syntax conversion
+        const refinedText = this.cleanText(response.content);
+        return this.convertPauseSyntax(refinedText);
     }
 
     /**
      * Build the refinement prompt for polishing debate content
+     * Optimized for ElevenLabs V3 expressive TTS
      */
     private buildRefinementPrompt(
         content: string,
@@ -246,20 +258,33 @@ export class PodcastScriptRefiner {
         proposition: string
     ): RefinementPrompt {
         return {
-            systemPrompt: `You are a podcast script editor. Transform debate transcripts into natural spoken dialogue suitable for text-to-speech synthesis.
+            systemPrompt: `You are a podcast script editor optimizing debate content for ElevenLabs V3 text-to-speech.
 
-Guidelines:
-- Remove ALL markdown formatting (**, *, #, bullet points, numbered lists)
+Transform the debate transcript into expressive, natural spoken dialogue.
+
+## V3 Expressive Syntax to Use:
+- [pause] or [short pause] for dramatic beats and transitions
+- [sigh] when expressing frustration or resignation
+- [laughs] for moments of irony or disbelief
+- Ellipses ... for trailing off or building tension
+- CAPITALIZATION for emphasized words (sparingly)
+
+## Guidelines:
+- Remove ALL markdown formatting (**, *, #, bullets, numbered lists)
 - Convert structured arguments into flowing conversational prose
-- Expand abbreviations naturally (AI -> "A.I.", US -> "the United States")
-- Add natural verbal pauses using [pause] markers sparingly
-- Keep the intellectual content and arguments intact
+- Expand abbreviations naturally (AI → "A.I.", US → "the United States")
 - Use contractions where natural (it's, we're, that's)
-- Break long sentences into shorter, more natural phrases
+- Break long sentences into natural phrases
 - Remove citations and footnote markers
-- Don't add new arguments or opinions - just polish the delivery
+- Keep intellectual content intact - don't change arguments
+- Match speaker personality: Pro should sound confident, Con should sound thoughtful
 
-Output ONLY the refined spoken text. No explanations or meta-commentary.`,
+## For Debate Dynamics:
+- When responding to a point, add energy: "Wait — " or "Hold on — "
+- When making a strong counterpoint, use emphasis: "But HERE'S the thing..."
+- For concessions, soften: "[sigh] Fair point, but..."
+
+Output ONLY the refined spoken text. No explanations.`,
 
             userPrompt: `Speaker: ${speaker}
 Topic: ${proposition}
@@ -551,5 +576,60 @@ Output ONLY the outro text.`,
 
         // Capitalize first letter
         return title.charAt(0).toUpperCase() + title.slice(1);
+    }
+
+    /**
+     * Clean interruption markers and convert to natural speech
+     * Transforms lively debate markers into natural spoken phrases
+     */
+    private cleanInterruptionMarkers(content: string): string {
+        return content
+            // Convert [INTERRUPTION: text...] to natural phrase
+            .replace(/\[INTERRUPTION:\s*([^\]]*?)\.{3}\]/gi, 'Hold on — $1')
+            .replace(/\[INTERRUPTION:\s*([^\]]*)\]/gi, 'Wait — $1')
+            // Convert [RESPONDING TO INTERRUPTION] to natural transition
+            .replace(/\[RESPONDING TO INTERRUPTION\]\s*/gi, 'Fair point, but ')
+            // Clean any remaining empty brackets
+            .replace(/\[\s*\]/g, '')
+            .trim();
+    }
+
+    /**
+     * Merge consecutive same-speaker turns for natural podcast flow
+     * Prevents awkward back-to-back segments from the same voice
+     */
+    private mergeConsecutiveTurns(phases: PhaseData[]): PhaseData[] {
+        return phases.map(phase => ({
+            ...phase,
+            turns: phase.turns.reduce((merged, turn) => {
+                const last = merged[merged.length - 1];
+                if (last && last.speaker === turn.speaker) {
+                    // Merge: add short pause between content
+                    last.content += ' [short pause] ' + turn.content;
+                } else {
+                    merged.push({ ...turn });
+                }
+                return merged;
+            }, [] as TurnData[])
+        }));
+    }
+
+    /**
+     * Convert pause syntax based on ElevenLabs model
+     * V3 uses text tags, other models need SSML break tags
+     */
+    private convertPauseSyntax(text: string): string {
+        if (this.elevenLabsModel === 'eleven_v3') {
+            // V3 uses text-based tags - already correct, just normalize
+            return text;
+        }
+        // Other models need SSML break tags
+        return text
+            .replace(/\[long pause\]/gi, '<break time="3s"/>')
+            .replace(/\[pause\]/gi, '<break time="2s"/>')
+            .replace(/\[short pause\]/gi, '<break time="0.5s"/>')
+            .replace(/\[sigh\]/gi, '<break time="0.5s"/>')
+            .replace(/\[laughs?\]/gi, '<break time="0.3s"/>')
+            .replace(/\[exhales?\]/gi, '<break time="0.3s"/>');
     }
 }

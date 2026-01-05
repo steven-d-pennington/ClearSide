@@ -96,15 +96,16 @@ export interface PodcastExportJob {
 }
 
 // Default voice assignments for debate roles
+// Optimized for ElevenLabs V3 expressiveness (lower stability = more responsive to tags)
 export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
   moderator: {
     speakerId: 'moderator',
     voiceId: 'EXAVITQu4vr4xnSDxMaL',  // "Bella" - professional
     voiceName: 'Bella',
     settings: {
-      stability: 0.7,
+      stability: 0.4,           // Lower for V3 expressiveness (was 0.7)
       similarity_boost: 0.8,
-      style: 0.3,
+      style: 0.5,               // Increased style (was 0.3)
       speed: 1.0,
       use_speaker_boost: true,
     },
@@ -114,9 +115,9 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
     voiceId: 'pNInz6obpgDQGcFmaJgB',  // "Adam" - confident
     voiceName: 'Adam',
     settings: {
-      stability: 0.5,
+      stability: 0.35,          // Lower for confident energy (was 0.5)
       similarity_boost: 0.75,
-      style: 0.5,
+      style: 0.6,               // Higher style for debate punch
       speed: 1.0,
       use_speaker_boost: true,
     },
@@ -126,9 +127,9 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
     voiceId: 'yoZ06aMxZJJ28mfd3POQ',  // "Sam" - articulate
     voiceName: 'Sam',
     settings: {
-      stability: 0.5,
+      stability: 0.35,          // Lower for thoughtful variation (was 0.5)
       similarity_boost: 0.75,
-      style: 0.5,
+      style: 0.6,               // Higher style for engagement
       speed: 1.0,
       use_speaker_boost: true,
     },
@@ -138,9 +139,9 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
     voiceId: 'ThT5KcBeYPX3keUQqHPh',  // "Nicole" - warm
     voiceName: 'Nicole',
     settings: {
-      stability: 0.6,
+      stability: 0.5,           // Slightly more stable for intros (was 0.6)
       similarity_boost: 0.7,
-      style: 0.4,
+      style: 0.5,               // Warmer style (was 0.4)
       speed: 1.0,
       use_speaker_boost: true,
     },

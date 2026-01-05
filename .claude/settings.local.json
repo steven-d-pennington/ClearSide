@@ -44,7 +44,8 @@
       "Bash(docs/FUTURE-FEATURES.md )",
       "Bash(frontend/src/components/DebateStage/DebateStage.tsx )",
       "Bash(frontend/src/components/ui/MarkdownRenderer.tsx)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(node_modules/.bin/tsc:*)"
     ]
   }
 }
