@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** PODCAST-001, AUDIO-001
-**Status:** TO DO
+**Status:** DONE
 
 ---
 
@@ -25,28 +25,39 @@ This task extends the existing ElevenLabs TTS integration (AUDIO-001) with podca
 
 ### Acceptance Criteria
 
-- [ ] Create `PodcastTTSClient` extending base ElevenLabs integration
-- [ ] Support all ElevenLabs models (eleven_v3, eleven_multilingual_v2, turbo, flash)
-- [ ] Implement per-segment voice settings (stability, similarity_boost, style, speed)
-- [ ] Add `previous_text` and `next_text` context for natural transitions
-- [ ] Track character usage for cost calculation
-- [ ] Handle rate limiting with exponential backoff
-- [ ] Support streaming for real-time progress updates
-- [ ] Implement proper error handling and retries
-- [ ] Add pronunciation dictionary support
-- [ ] Return audio as Buffer or stream for concatenation
+- [x] Create `PodcastTTSClient` extending base ElevenLabs integration
+- [x] Support all ElevenLabs models (eleven_v3, eleven_multilingual_v2, turbo, flash)
+- [x] Implement per-segment voice settings (stability, similarity_boost, style, speed)
+- [x] Add `previous_text` and `next_text` context for natural transitions
+- [x] Track character usage for cost calculation
+- [x] Handle rate limiting with exponential backoff
+- [x] Support streaming for real-time progress updates
+- [x] Implement proper error handling and retries
+- [x] Add pronunciation dictionary support
+- [x] Return audio as Buffer or stream for concatenation
 
 ### Functional Requirements
 
 From FUTURE-FEATURES.md:
-- Use model-specific character limits (5K-40K depending on model)
-- Apply custom voice settings per speaker role
-- Track actual character count for billing
-- Handle context continuity between segments
+- [x] Use model-specific character limits (5K-40K depending on model)
+- [x] Apply custom voice settings per speaker role
+- [x] Track actual character count for billing
+- [x] Handle context continuity between segments
 
 ---
 
 ## Implementation Guide
+
+### Definition of Done
+
+- [x] TTS client supports all four ElevenLabs models
+- [x] Voice settings are correctly applied per segment
+- [x] Rate limiting prevents API quota exhaustion
+- [x] Retry logic handles transient errors gracefully
+- [x] Cost tracking is accurate to within 5%
+- [x] Context fields (previous_text, next_text) improve audio flow
+- [x] Unit tests pass with >90% coverage
+- [x] Voice validation catches invalid configurations
 
 ### Podcast TTS Client
 
@@ -478,14 +489,14 @@ export class VoiceValidator {
 
 ### Definition of Done
 
-- [ ] TTS client supports all four ElevenLabs models
-- [ ] Voice settings are correctly applied per segment
-- [ ] Rate limiting prevents API quota exhaustion
-- [ ] Retry logic handles transient errors gracefully
-- [ ] Cost tracking is accurate to within 5%
-- [ ] Context fields (previous_text, next_text) improve audio flow
-- [ ] Unit tests pass with >90% coverage
-- [ ] Voice validation catches invalid configurations
+- [x] TTS client supports all four ElevenLabs models
+- [x] Voice settings are correctly applied per segment
+- [x] Rate limiting prevents API quota exhaustion
+- [x] Retry logic handles transient errors gracefully
+- [x] Cost tracking is accurate to within 5%
+- [x] Context fields (previous_text, next_text) improve audio flow
+- [x] Unit tests pass with >90% coverage
+- [x] Voice validation catches invalid configurations
 
 ---
 

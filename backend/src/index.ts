@@ -9,6 +9,7 @@ import { config } from 'dotenv';
 config();
 
 import express, { type Request, type Response } from 'express';
+import path from 'path';
 import { sseManager } from './services/sse/index.js';
 import debateRoutes from './routes/debate-routes.js';
 import interventionRoutes from './routes/intervention-routes.js';
@@ -18,6 +19,7 @@ import livelyRoutes from './routes/lively-routes.js';
 import modelRoutes from './routes/model-routes.js';
 import adminRoutes from './routes/admin-routes.js';
 import duelogicRoutes from './routes/duelogic-routes.js';
+import podcastRoutes from './routes/podcast-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 import { runMigrationsOnStartup } from './db/runMigrations.js';
@@ -65,6 +67,10 @@ app.use((req, _res, next) => {
   next();
 });
 
+// Serve static files from exports directory
+const exportsDir = process.env.EXPORTS_DIR || './exports';
+app.use('/exports', express.static(path.resolve(exportsDir)));
+
 /**
  * Routes
  */
@@ -88,6 +94,7 @@ app.use('/api', livelyRoutes);
 app.use('/api/models', modelRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', duelogicRoutes);
+app.use('/api/exports/podcast', podcastRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

@@ -206,9 +206,17 @@
 }
 
 /* Responsive */
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .formatButtons {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 400px) {
+  .formatButtons {
+    grid-template-columns: 1fr;
   }
 
   .downloadSection {

@@ -1,0 +1,64 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: var(--color-bg-subtle);
+  border-radius: 6px;
+  border-left: 3px solid var(--color-border);
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.label {
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+.score {
+  font-weight: 700;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.metricLabel {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.metricValue {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.interjectionAlert {
+  margin-top: 4px;
+  color: var(--color-error);
+  font-weight: 600;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

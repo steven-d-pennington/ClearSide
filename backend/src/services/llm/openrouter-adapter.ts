@@ -207,6 +207,7 @@ export class OpenRouterLLMClient extends LLMClient {
           usage,
           finishReason: choice?.finish_reason === 'length' ? 'length' : 'stop',
           provider: 'openrouter',
+          citations: (completion as any).citations,
         };
       } catch (error) {
         const duration = Date.now() - startTime;
@@ -265,6 +266,100 @@ export class OpenRouterLLMClient extends LLMClient {
 
     // Should never reach here, but TypeScript needs it
     throw lastError || new Error('Unknown error in OpenRouter completion');
+  }
+
+  /**
+   * Generate with extended OpenRouter options (e.g. for Perplexity)
+   */
+  async generate(options: {
+    model: string;
+    messages: { role: string; content: string }[];
+    temperature?: number;
+    max_tokens?: number;
+    extra_body?: Record<string, any>;
+  }): Promise<import('../../types/llm.js').LLMResponse> {
+    const rateLimiter = getRateLimiter();
+    // Use the model from options, or fall back to client's configured model
+    const startModelId = options.model || this.modelId;
+    let lastError: Error | null = null;
+    let currentModelId = startModelId;
+
+    for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+      const startTime = Date.now();
+
+      try {
+        await rateLimiter.waitIfNeeded(currentModelId);
+        rateLimiter.recordRequest(currentModelId);
+
+        logger.info({
+          provider: 'openrouter',
+          model: currentModelId,
+          messageCount: options.messages.length,
+          hasExtraBody: !!options.extra_body,
+        }, 'Starting OpenRouter generate request');
+
+        const requestBody: any = {
+          model: currentModelId,
+          messages: options.messages.map(msg => ({
+            role: msg.role as 'system' | 'user' | 'assistant',
+            content: msg.content,
+          })),
+          temperature: options.temperature ?? 0.7,
+          max_tokens: options.max_tokens ?? 4096,
+          stream: false,
+        };
+
+        if (options.extra_body) {
+          Object.assign(requestBody, options.extra_body);
+        }
+
+        // Add reasoning if configured (and not overridden by extra_body)
+        const reasoning = this.buildReasoningParam();
+        if (reasoning && !requestBody.reasoning) {
+          requestBody.reasoning = reasoning;
+        }
+
+        const completion = await this.openRouterClient.chat.completions.create(requestBody) as ChatCompletion;
+
+        const choice = completion.choices[0];
+        const content = choice?.message?.content ?? '';
+        const duration = Date.now() - startTime;
+
+        const usage = {
+          promptTokens: completion.usage?.prompt_tokens ?? 0,
+          completionTokens: completion.usage?.completion_tokens ?? 0,
+          totalTokens: completion.usage?.total_tokens ?? 0,
+        };
+
+        return {
+          content,
+          model: completion.model || currentModelId,
+          usage,
+          finishReason: choice?.finish_reason === 'length' ? 'length' : 'stop',
+          provider: 'openrouter',
+          citations: (completion as any).citations,
+        };
+
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const isRateLimitError = this.isRateLimitError(error);
+        const rateLimitHeaders = this.extractRateLimitHeaders(error);
+
+        if (rateLimitHeaders) {
+          rateLimiter.updateFromHeaders(currentModelId, rateLimitHeaders);
+        }
+
+        if (attempt >= RETRY_CONFIG.maxRetries) throw lastError;
+
+        const waitTime = isRateLimitError
+          ? rateLimiter.getRetryAfter(currentModelId, rateLimitHeaders)
+          : Math.min(RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt), RETRY_CONFIG.maxDelayMs);
+
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+
+    throw lastError || new Error('Unknown error in OpenRouter generate');
   }
 
   /**

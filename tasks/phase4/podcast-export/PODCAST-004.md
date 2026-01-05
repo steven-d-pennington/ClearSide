@@ -6,7 +6,7 @@
 **Priority:** P1
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** PODCAST-001, PODCAST-002
-**Status:** TO DO
+**Status:** DONE
 
 ---
 
@@ -24,15 +24,15 @@ Before generating TTS audio (which incurs costs), users should be able to previe
 
 ### Acceptance Criteria
 
-- [ ] Create POST endpoint to refine a debate into a podcast script
-- [ ] Create GET endpoint to retrieve a refined script by job ID
-- [ ] Create PUT endpoint to update individual script segments
-- [ ] Create POST endpoint to regenerate specific segments
-- [ ] Add cost estimation to script preview response
-- [ ] Support segment reordering and deletion
-- [ ] Validate segment text length against model limits
-- [ ] Include audio duration estimates in responses
-- [ ] Add voice preview endpoint (generate sample audio for voice)
+- [x] Create POST endpoint to refine a debate into a podcast script
+- [x] Create GET endpoint to retrieve a refined script by job ID
+- [x] Create PUT endpoint to update individual script segments
+- [x] Create POST endpoint to regenerate specific segments
+- [x] Add cost estimation to script preview response
+- [x] Support segment reordering and deletion
+- [x] Validate segment text length against model limits
+- [x] Include audio duration estimates in responses
+- [x] Add voice preview endpoint (generate sample audio for voice)
 
 ### Functional Requirements
 
@@ -536,12 +536,12 @@ Get available ElevenLabs voices.
 
 ### Definition of Done
 
-- [ ] All endpoints implemented and tested
-- [ ] Error handling covers all edge cases
-- [ ] Cost estimation is accurate
-- [ ] Script editing preserves data integrity
-- [ ] Voice preview works reliably
-- [ ] API documentation is complete
+- [x] All endpoints implemented and tested
+- [x] Error handling covers all edge cases
+- [x] Cost estimation is accurate
+- [x] Script editing preserves data integrity
+- [x] Voice preview works reliably
+- [x] API documentation is complete
 
 ---
 
