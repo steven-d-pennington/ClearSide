@@ -230,7 +230,7 @@ The qualityScore should reflect how well this topic fits Duelogic's mission of g
             let jsonStr = content;
 
             const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (jsonMatch) {
+            if (jsonMatch && jsonMatch[1]) {
                 jsonStr = jsonMatch[1].trim();
             }
 

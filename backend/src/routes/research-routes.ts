@@ -10,7 +10,7 @@ export function createResearchRoutes(
     const router = Router();
 
     // Get all research configs
-    router.get('/configs', async (req, res) => {
+    router.get('/configs', async (_req, res) => {
         try {
             const configs = await researchRepo.findAllConfigs();
             res.json(configs);
@@ -72,7 +72,8 @@ export function createResearchRoutes(
             const { configId } = req.body;
 
             if (!configId) {
-                return res.status(400).json({ error: 'configId is required' });
+                res.status(400).json({ error: 'configId is required' });
+                return;
             }
 
             const job = await scheduler.runJob(configId);
@@ -87,7 +88,8 @@ export function createResearchRoutes(
         try {
             const job = await researchRepo.findJobById(req.params.id);
             if (!job) {
-                return res.status(404).json({ error: 'Job not found' });
+                res.status(404).json({ error: 'Job not found' });
+                return;
             }
             res.json(job);
         } catch (error: any) {
@@ -96,7 +98,7 @@ export function createResearchRoutes(
     });
 
     // Get scheduler status
-    router.get('/scheduler/status', (req, res) => {
+    router.get('/scheduler/status', (_req, res) => {
         res.json({
             isRunning: scheduler.isJobRunning(),
             activeJobs: scheduler.getActiveJobs(),

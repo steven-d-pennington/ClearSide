@@ -323,7 +323,6 @@ export class OpenRouterLLMClient extends LLMClient {
 
         const choice = completion.choices[0];
         const content = choice?.message?.content ?? '';
-        const duration = Date.now() - startTime;
 
         const usage = {
           promptTokens: completion.usage?.prompt_tokens ?? 0,

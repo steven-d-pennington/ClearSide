@@ -109,7 +109,7 @@ export function ScriptPreviewEditor({
       // For content segments, we need to update the full array
       const updatedSegments = allSegments
         .filter((s) => s.type === 'content')
-        .map((s, i) => {
+        .map((s) => {
           const { type: __, displayIndex: ___, ...rest } = s;
           if (s.displayIndex === editingIndex) {
             return { ...rest, text: editText };
