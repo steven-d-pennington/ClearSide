@@ -1,0 +1,529 @@
+/**
+ * DuelogicConfig Component Styles
+ */
+
+/* Main Panel */
+.configPanel {
+  background: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.configPanel.disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Section Headers */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0 0 0.75rem 0;
+}
+
+/* Loading and Error States */
+.loading,
+.error {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+}
+
+.error {
+  color: var(--color-error, #dc2626);
+}
+
+/* Preset Selector */
+.presetSelector {
+  margin-bottom: 2rem;
+}
+
+.presetDescription {
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.presetCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem;
+  background: var(--bg-secondary, #f9fafb);
+  border: 2px solid var(--border-color, #e5e7eb);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.presetCard:hover:not(:disabled) {
+  border-color: var(--color-primary, #3b82f6);
+  background: var(--bg-primary, #ffffff);
+}
+
+.presetCard:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.presetName {
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin-bottom: 0.25rem;
+}
+
+.presetDesc {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 0.5rem;
+}
+
+.presetChairs {
+  font-size: 0.75rem;
+  color: var(--color-primary, #3b82f6);
+  font-weight: 500;
+}
+
+/* Chair Selector */
+.chairSelector {
+  margin-bottom: 2rem;
+}
+
+.chairCount {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.chairGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chairCard {
+  background: var(--bg-secondary, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.chairHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.chairTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin: 0;
+}
+
+.removeButton {
+  font-size: 0.75rem;
+  color: var(--color-error, #dc2626);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+
+.removeButton:hover {
+  text-decoration: underline;
+}
+
+.addChairButton {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--bg-primary, #ffffff);
+  border: 2px dashed var(--border-color, #e5e7eb);
+  border-radius: 0.5rem;
+  color: var(--color-primary, #3b82f6);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.addChairButton:hover:not(:disabled) {
+  border-color: var(--color-primary, #3b82f6);
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.maxChairsNote {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+  margin-top: 0.5rem;
+}
+
+/* Form Fields */
+.fieldGroup {
+  margin-bottom: 1rem;
+}
+
+.label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary, #111827);
+  margin-bottom: 0.5rem;
+}
+
+.labelValue {
+  font-weight: 600;
+  color: var(--color-primary, #3b82f6);
+}
+
+.select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.375rem;
+  background: var(--bg-primary, #ffffff);
+  font-size: 0.875rem;
+  color: var(--text-primary, #111827);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Framework Info */
+.frameworkInfo {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-primary, #ffffff);
+  border-radius: 0.375rem;
+}
+
+.coreQuestion {
+  font-style: italic;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.description {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #9ca3af);
+  margin: 0;
+}
+
+/* Tier Badge */
+.tierBadge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+/* Blind Spots */
+.blindSpots {
+  margin-top: 0.5rem;
+}
+
+.blindSpotsSummary {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.blindSpotsSummary:hover {
+  color: var(--text-primary, #111827);
+}
+
+.blindSpotsList {
+  margin-top: 0.5rem;
+  padding-left: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.blindSpotsList li {
+  margin-bottom: 0.25rem;
+}
+
+/* Tone Selector */
+.toneSelector {
+  margin-bottom: 2rem;
+}
+
+.toneGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .toneGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.toneCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--bg-secondary, #f9fafb);
+  border: 2px solid var(--border-color, #e5e7eb);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.toneCard:hover:not(:disabled) {
+  border-color: var(--color-primary, #3b82f6);
+}
+
+.toneCard.selected {
+  border-color: var(--color-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.toneName {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary, #111827);
+  margin-bottom: 0.25rem;
+}
+
+.toneDesc {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+/* Interruption Settings */
+.interruptionSettings {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 0.5rem;
+}
+
+.interruptionOptions {
+  margin-top: 1rem;
+}
+
+.toggleLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-primary, #111827);
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.checkboxLabel input {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Flow Settings */
+.flowSettings {
+  margin-bottom: 2rem;
+}
+
+/* Slider */
+.sliderContainer {
+  margin-top: 0.5rem;
+}
+
+.slider {
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--border-color, #e5e7eb);
+  cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--color-primary, #3b82f6);
+  cursor: pointer;
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  margin-top: 0.25rem;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+/* Proposition Input */
+.propositionSection {
+  margin-bottom: 2rem;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.charCount {
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  margin-top: 0.25rem;
+}
+
+/* Advanced Toggle */
+.advancedSection {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+}
+
+.advancedToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #6b7280);
+  font-size: 0.875rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+
+.advancedToggle:hover {
+  color: var(--text-primary, #111827);
+}
+
+/* Submit Button */
+.submitSection {
+  margin-top: 2rem;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  padding-top: 1.5rem;
+}
+
+.submitButton {
+  width: 100%;
+  padding: 1rem;
+  background: var(--color-primary, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: var(--color-primary-hover, #2563eb);
+}
+
+.submitButton:disabled {
+  background: var(--text-secondary, #6b7280);
+  cursor: not-allowed;
+}
+
+.submitButton.loading {
+  position: relative;
+  color: transparent;
+}
+
+.submitButton.loading::after {
+  content: '';
+  position: absolute;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Error Message */
+.errorMessage {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid var(--color-error, #dc2626);
+  border-radius: 0.375rem;
+  color: var(--color-error, #dc2626);
+  font-size: 0.875rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .configPanel {
+    padding: 1rem;
+  }
+
+  .chairGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .presetGrid {
+    grid-template-columns: 1fr;
+  }
+}

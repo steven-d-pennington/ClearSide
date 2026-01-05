@@ -52,7 +52,14 @@ export type SSEEventType =
   | 'end_detection_result'   // AI evaluated ending conditions
   | 'entering_wrapup'        // Discussion entering wrap-up phase
   | 'discussion_summary'     // Auto-generated summary ready
-  | 'discussion_complete';   // Informal discussion fully ended
+  | 'discussion_complete'    // Informal discussion fully ended
+  // Duelogic mode events
+  | 'token'                  // Streaming token for live display
+  | 'duelogic_debate_started' // Duelogic debate started
+  | 'segment_start'          // Duelogic segment started
+  | 'segment_complete'       // Duelogic segment completed
+  | 'chair_interrupt'        // Chair interrupted another chair
+  | 'arbiter_interjection';  // Arbiter interjected for violation
 
 /**
  * SSE Client

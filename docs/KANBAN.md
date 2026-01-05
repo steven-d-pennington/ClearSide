@@ -1,9 +1,21 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2025-12-27
-> Version: 4.2.0 - Persona System Complete
+> Last Updated: 2026-01-03
+> Version: 5.0.0 - Phase 4 Podcast Export Tasks Added
 
-## 🔧 Recent Changes (2025-12-27)
+## 🔧 Recent Changes (2026-01-03)
+
+**NEW: Phase 4 - Podcast Export Pipeline:**
+- LLM-powered script refinement for broadcast-quality audio
+- ElevenLabs TTS integration with per-speaker voice settings
+- Script preview/edit UI before costly TTS generation
+- Full generation pipeline with progress tracking
+- 6 comprehensive task files in `tasks/phase4/podcast-export/`
+- See [FUTURE-FEATURES.md](./FUTURE-FEATURES.md) Section 9 for full specification
+
+---
+
+## 🔧 Previous Changes (2025-12-27)
 
 **NEW: Lively Debate Arena (Phase 3 Roadmap):**
 - Multi-panel UI with active speaker highlighting (ARENA-001)
@@ -157,8 +169,36 @@ OpenRouter provides unified API to 100+ models. This builds on the Persona syste
 
 **Target Audience:** Debate clubs, educational institutions, content creators who want engaging human+AI panel discussions
 
+### Option E: Podcast Export Pipeline (Phase 4) - NEW!
+
+**Broadcast-quality podcast generation with LLM script refinement and ElevenLabs TTS.**
+
+| Task | Description | Estimate | Status |
+|------|-------------|----------|--------|
+| PODCAST-001 | Database Schema & Types for Podcast Export | S | 🟢 Ready |
+| PODCAST-002 | Script Refinement Service (LLM polish) | L | 🟢 Ready |
+| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | M | 🟢 Ready |
+| PODCAST-004 | Script Preview & Edit API | M | 🟢 Ready |
+| PODCAST-005 | Podcast Generation Pipeline | L | 🟢 Ready |
+| PODCAST-006 | Frontend Podcast Export UI | L | 🟢 Ready |
+
+**Key Features:**
+- LLM refines debate transcripts into natural spoken dialogue
+- Remove markdown, add transitions, expand abbreviations
+- Per-speaker voice assignment with advanced settings
+- Script preview/edit before TTS to control costs
+- Progress tracking with segment-level granularity
+- Cost estimation before generation
+
+**Dependencies:** AUDIO-001 (ElevenLabs TTS basic integration)
+
+**Start Here:** PODCAST-001 (Database Schema & Types)
+
+---
+
 ### Recommendation
 
+For **podcast content creators**: Start with PODCAST-001 (broadcast-quality audio)
 For **user-facing features**: Start with PERSONA-001 (differentiated debates)
 For **content distribution**: Audio export is complete! Try EXPORT-002 (PDF) or VIDEO-001 (video)
 For **advanced debates**: After personas, consider OPENROUTER-001 (multi-LLM debates)
@@ -404,6 +444,33 @@ For **advanced debates**: After personas, consider OPENROUTER-001 (multi-LLM deb
 **Dependencies:**
 - EXPORT-UI-001 depends on EXPORT-001, AUDIO-003
 - EXPORT-UI-002 depends on QUEUE-002
+
+---
+
+## 📋 PHASE 4: PODCAST EXPORT PIPELINE
+
+Transform debate transcripts into broadcast-quality podcast audio using LLM script refinement and ElevenLabs TTS.
+
+### 🎙️ Podcast Export
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| PODCAST-001 | Database Schema & Types for Podcast Export | P0 | S | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-001.md) |
+| PODCAST-002 | Script Refinement Service | P0 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-002.md) |
+| PODCAST-003 | ElevenLabs TTS Client for Podcast Export | P0 | M | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-003.md) |
+| PODCAST-004 | Script Preview & Edit API | P1 | M | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-004.md) |
+| PODCAST-005 | Podcast Generation Pipeline | P0 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-005.md) |
+| PODCAST-006 | Frontend Podcast Export UI | P1 | L | 🟢 Ready | [View Task](../tasks/phase4/podcast-export/PODCAST-006.md) |
+
+**Dependencies:**
+- PODCAST-001 can start immediately
+- PODCAST-002 depends on PODCAST-001
+- PODCAST-003 depends on PODCAST-001, AUDIO-001
+- PODCAST-004 depends on PODCAST-001, PODCAST-002
+- PODCAST-005 depends on PODCAST-001, PODCAST-002, PODCAST-003, PODCAST-004
+- PODCAST-006 depends on PODCAST-004, PODCAST-005
+
+**Critical Path:** PODCAST-001 → PODCAST-002 → PODCAST-004 → PODCAST-005 → PODCAST-006
 
 ---
 

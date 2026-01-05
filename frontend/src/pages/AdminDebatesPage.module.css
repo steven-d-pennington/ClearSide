@@ -433,7 +433,8 @@
 
 /* Action buttons - Editorial style */
 .stopBtn,
-.deleteBtn {
+.deleteBtn,
+.rerunBtn {
   padding: var(--spacing-xs) var(--spacing-sm);
   font-family: var(--font-sans);
   font-size: var(--font-size-xs);
@@ -444,6 +445,16 @@
   transition: all var(--transition-base);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
+}
+
+.rerunBtn {
+  background: rgba(45, 106, 79, 0.15);
+  color: var(--color-pro);
+}
+
+.rerunBtn:hover:not(:disabled) {
+  background: rgba(45, 106, 79, 0.25);
+  transform: translateY(-1px);
 }
 
 .stopBtn {
@@ -467,7 +478,8 @@
 }
 
 .stopBtn:disabled,
-.deleteBtn:disabled {
+.deleteBtn:disabled,
+.rerunBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none;

@@ -1,239 +1,113 @@
 # CLAUDE.md - AI Agent Guide for ClearSide Development
 
-> **🚨 CRITICAL INSTRUCTION FOR ALL AI AGENTS 🚨**
->
-> **When you first access this repository, you MUST immediately:**
-> 1. **Display project status summary** - Show what's been completed and what's next
-> 2. **Show next available tasks** - List 3-5 ready-to-start tasks from the kanban board
-> 3. **Ask the user what they want to work on** - Don't assume, let them choose
->
-> **Use the "Initial Response Template" at the bottom of this file.**
+> **Last Updated:** 2026-01-03
+> **Version:** 4.0.0
+
+---
+
+## Quick Start: What to Work On
+
+### Current Priority: Phase 4 - Podcast Export Pipeline
+
+Start with **PODCAST-001** in `tasks/phase4/podcast-export/PODCAST-001.md`
+
+| Task | Description | Status | File |
+|------|-------------|--------|------|
+| PODCAST-001 | Database Schema & Types | Ready | [View](tasks/phase4/podcast-export/PODCAST-001.md) |
+| PODCAST-002 | Script Refinement Service | Ready | [View](tasks/phase4/podcast-export/PODCAST-002.md) |
+| PODCAST-003 | ElevenLabs TTS Client | Ready | [View](tasks/phase4/podcast-export/PODCAST-003.md) |
+| PODCAST-004 | Script Preview & Edit API | Ready | [View](tasks/phase4/podcast-export/PODCAST-004.md) |
+| PODCAST-005 | Podcast Generation Pipeline | Ready | [View](tasks/phase4/podcast-export/PODCAST-005.md) |
+| PODCAST-006 | Frontend Podcast Export UI | Ready | [View](tasks/phase4/podcast-export/PODCAST-006.md) |
+
+### Alternative Options
+
+| Option | First Task | Description |
+|--------|------------|-------------|
+| PDF Export | EXPORT-002 | Quick win - text export to PDF |
+| Video Export | VIDEO-001 | Remotion video framework setup |
+| Multi-LLM | OPENROUTER-001 | Let users choose LLMs per agent |
+
+**Full task board:** [docs/KANBAN.md](docs/KANBAN.md)
 
 ---
 
 ## Project Overview
 
-**ClearSide** is a live debate theater and AI-powered structured reasoning engine that helps users think clearly about complex questions through real-time adversarial debates.
+**ClearSide** is a live debate theater and AI-powered structured reasoning engine.
 
-### Core Concept
-- **Live Debate Streaming**: Watch AI agents debate in real-time following formal protocols
-- **Dual Adversarial Agents**: Pro and Con advocates construct steel-man arguments
-- **User Participation**: Pause, question, inject evidence, and direct questions during debates
-- **Hybrid Replay Model**: Live debates become instantly-replayable artifacts
-- **Multi-Format Export**: Transform debates into text, audio podcasts, or video content
+### What It Does
+- Live AI debates with Pro and Con advocates following formal protocols
+- User participation: pause, question, inject evidence, direct questions
+- Export debates as text, audio podcasts, or video content
 
-### North Star Metric
+### North Star
 > **Did the user understand the issue better than when they started?**
 
-### Tagline
-> *"Watch the debate. Think both sides. Decide with clarity."*
-
 ---
 
-## Quick Start for AI Agents
+## How to Work on Tasks
 
-### 1. Initial Setup (First Time)
-```bash
-# Check project status
-git status
-git log -3 --oneline
+### 1. Pick a Task
 
-# Review available tasks
-cat docs/KANBAN.md | head -100
+Open [docs/KANBAN.md](docs/KANBAN.md) and find a task marked **Ready**. Each task file contains everything you need:
 
-# Check your working directory
-pwd
-```
+- Full context and requirements
+- Implementation guide with code examples
+- Dependencies and validation steps
+- Test cases
 
-### 2. Finding Work
+### 2. Update Status
 
-**Option A: Browse the Kanban Board** ⭐ RECOMMENDED
-- Open [docs/KANBAN.md](docs/KANBAN.md)
-- Look for tasks marked 🟢 **TO DO** with no blockers
-- Click the task file link to see full implementation details
-
-**Option B: Direct Task Selection**
-```bash
-# View all available tasks
-ls tasks/phase1/infrastructure/
-ls tasks/phase1/core/
-ls tasks/phase1/agents/
-ls tasks/phase1/ui/
-ls tasks/phase1/testing/
-
-# Open a specific task file
-cat tasks/phase1/infrastructure/INFRA-001.md
-```
-
-### 3. Understanding a Task
-
-Each task file contains **everything you need**:
-- **Context**: Why this task matters and how it fits
-- **Requirements**: Acceptance criteria (checklist format)
-- **Implementation Guide**: Complete TypeScript/React code examples (500-2,000 lines)
-- **Dependencies**: What must be done first
-- **Validation**: How to test and verify completion
-- **Notes**: Best practices, warnings, tips
-
-**No need to read 10+ documents. Everything is in the task file.**
-
----
-
-## Development Workflow
-
-### Step 1: Pick a Task
-
-1. Check [docs/KANBAN.md](docs/KANBAN.md) for available work
-2. Choose a task marked 🟢 **TO DO** with:
-   - No dependency blockers
-   - Priority P0 or P1 for MVP work
-   - Skills matching your capabilities
-3. **Announce your selection to the user**
-
-**Example:**
-> "I'll work on **INFRA-001: Set Up LLM API Integration Layer**. This is a P0 task with no blockers. Opening the task file now..."
-
-### Step 2: Read the Task File
-
-```bash
-# Open the full task file
-cat tasks/phase1/infrastructure/INFRA-001.md
-```
-
-Read the entire file before starting:
-- [ ] Context section - understand the "why"
-- [ ] Requirements section - know what success looks like
-- [ ] Implementation guide - review code examples
-- [ ] Dependencies - verify prerequisites are met
-- [ ] Validation - plan your testing approach
-
-### Step 3: Update Status (Start Work)
-
-Update [docs/KANBAN.md](docs/KANBAN.md):
+When starting:
 ```markdown
-Before: | INFRA-001 | ... | 🟢 TO DO | [View Task](...) |
-After:  | INFRA-001 | ... | 🟡 IN PROGRESS | [View Task](...) |
+| PODCAST-001 | ... | Ready → In Progress |
 ```
 
-**Tell the user you're starting:**
-> "Starting work on INFRA-001. I've updated the kanban board status to IN PROGRESS."
+When done:
+```markdown
+| PODCAST-001 | ... | In Progress → Done |
+```
 
-### Step 4: Implement
+### 3. Implement
 
-Follow the implementation guide in the task file:
-1. Create necessary files/directories
-2. Implement code following the examples
-3. Write tests as you go (TDD approach recommended)
-4. Follow project standards:
-   - TypeScript strict mode
-   - ESLint/Prettier formatting
-   - >90% test coverage for critical paths
+Follow the implementation guide in the task file. Use TodoWrite to track sub-tasks:
 
-**Use the TodoWrite tool** to track sub-tasks:
 ```typescript
 TodoWrite({
   todos: [
-    { content: "Create LLM client abstraction", status: "in_progress", activeForm: "Creating LLM client" },
-    { content: "Implement retry logic", status: "pending", activeForm: "Implementing retry logic" },
-    { content: "Add rate limiting", status: "pending", activeForm: "Adding rate limiting" },
-    { content: "Write unit tests", status: "pending", activeForm: "Writing unit tests" }
+    { content: "Create types", status: "in_progress", activeForm: "Creating types" },
+    { content: "Write migration", status: "pending", activeForm: "Writing migration" },
+    { content: "Implement repository", status: "pending", activeForm: "Implementing repository" },
+    { content: "Write tests", status: "pending", activeForm: "Writing tests" }
   ]
 });
 ```
 
-### Step 5: Validate
+### 4. Validate
 
-Before marking complete, check the **Definition of Done** in the task file:
-- [ ] All acceptance criteria checked off
-- [ ] Tests written and passing
-- [ ] Code follows project standards
-- [ ] Documentation updated (if needed)
-- [ ] No regressions introduced
+Before marking complete:
+- All acceptance criteria met
+- Tests passing
+- TypeScript strict mode passes
+- No regressions
 
-Run validation:
-```bash
-# Run tests
-npm test
-
-# Run linter
-npm run lint
-
-# Build check
-npm run build
-```
-
-### Step 6: Update Status (Complete Work)
-
-Update [docs/KANBAN.md](docs/KANBAN.md):
-```markdown
-Before: | INFRA-001 | ... | 🟡 IN PROGRESS | [View Task](...) |
-After:  | INFRA-001 | ... | ✅ DONE | [View Task](...) |
-```
-
-**Tell the user you're done:**
-> "✅ INFRA-001 is complete! All acceptance criteria met, tests passing. Ready for the next task."
-
-### Step 7: Knowledge Sharing (IMPORTANT)
-
-**After completing a task, evaluate your work for insights that would help future agents and developers:**
-
-1. **Review your implementation outputs:**
-   - What patterns or approaches worked well?
-   - Were there any gotchas, edge cases, or non-obvious solutions?
-   - Did you discover dependencies or integration points not documented in the task?
-
-2. **Identify relevant task files to update:**
-   - Check dependent tasks that will build on your work
-   - Look for related tasks in the same category
-   - Consider if the task summary (`TASK_CREATION_SUMMARY.md`) needs updates
-
-3. **Add helpful context to task files:**
-   - Add "Implementation Notes" sections with practical insights
-   - Document actual file paths, function names, or APIs created
-   - Note any deviations from the original implementation guide
-   - Include example usage or integration patterns
-
-**Example additions to a dependent task file:**
-```markdown
-## 📝 Implementation Notes from INFRA-001
-
-> Added by agent completing INFRA-001 on 2025-12-24
-
-- LLM client is exported from `src/lib/llm/client.ts`
-- Use `createLLMClient()` factory - supports both OpenAI and Anthropic
-- Rate limiter is configured in `src/lib/llm/rate-limiter.ts` (100 req/min default)
-- For streaming responses, use `client.streamChat()` not `client.chat()`
-```
-
-4. **Update `docs/IMPLEMENTATION_NOTES.md`** (create if needed):
-   - Add cross-cutting learnings that affect multiple tasks
-   - Document architectural decisions made during implementation
-   - Note any changes to the original design
-
-**This step ensures institutional knowledge is preserved and future agents don't repeat discoveries or make avoidable mistakes.**
-
-### Step 8: Commit Changes
+### 5. Commit
 
 ```bash
-# Stage changes
 git add .
+git commit -m "feat(podcast): implement database schema for podcast export
 
-# Commit with descriptive message
-git commit -m "feat(infra): implement LLM API integration layer
+- Added podcast_export_jobs table
+- Created TypeScript types for podcast export
+- Implemented PodcastExportRepository
+- Unit tests with >90% coverage
 
-- Created LLM client abstraction supporting OpenAI and Anthropic
-- Implemented retry logic with exponential backoff
-- Added rate limiting and timeout handling
-- Unit tests with >95% coverage
-
-Closes INFRA-001
+Closes PODCAST-001
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-
-# Push to remote
-git push
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
 ```
 
 ---
@@ -242,58 +116,29 @@ git push
 
 ```
 ClearSide/
-├── CLAUDE.md                 # ⭐ This file - your guide
-├── ROADMAP.md                # Project roadmap and phases
-├── TASK_SYSTEM_COMPLETE.md   # Task system overview
+├── CLAUDE.md                 # This file - your guide
 ├── docs/
-│   ├── KANBAN.md             # ⭐ Main kanban board - CHECK THIS FIRST
-│   ├── REQUIREMENTS.md       # Product requirements (FR/NFR)
-│   ├── 01_product-vision.md  # Vision and mission
-│   ├── 08_live-debate-protocol.md  # Custom debate format spec
-│   ├── 09_real-time-architecture.md  # Technical architecture
-│   └── 10_media-production.md  # Export pipeline spec
-├── tasks/                    # ⭐ Individual task files - YOUR WORK LIVES HERE
-│   ├── README.md             # Task system guide
-│   ├── TASK_CREATION_SUMMARY.md  # Comprehensive task summary
-│   ├── phase1/
-│   │   ├── infrastructure/   # 5 tasks (LLM, DB, SSE, Schema, Logging)
-│   │   ├── core/             # 5 tasks (State machine, Orchestrator, etc.)
-│   │   ├── agents/           # 5 tasks (Pro, Con, Moderator agents)
-│   │   ├── ui/               # 9 tasks (React components)
-│   │   └── testing/          # 5 tasks (Unit, integration, E2E)
-│   └── phase2/
-│       ├── text-export/      # 2 tasks (Markdown, PDF)
-│       ├── audio-export/     # 4 tasks (TTS, podcast generation)
-│       ├── video-export/     # 4 tasks (Remotion, video pipeline)
-│       ├── queue/            # 2 tasks (BullMQ, status tracking)
-│       ├── storage/          # 2 tasks (S3, CDN)
-│       └── ui/               # 2 tasks (Export controls, status)
-└── (implementation will go here)
-    ├── backend/              # Node.js/TypeScript backend
-    ├── frontend/             # React/Vite frontend
-    └── ...
+│   ├── KANBAN.md             # Task board - CHECK THIS FIRST
+│   ├── FUTURE-FEATURES.md    # Feature specifications
+│   └── REQUIREMENTS.md       # Product requirements
+├── tasks/
+│   ├── phase1/               # MVP tasks (complete)
+│   ├── phase2/               # Media export tasks
+│   └── phase4/               # Podcast export tasks (NEW)
+│       └── podcast-export/
+│           ├── PODCAST-001.md
+│           ├── PODCAST-002.md
+│           ├── PODCAST-003.md
+│           ├── PODCAST-004.md
+│           ├── PODCAST-005.md
+│           └── PODCAST-006.md
+├── backend/                  # Node.js/TypeScript backend
+└── frontend/                 # React/Vite frontend
 ```
 
 ---
 
-## Key Documentation Reference
-
-| Document | When to Use | What It Contains |
-|----------|-------------|------------------|
-| **[docs/KANBAN.md](docs/KANBAN.md)** | ⭐ START HERE | Task status, dependencies, sprint planning |
-| **[tasks/{category}/{TASK-ID}.md](tasks/)** | Before implementing | Complete implementation guide with code |
-| **[docs/REQUIREMENTS.md](docs/REQUIREMENTS.md)** | Understanding features | Functional/non-functional requirements |
-| **[docs/08_live-debate-protocol.md](docs/08_live-debate-protocol.md)** | Agent implementation | 6-phase debate format, prompt contracts |
-| **[docs/09_real-time-architecture.md](docs/09_real-time-architecture.md)** | Backend work | SSE, state machine, database schema |
-| **[docs/10_media-production.md](docs/10_media-production.md)** | Phase 2 export work | TTS, audio, video pipeline |
-| **[ROADMAP.md](ROADMAP.md)** | Understanding phases | High-level feature roadmap |
-| **[TASK_SYSTEM_COMPLETE.md](TASK_SYSTEM_COMPLETE.md)** | System overview | Task statistics and completion status |
-
----
-
-## Design Principles (ALWAYS FOLLOW)
-
-### The Seven Principles
+## Design Principles
 
 1. **Single-responsibility agents** - Each agent has one job; no agent wins
 2. **No final answers** - Preserve disagreement and uncertainty
@@ -305,277 +150,48 @@ ClearSide/
 
 ### Code Quality Standards
 
-- **TypeScript Strict Mode**: All code must pass strict type checking
-- **Test Coverage**: >90% for critical paths, >80% overall
-- **No Shortcuts**: Follow the implementation guide in task files
-- **Steel-Man Quality**: When implementing agents, no straw-man arguments
-- **Moderator Neutrality**: Moderator agent NEVER picks a winner
-
-### What ClearSide is NOT
-
-| ❌ We Are NOT | ✅ We ARE |
-|---------------|----------|
-| An advice engine | A reasoning support system |
-| An opinion generator | A debate theater |
-| A chatbot | A structured analysis tool |
-| A persuasion tool | A clarity engine |
-| A prediction engine | An uncertainty preserver |
+- TypeScript strict mode
+- Test coverage >90% for critical paths
+- No straw-man arguments in agent prompts
+- Moderator agent NEVER picks a winner
 
 ---
 
-## Progress Tracking
+## Key Documentation
 
-### Update the Kanban Board
-
-**When starting a task:**
-```markdown
-| TASK-ID | Task Name | Priority | Estimate | Status | Task File |
-|---------|-----------|----------|----------|--------|-----------|
-| INFRA-001 | LLM Integration | P0 | M | 🟡 IN PROGRESS | [View](../tasks/...) |
-```
-
-**When completing a task:**
-```markdown
-| TASK-ID | Task Name | Priority | Estimate | Status | Task File |
-|---------|-----------|----------|----------|--------|-----------|
-| INFRA-001 | LLM Integration | P0 | M | ✅ DONE | [View](../tasks/...) |
-```
-
-### Use TodoWrite During Work
-
-Track your sub-tasks in real-time:
-```typescript
-TodoWrite({
-  todos: [
-    { content: "Create database schema", status: "completed", activeForm: "Creating schema" },
-    { content: "Implement migrations", status: "in_progress", activeForm: "Implementing migrations" },
-    { content: "Add seed data", status: "pending", activeForm: "Adding seed data" },
-    { content: "Write repository tests", status: "pending", activeForm: "Writing tests" }
-  ]
-});
-```
-
-### Commit Message Format
-
-```
-<type>(<scope>): <short description>
-
-<longer description if needed>
-
-- Bullet point 1
-- Bullet point 2
-
-Closes TASK-ID
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
-```
-
-**Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+| Document | Purpose |
+|----------|---------|
+| [docs/KANBAN.md](docs/KANBAN.md) | Task status and dependencies |
+| [docs/FUTURE-FEATURES.md](docs/FUTURE-FEATURES.md) | Feature specifications |
+| [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | Product requirements |
+| [docs/08_live-debate-protocol.md](docs/08_live-debate-protocol.md) | 6-phase debate format |
+| [docs/09_real-time-architecture.md](docs/09_real-time-architecture.md) | Technical architecture |
 
 ---
 
-## Common Tasks and How to Do Them
+## Project Status
 
-### Starting a New Sprint
+### Complete
+- Phase 1: Live Debate Engine (36/36 tasks)
+- Phase 2 Audio: ElevenLabs TTS, podcast generation
+- Informal Discussion Mode
+- Human Participation Mode
 
-1. Review sprint goals in [docs/KANBAN.md](docs/KANBAN.md)
-2. Check all sprint tasks are marked 🟢 TO DO
-3. Verify dependencies from previous sprint are complete
-4. Ask user which tasks to prioritize
+### In Progress
+- Phase 4: Podcast Export Pipeline (0/6 tasks)
 
-### Working on Multiple Tasks in Parallel
-
-**ONLY if tasks have no dependencies:**
-
-1. Pick 2-3 independent tasks (e.g., INFRA-001, INFRA-002, UI-001)
-2. Tell the user your plan
-3. Update all to 🟡 IN PROGRESS
-4. Work systematically, completing one before moving to next
-5. Update each to ✅ DONE as finished
-
-### Handling Blockers
-
-If you encounter a blocker:
-
-1. **Document it clearly:**
-   ```markdown
-   | INFRA-003 | SSE Layer | P0 | L | 🔴 BLOCKED | [View](...) |
-
-   **Blocker**: Requires INFRA-002 (Database) to be complete for state persistence
-   ```
-
-2. **Tell the user:**
-   > "INFRA-003 is blocked by INFRA-002. I'll work on an alternative task while we wait."
-
-3. **Pick an unblocked task** from the same sprint
-
-### Implementing Agents (Special Instructions)
-
-When working on AGENT tasks:
-
-1. **Read the prompt contracts** in [docs/08_live-debate-protocol.md](docs/08_live-debate-protocol.md)
-2. **Follow the phase structure** - agents operate turn-by-turn
-3. **Enforce steel-man quality** - no straw-man arguments
-4. **Test against flagship demo** - AI Data Center Moratorium benchmark
-5. **Validate schema** - outputs must match JSON Schema v2.0.0
-
-### Testing Your Work
-
-```bash
-# Unit tests
-npm run test:unit
-
-# Integration tests
-npm run test:integration
-
-# E2E tests
-npm run test:e2e
-
-# All tests
-npm test
-
-# Coverage report
-npm run test:coverage
-```
-
-**Minimum requirements:**
-- Unit tests: >90% coverage for business logic
-- Integration tests: All agent interactions
-- E2E tests: Complete user flows
-
----
-
-## Sprint Overview
-
-### ✅ Sprint 1-4: MVP Complete (2025-12-26)
-
-All Phase 1 tasks have been completed:
-
-| Category | Tasks | Status |
-|----------|-------|--------|
-| Infrastructure | INFRA-001 to INFRA-005 | ✅ Complete |
-| Core Engine | CORE-001 to CORE-005 | ✅ Complete |
-| AI Agents | AGENT-001 to AGENT-005 | ✅ Complete |
-| UI Components | UI-001 to UI-009 | ✅ Complete |
-| Testing | TEST-001 to TEST-005 | ✅ Complete (load testing optional) |
-| Configuration | CONFIG-001 to CONFIG-007 | ✅ Complete |
-
-### Current Focus: Phase 2
-
-**Next Available Tasks:**
-
-| Task | Description | Priority |
-|------|-------------|----------|
-| EXPORT-002 | PDF export | P1 |
-| AUDIO-001 | TTS integration | P0 |
-| PERSONA-001 | Persona system database | P1 |
-
-### Features Added Since Original Plan
-
-1. **Configuration System** - Presets, brevity, LLM settings
-2. **Flow Mode** - Auto vs Step-by-step debate pacing
-3. **Debate History** - Browse and replay completed debates
-4. **Docker Dev Environment** - Containerized local development
-
----
-
-## Troubleshooting
-
-### "I don't know what to work on"
-→ Check [docs/KANBAN.md](docs/KANBAN.md) for tasks marked 🟢 TO DO
-→ Ask the user what their priority is
-
-### "The task file is too detailed"
-→ This is intentional! Everything you need is in one place
-→ Skim the context, focus on implementation guide and acceptance criteria
-
-### "I found a bug in the task file"
-→ Document the issue and continue with your best judgment
-→ Tell the user so it can be fixed
-
-### "This task depends on something incomplete"
-→ Mark task as 🔴 BLOCKED
-→ Pick an alternative task from the same sprint
-
-### "Tests are failing"
-→ Do NOT mark task as complete
-→ Debug using the validation section in the task file
-→ Ask user for help if stuck
-
----
-
-## Initial Response Template
-
-**⭐ WHEN YOU FIRST ACCESS THIS REPOSITORY, USE THIS TEMPLATE:**
-
-```markdown
-# ClearSide Project Status Report
-
-## 📊 Current State
-
-**Phase:** MVP Complete - Starting Phase 2 (Media Production)
-**Version:** 1.0.0
-**Overall Progress:** 36/36 Phase 1 tasks complete (100%)
-
-### ✅ Phase 1 Complete
-- **Infrastructure (5/5):** LLM API, PostgreSQL, SSE, Schema Validation, Logging
-- **Core Engine (5/5):** State Machine, Orchestrator, Turn Manager, Interventions, Transcript
-- **AI Agents (5/5):** Orchestrator, Pro Advocate, Con Advocate, Moderator, Prompt Templates
-- **UI Components (9/9):** Input, Stream, Timeline, Interventions, Layout, Design System
-- **Testing (5/5):** Unit, Integration, E2E, Accessibility, Agent Quality (480+ tests)
-- **Configuration (7/7):** Presets, Brevity, LLM Settings, API, Frontend ConfigPanel
-
-### 📋 Phase 2 Started
-- **Text Export (1/2):** Markdown export complete, PDF pending
-- **Audio Export (0/4):** TTS, Voice Profiles, Podcast Generator pending
-- **Video Export (0/4):** Remotion pipeline pending
-
----
-
-## 🎯 Available Tasks
-
-### Phase 2 (Media Production):
-
-**1. EXPORT-002: PDF Export**
-- **Priority:** P1 | Uses Markdown exporter as base
-- **File:** [tasks/phase2/text-export/EXPORT-002.md](tasks/phase2/text-export/EXPORT-002.md)
-
-**2. AUDIO-001: TTS Integration**
-- **Priority:** P0 | ElevenLabs/PlayHT API
-- **File:** [tasks/phase2/audio-export/AUDIO-001.md](tasks/phase2/audio-export/AUDIO-001.md)
-
-### Configuration Enhancements (Planned):
-
-**3. PERSONA-001: Persona System Database**
-- **Priority:** P1 | 6 argumentation archetypes
-- Add persona selection to debates
-
----
-
-## 💬 What would you like to work on?
-
-I can:
-- ✅ Continue Phase 2: **Audio/Video export pipeline**
-- ✅ Add features: **Persona system, Team debates, Interactive modes**
-- ✅ Improve UI: **Debate history design, mobile optimization**
-- ℹ️ Review implementation: [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md)
-- ℹ️ View changelog: [CHANGELOG.md](CHANGELOG.md)
-
-**What would you like to focus on?**
-```
+### Planned
+- Phase 2 Video: Remotion video export
+- Phase 3: OpenRouter multi-LLM debates
 
 ---
 
 ## User Preferences
 
-From user's global settings:
-- **GitHub Account**: steven-d-pennington
-- **Email**: steve.d.pennington@gmail.com
-- **Resend Domain**: invitation.monkeylovestack.com
-- **Always use subagents** if appropriate
-- **Check for running dev servers** before starting new ones
+- **GitHub:** steven-d-pennington
+- **Email:** steve.d.pennington@gmail.com
+- Always use subagents if appropriate
+- Check for running dev servers before starting new ones
 
 ---
 
@@ -585,18 +201,10 @@ From user's global settings:
 - **Update KANBAN.md** - Keep task status current
 - **Follow task files** - They contain everything you need
 - **Test thoroughly** - >90% coverage for critical paths
-- **Commit frequently** - Small, focused commits
 - **Be transparent** - Tell the user what you're doing and why
-- **Share knowledge** - After completing a task, add helpful context to dependent task files for future agents
 
 ---
 
 **ClearSide is a thinking support system, not an opinion generator.**
 
-Every feature, every line of code, every prompt should serve the goal of helping users **understand issues better** - not telling them what to think.
-
----
-
-*Last Updated: 2025-12-26*
-*Version: 3.0.0 (MVP Complete)*
-*For questions, check [tasks/README.md](tasks/README.md) or ask the user*
+Every feature should help users understand issues better - not tell them what to think.

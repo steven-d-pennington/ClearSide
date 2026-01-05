@@ -10,6 +10,7 @@ import { ModelSelector } from '../ConfigPanel/ModelSelector';
 import { PersonaSelector } from './PersonaSelector';
 import { DebateModeSelector } from './DebateModeSelector';
 import { InformalSettings } from './InformalSettings';
+import { DuelogicConfigPanel } from '../DuelogicConfig';
 import type { FlowMode, HumanParticipation, HumanSide } from '../../types/debate';
 import type { DebateConfiguration, PersonaSelection, ModelSelection } from '../../types/configuration';
 import { DEFAULT_CONFIGURATION, DEFAULT_PERSONA_SELECTION, DEFAULT_MODEL_SELECTION } from '../../types/configuration';
@@ -297,6 +298,38 @@ export const InputForm: React.FC<InputFormProps> = ({
 
   const isSubmitDisabled =
     isLoading || !formState.question.trim() || Object.keys(errors).length > 0 || isInformalInvalid;
+
+  // Duelogic mode uses its own form inside DuelogicConfigPanel
+  // Render as div wrapper to avoid nested forms
+  if (formState.debateMode === 'duelogic') {
+    return (
+      <div className={`${styles.inputForm} ${className}`}>
+        <div className={styles.header}>
+          <h1 className={styles.title}>Think both sides. Decide with clarity.</h1>
+          <p className={styles.description}>
+            Explore propositions through philosophical debate with multiple frameworks.
+          </p>
+        </div>
+
+        {/* Debate Mode Selector */}
+        <DebateModeSelector
+          mode={formState.debateMode}
+          settings={formState.livelySettings}
+          informalSettings={formState.informalSettings}
+          onModeChange={handleDebateModeChange}
+          onSettingsChange={handleLivelySettingsChange}
+          onInformalSettingsChange={handleInformalSettingsChange}
+          disabled={isLoading}
+        />
+
+        {/* Duelogic Configuration Panel - has its own form */}
+        <DuelogicConfigPanel
+          onDebateCreated={onSuccess}
+          disabled={isLoading}
+        />
+      </div>
+    );
+  }
 
   return (
     <form

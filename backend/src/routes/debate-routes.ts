@@ -10,6 +10,8 @@ import * as utteranceRepository from '../db/repositories/utterance-repository.js
 import * as presetRepository from '../db/repositories/preset-repository.js';
 import * as personaRepository from '../db/repositories/persona-repository.js';
 import * as livelyRepository from '../db/repositories/lively-repository.js';
+import * as informalRepository from '../db/repositories/informal-repository.js';
+import * as duelogicRepository from '../db/repositories/duelogic-repository.js';
 import { createLogger } from '../utils/logger.js';
 import type { CreateDebateInput, FlowMode } from '../types/database.js';
 import {
@@ -803,6 +805,134 @@ router.get('/debates/:debateId', async (req: Request, res: Response) => {
     logger.error({ debateId, error }, 'Error getting debate');
     res.status(500).json({
       error: 'Failed to get debate',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
+ * GET /debates/:debateId/config
+ * Get full debate configuration for re-running a debate
+ * Returns all parameters needed to start a new debate with the same settings
+ */
+router.get('/debates/:debateId/config', async (req: Request, res: Response) => {
+  const { debateId } = req.params;
+
+  try {
+    const debate = await debateRepository.findById(debateId!);
+
+    if (!debate) {
+      res.status(404).json({
+        error: 'Debate not found',
+        debateId,
+      });
+      return;
+    }
+
+    // Build the base configuration
+    const config: Record<string, unknown> = {
+      // Basic info
+      proposition: debate.propositionText,
+      propositionContext: debate.propositionContext,
+      debateMode: debate.debateMode,
+      flowMode: debate.flowMode,
+
+      // Configuration settings
+      presetMode: debate.presetMode,
+      brevityLevel: debate.brevityLevel,
+      llmTemperature: debate.llmTemperature,
+      maxTokensPerResponse: debate.maxTokensPerResponse,
+      requireCitations: debate.requireCitations,
+
+      // Persona assignments
+      proPersonaId: debate.proPersonaId,
+      conPersonaId: debate.conPersonaId,
+
+      // Model assignments
+      proModelId: debate.proModelId,
+      conModelId: debate.conModelId,
+      moderatorModelId: debate.moderatorModelId,
+    };
+
+    // Fetch mode-specific settings
+    if (debate.debateMode === 'lively') {
+      try {
+        const livelySettings = await livelyRepository.findLivelySettingsByDebateId(debateId!);
+        if (livelySettings) {
+          config.livelySettings = {
+            aggressionLevel: livelySettings.aggressionLevel,
+            maxInterruptsPerMinute: livelySettings.maxInterruptsPerMinute,
+            interruptCooldownMs: livelySettings.interruptCooldownMs,
+            minSpeakingTimeMs: livelySettings.minSpeakingTimeMs,
+            relevanceThreshold: livelySettings.relevanceThreshold,
+            contradictionBoost: livelySettings.contradictionBoost,
+            pacingMode: livelySettings.pacingMode,
+            interjectionMaxTokens: livelySettings.interjectionMaxTokens,
+          };
+        }
+      } catch {
+        // Lively settings not found, continue without them
+      }
+    } else if (debate.debateMode === 'informal') {
+      try {
+        const informalSettings = await informalRepository.findByDebateId(debateId!);
+        if (informalSettings) {
+          config.informalSettings = {
+            participantNames: informalSettings.participantNames,
+            maxExchanges: informalSettings.maxExchanges,
+            minExchanges: informalSettings.minExchanges,
+            endDetection: informalSettings.endDetection,
+            maxTokensPerTurn: informalSettings.maxTokensPerTurn,
+            temperature: informalSettings.temperature,
+          };
+        }
+      } catch {
+        // Informal settings not found, continue without them
+      }
+    } else if (debate.debateMode === 'duelogic') {
+      try {
+        const duelogicConfig = await duelogicRepository.getDuelogicConfig(debateId!);
+        if (duelogicConfig) {
+          config.duelogicConfig = duelogicConfig;
+        }
+      } catch {
+        // Duelogic config not found, continue without it
+      }
+    }
+
+    // Fetch persona names if assigned
+    if (debate.proPersonaId) {
+      try {
+        const proPersona = await personaRepository.findById(debate.proPersonaId);
+        if (proPersona) {
+          config.proPersonaName = proPersona.name;
+        }
+      } catch {
+        // Persona not found
+      }
+    }
+    if (debate.conPersonaId) {
+      try {
+        const conPersona = await personaRepository.findById(debate.conPersonaId);
+        if (conPersona) {
+          config.conPersonaName = conPersona.name;
+        }
+      } catch {
+        // Persona not found
+      }
+    }
+
+    res.json({
+      success: true,
+      debateId,
+      config,
+      originalStatus: debate.status,
+      createdAt: debate.createdAt,
+    });
+  } catch (error) {
+    logger.error({ debateId, error }, 'Error getting debate config');
+    res.status(500).json({
+      error: 'Failed to get debate config',
       message: error instanceof Error ? error.message : String(error),
     });
   }
