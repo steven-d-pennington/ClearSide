@@ -122,6 +122,14 @@ router.get('/providers', async (_req: Request, res: Response): Promise<void> => 
 
         const providers = [
             {
+                id: 'google-cloud-long',
+                name: 'Google Cloud Long Audio',
+                description: 'Async synthesis for long content - no chunking, high quality Neural2 voices',
+                available: available.includes('google-cloud-long'),
+                costPer1000Chars: 1.6,  // ~$0.016 per 1K chars
+                quality: 'high',
+            },
+            {
                 id: 'elevenlabs',
                 name: 'ElevenLabs',
                 description: 'Premium AI voices with V3 audio tags for expressive delivery',
@@ -141,7 +149,7 @@ router.get('/providers', async (_req: Request, res: Response): Promise<void> => 
 
         res.json({
             providers,
-            defaultProvider: available[0] || 'elevenlabs',
+            defaultProvider: getDefaultProvider(),
         });
     } catch (error: any) {
         logger.error({ error }, 'Get providers error');

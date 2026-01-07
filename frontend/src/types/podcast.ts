@@ -12,7 +12,7 @@
 /**
  * Available TTS providers for podcast generation
  */
-export type TTSProviderType = 'elevenlabs' | 'gemini';
+export type TTSProviderType = 'elevenlabs' | 'gemini' | 'google-cloud-long';
 
 // ============================================================================
 // ElevenLabs Models and Formats
@@ -328,7 +328,7 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
  * Default podcast export configuration
  */
 export const DEFAULT_PODCAST_CONFIG: PodcastExportConfig = {
-  ttsProvider: 'elevenlabs',  // Default for backward compatibility
+  // ttsProvider intentionally omitted - backend will use getDefaultProvider()
   refinementModel: 'google/gemini-3-flash-preview',
   includeIntro: true,
   includeOutro: true,

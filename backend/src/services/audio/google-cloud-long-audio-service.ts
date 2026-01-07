@@ -164,9 +164,10 @@ export class GoogleCloudLongAudioService implements ITTSService {
       ...config.voiceProfiles,
     };
 
-    // Create axios client for TTS API
+    // Create axios client for TTS Long Audio API
+    // Long Audio API uses location-specific endpoint and v1beta1
     this.client = axios.create({
-      baseURL: 'https://texttospeech.googleapis.com/v1',
+      baseURL: `https://${this.location}-texttospeech.googleapis.com/v1beta1`,
       timeout: 60000,
       headers: {
         'Content-Type': 'application/json',
@@ -313,8 +314,9 @@ export class GoogleCloudLongAudioService implements ITTSService {
     );
 
     try {
+      // Long Audio API endpoint: /projects/{project}/locations/{location}:synthesizeLongAudio
       const response = await this.client.post(
-        `/text:synthesizeLongAudio`,
+        `/${parent}:synthesizeLongAudio`,
         requestBody,
         {
           headers: {
