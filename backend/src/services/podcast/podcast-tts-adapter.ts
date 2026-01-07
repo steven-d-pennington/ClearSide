@@ -45,8 +45,9 @@ export interface PodcastTTSResponse {
  * These are approximate and subject to change
  */
 const COST_PER_1000_CHARS_CENTS: Record<TTSProviderType, number> = {
-  elevenlabs: 15,  // $0.15 per 1K chars (Creator tier)
-  gemini: 1.5,     // ~$0.015 per 1K chars (much cheaper)
+  elevenlabs: 15,           // $0.15 per 1K chars (Creator tier)
+  gemini: 1.5,              // ~$0.015 per 1K chars (much cheaper)
+  'google-cloud-long': 1.6, // ~$0.016 per 1K chars for Neural2 voices
 };
 
 /**
@@ -65,11 +66,11 @@ export class PodcastTTSAdapter {
 
   constructor(provider: TTSProviderType = 'elevenlabs') {
     this.provider = provider;
-    this.tagConverter = new AudioTagConverter(provider);
+    this.tagConverter = new AudioTagConverter(provider === 'google-cloud-long' ? 'elevenlabs' : provider);
 
     // Validate provider is available
     // Map podcast provider type to audio service provider type
-    const serviceProvider = provider as 'elevenlabs' | 'gemini';
+    const serviceProvider = provider as 'elevenlabs' | 'gemini' | 'google-cloud-long';
     if (!isProviderAvailable(serviceProvider)) {
       throw new Error(
         `TTS provider '${provider}' is not available. ` +
@@ -80,10 +81,11 @@ export class PodcastTTSAdapter {
     this.service = getTTSService(serviceProvider);
 
     // Rate limiter - adjust based on provider
-    const rpmLimit = provider === 'gemini' ? 30 : 100;  // Gemini has lower limits
+    // Gemini has lower limits, google-cloud-long is async so no limits needed
+    const rpmLimit = provider === 'gemini' ? 30 : provider === 'google-cloud-long' ? 60 : 100;
     this.limiter = new Bottleneck({
       minTime: Math.ceil(60000 / rpmLimit),
-      maxConcurrent: provider === 'gemini' ? 2 : 1,
+      maxConcurrent: provider === 'gemini' ? 2 : 3,
     });
 
     this.usageStats = {
@@ -325,7 +327,7 @@ export class PodcastTTSAdapter {
    * Check if provider is available
    */
   static isProviderAvailable(provider: TTSProviderType): boolean {
-    return isProviderAvailable(provider as 'elevenlabs' | 'gemini');
+    return isProviderAvailable(provider as 'elevenlabs' | 'gemini' | 'google-cloud-long');
   }
 }
 
@@ -348,6 +350,10 @@ export function getAvailablePodcastProviders(): TTSProviderType[] {
 
   if (process.env.GOOGLE_AI_API_KEY) {
     available.push('gemini');
+  }
+
+  if (process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_CLOUD_TTS_BUCKET) {
+    available.push('google-cloud-long');
   }
 
   return available;

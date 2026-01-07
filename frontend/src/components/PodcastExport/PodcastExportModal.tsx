@@ -55,6 +55,8 @@ export function PodcastExportModal({
     resumeExistingJob,
     updateScript,
     regenerateSegment,
+    deleteSegment,
+    addSegment,
     startGenerationWithSSE,
     regenerateAllAudio,
     downloadPodcast,
@@ -91,8 +93,8 @@ export function PodcastExportModal({
     }, 100);
   };
 
-  // Handle regenerating all audio from scratch with correct settings
-  const handleRegenerateAll = () => {
+  // Handle regenerating all audio from scratch with V3 model
+  const handleRegenerateAllV3 = () => {
     if (!existingJob) return;
 
     const targetJobId = existingJob.id;
@@ -100,6 +102,17 @@ export function PodcastExportModal({
     setStep('generate');
     // Pass the jobId directly since state update is async
     regenerateAllAudio({ elevenLabsModel: 'eleven_v3' }, targetJobId);
+  };
+
+  // Handle starting fresh - clear all audio but keep current settings
+  const handleStartFresh = () => {
+    if (!existingJob) return;
+
+    const targetJobId = existingJob.id;
+    resumeExistingJob();
+    setStep('generate');
+    // Start fresh without changing any settings
+    regenerateAllAudio(undefined, targetJobId);
   };
 
   // Handle refine and preview
@@ -186,7 +199,8 @@ export function PodcastExportModal({
 
     const createdDate = new Date(existingJob.createdAt).toLocaleDateString();
     const hasScript = !!existingJob.refinedScript;
-    const canRetryGeneration = existingJob.status === 'error' && hasScript;
+    const hasPartialAudio = (existingJob.partialCostCents ?? 0) > 0;
+    const wasGenerating = existingJob.status === 'generating' || existingJob.status === 'error';
     const existingModel = existingJob.config?.elevenLabsModel || 'unknown';
     const needsModelUpdate = existingModel !== 'eleven_v3';
 
@@ -202,8 +216,8 @@ export function PodcastExportModal({
               {createdDate}
               {' • '}
               Model: {existingModel}
-              {existingJob.partialCostCents !== undefined && existingJob.partialCostCents > 0 && (
-                <> • Partial cost: ${(existingJob.partialCostCents / 100).toFixed(2)}</>
+              {hasPartialAudio && (
+                <> • Partial cost: ${(existingJob.partialCostCents! / 100).toFixed(2)}</>
               )}
             </span>
             {existingJob.errorMessage && (
@@ -211,30 +225,62 @@ export function PodcastExportModal({
             )}
             {needsModelUpdate && (
               <span className={styles.bannerWarning}>
-                Using older model. Use "Regenerate All (V3)" to use the latest model with audio tags.
+                Using older model. Use "Upgrade to V3" for the latest model with audio tags.
               </span>
             )}
           </div>
           <div className={styles.bannerActions}>
-            {canRetryGeneration ? (
+            {/* Job was generating or failed - show audio generation options */}
+            {wasGenerating && hasScript ? (
               <>
-                <Button variant="secondary" size="sm" onClick={handleRetryGeneration}>
-                  Retry
-                </Button>
-                <Button variant="primary" size="sm" onClick={handleRegenerateAll}>
-                  Regenerate All (V3)
-                </Button>
-              </>
-            ) : hasScript ? (
-              <>
-                <Button variant="secondary" size="sm" onClick={handleResumeJob}>
-                  Resume
-                </Button>
-                {needsModelUpdate && (
-                  <Button variant="primary" size="sm" onClick={handleRegenerateAll}>
-                    Regenerate (V3)
+                {hasPartialAudio && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRetryGeneration}
+                    title="Continue generating from where it stopped"
+                  >
+                    Continue
                   </Button>
                 )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleStartFresh}
+                  title="Clear all generated audio and start over"
+                >
+                  Start Fresh
+                </Button>
+                {needsModelUpdate && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleRegenerateAllV3}
+                    title="Clear all and regenerate with ElevenLabs V3 model"
+                  >
+                    Upgrade to V3
+                  </Button>
+                )}
+              </>
+            ) : hasScript ? (
+              /* Job has script but hasn't started generating - go to preview */
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleResumeJob}
+                  title="Review and edit the refined script"
+                >
+                  Edit Script
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleStartFresh}
+                  title="Start generating audio for this script"
+                >
+                  Generate
+                </Button>
               </>
             ) : (
               <Button variant="secondary" size="sm" onClick={handleResumeJob}>
@@ -340,6 +386,8 @@ export function PodcastExportModal({
             voiceAssignments={config.voiceAssignments}
             onUpdate={updateScript}
             onRegenerate={regenerateSegment}
+            onDelete={deleteSegment}
+            onAdd={addSegment}
           />
 
           <div className={styles.costEstimate}>

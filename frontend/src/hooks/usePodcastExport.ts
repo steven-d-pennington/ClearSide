@@ -60,6 +60,8 @@ interface UsePodcastExportReturn {
   resumeExistingJob: () => void;
   updateScript: (update: { segments?: PodcastSegment[]; intro?: PodcastSegment; outro?: PodcastSegment }) => Promise<void>;
   regenerateSegment: (segmentIndex: number, instructions?: string) => Promise<void>;
+  deleteSegment: (segmentIndex: number) => Promise<void>;
+  addSegment: (insertAfterIndex: number, speaker: string) => Promise<number | undefined>;
   startGeneration: () => Promise<void>;
   startGenerationWithSSE: () => void;
   updateJobConfig: (updates: Partial<PodcastExportConfig>) => Promise<void>;
@@ -282,6 +284,76 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to regenerate segment';
       setError(message);
+    }
+  }, [jobId]);
+
+  /**
+   * Delete a segment from the script
+   */
+  const deleteSegment = useCallback(async (segmentIndex: number) => {
+    if (!jobId) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/exports/podcast/${jobId}/segment/${segmentIndex}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete segment');
+      }
+
+      const data = await response.json();
+      if (data.script) {
+        setRefinedScript(data.script);
+      }
+      if (data.estimatedCostCents !== undefined) {
+        setEstimatedCost(data.estimatedCostCents);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to delete segment';
+      setError(message);
+    }
+  }, [jobId]);
+
+  /**
+   * Add a new blank segment after the specified index
+   * @returns The index of the newly inserted segment, or undefined on error
+   */
+  const addSegment = useCallback(async (
+    insertAfterIndex: number,
+    speaker: string
+  ): Promise<number | undefined> => {
+    if (!jobId) return undefined;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/exports/podcast/${jobId}/segment`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ insertAfterIndex, speaker }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to add segment');
+      }
+
+      const data = await response.json();
+      if (data.script) {
+        setRefinedScript(data.script);
+      }
+      if (data.estimatedCostCents !== undefined) {
+        setEstimatedCost(data.estimatedCostCents);
+      }
+      return data.newSegmentIndex;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to add segment';
+      setError(message);
+      return undefined;
     }
   }, [jobId]);
 
@@ -605,6 +677,8 @@ export function usePodcastExport(debateId: string): UsePodcastExportReturn {
     resumeExistingJob,
     updateScript,
     regenerateSegment,
+    deleteSegment,
+    addSegment,
     startGeneration,
     startGenerationWithSSE,
     updateJobConfig,

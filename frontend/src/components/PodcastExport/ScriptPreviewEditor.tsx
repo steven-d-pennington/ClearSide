@@ -20,7 +20,16 @@ interface ScriptPreviewEditorProps {
   voiceAssignments: Record<string, VoiceAssignment>;
   onUpdate: (update: { segments?: PodcastSegment[]; intro?: PodcastSegment; outro?: PodcastSegment }) => void;
   onRegenerate: (index: number, instructions?: string) => Promise<void>;
+  onDelete?: (segmentIndex: number) => Promise<void>;
+  onAdd?: (insertAfterIndex: number, speaker: string) => Promise<number | undefined>;
 }
+
+const SPEAKER_OPTIONS = [
+  { value: 'narrator', label: 'Narrator' },
+  { value: 'moderator', label: 'Moderator' },
+  { value: 'pro_advocate', label: 'Pro Advocate' },
+  { value: 'con_advocate', label: 'Con Advocate' },
+];
 
 interface DisplaySegment extends PodcastSegment {
   type: 'intro' | 'content' | 'outro';
@@ -32,11 +41,16 @@ export function ScriptPreviewEditor({
   voiceAssignments,
   onUpdate,
   onRegenerate,
+  onDelete,
+  onAdd,
 }: ScriptPreviewEditorProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
   const [showDirectorNotes, setShowDirectorNotes] = useState(false);
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
+  const [addingAfterIndex, setAddingAfterIndex] = useState<number | null>(null);
 
   // Check if director's notes are available
   const hasDirectorNotes = !!script.geminiDirectorNotes;
@@ -141,6 +155,67 @@ export function ScriptPreviewEditor({
       await onRegenerate(displayIndex);
     } finally {
       setRegeneratingIndex(null);
+    }
+  };
+
+  // Handle delete segment
+  const handleDelete = async (displayIndex: number) => {
+    if (!onDelete) return;
+
+    // For content segments, we need to map displayIndex to the actual segment index
+    const segment = allSegments[displayIndex];
+    if (!segment || segment.type !== 'content') {
+      // Only allow deleting content segments, not intro/outro
+      return;
+    }
+
+    // Find the actual index in the segments array
+    const contentSegments = allSegments.filter(s => s.type === 'content');
+    const segmentIndex = contentSegments.findIndex(s => s.displayIndex === displayIndex);
+
+    if (segmentIndex === -1) return;
+
+    setDeletingIndex(displayIndex);
+    try {
+      await onDelete(segmentIndex);
+    } finally {
+      setDeletingIndex(null);
+      setConfirmDeleteIndex(null);
+    }
+  };
+
+  // Handle add segment
+  const handleAddSegment = async (insertAfterDisplayIndex: number, speaker: string) => {
+    if (!onAdd) return;
+
+    // Calculate the actual segment index to insert after
+    // -1 means insert at the very beginning (before all content segments)
+    let insertAfterIndex = -1;
+
+    if (insertAfterDisplayIndex >= 0) {
+      const segment = allSegments[insertAfterDisplayIndex];
+      if (segment) {
+        if (segment.type === 'intro') {
+          insertAfterIndex = -1; // Insert at the beginning of content segments
+        } else if (segment.type === 'content') {
+          // Find actual index in segments array
+          const contentSegments = allSegments.filter(s => s.type === 'content');
+          insertAfterIndex = contentSegments.findIndex(s => s.displayIndex === insertAfterDisplayIndex);
+        } else if (segment.type === 'outro') {
+          // Insert before outro = after last content segment
+          insertAfterIndex = script.segments.length - 1;
+        }
+      }
+    }
+
+    setAddingAfterIndex(insertAfterDisplayIndex);
+    try {
+      const newIndex = await onAdd(insertAfterIndex, speaker);
+      if (newIndex !== undefined) {
+        // Could auto-open edit mode for the new segment here
+      }
+    } finally {
+      setAddingAfterIndex(null);
     }
   };
 
@@ -301,6 +376,53 @@ export function ScriptPreviewEditor({
                       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                     </svg>
                   </Button>
+                  {/* Delete button - only for content segments */}
+                  {onDelete && segment.type === 'content' && (
+                    confirmDeleteIndex === index ? (
+                      <div className={styles.confirmDelete}>
+                        <span className={styles.confirmText}>Delete?</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(index)}
+                          disabled={deletingIndex === index}
+                          className={styles.confirmYes}
+                          title="Confirm delete"
+                        >
+                          {deletingIndex === index ? '...' : 'Yes'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmDeleteIndex(null)}
+                          className={styles.confirmNo}
+                          title="Cancel"
+                        >
+                          No
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmDeleteIndex(index)}
+                        className={styles.deleteButton}
+                        title="Delete segment"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </Button>
+                    )
+                  )}
                 </div>
               )}
             </div>
@@ -324,6 +446,56 @@ export function ScriptPreviewEditor({
               </div>
             ) : (
               <p className={styles.segmentText}>{segment.text}</p>
+            )}
+
+            {/* Add Segment Button - show between content segments and after intro */}
+            {onAdd && (segment.type === 'content' || segment.type === 'intro') && (
+              <div className={styles.addSegmentContainer}>
+                {addingAfterIndex === index ? (
+                  <div className={styles.speakerSelector}>
+                    <span className={styles.selectorLabel}>Select speaker:</span>
+                    <div className={styles.speakerOptions}>
+                      {SPEAKER_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`${styles.speakerOption} ${getSpeakerColor(option.value)}`}
+                          onClick={() => handleAddSegment(index, option.value)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className={styles.cancelOption}
+                        onClick={() => setAddingAfterIndex(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.addSegmentButton}
+                    onClick={() => setAddingAfterIndex(index)}
+                    title="Add new segment here"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span>Add Segment</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ))}

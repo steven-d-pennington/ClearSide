@@ -48,6 +48,10 @@ services:
       # GOOGLE_AI_API_KEY is used by podcast TTS - fallback to GEMINI_API_KEY if not set
       GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-${GEMINI_API_KEY:-}}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Google Cloud Long Audio Synthesis (async TTS for long content)
+      GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON: ${GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_CLOUD_TTS_BUCKET: ${GOOGLE_CLOUD_TTS_BUCKET:-}
+      GOOGLE_CLOUD_PROJECT_ID: ${GOOGLE_CLOUD_PROJECT_ID:-}
       LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-gpt-4}
       # Vector Database (Pinecone) for RAG
       PINECONE_API_KEY: ${PINECONE_API_KEY:-}

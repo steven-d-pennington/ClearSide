@@ -18,10 +18,11 @@ export type VoiceType = 'pro' | 'con' | 'moderator' | 'narrator';
  * - elevenlabs: Premium quality, paid API ($5+ per month)
  * - gemini: Google Gemini 2.5 TTS via AI Studio API
  * - google-cloud: Google Cloud Text-to-Speech (1M chars/month free)
+ * - google-cloud-long: Google Cloud Long Audio Synthesis (async, up to 1MB input)
  * - azure: Microsoft Azure Cognitive Services TTS (500K chars/month free)
  * - edge: Microsoft Edge TTS (completely free, no API key needed)
  */
-export type TTSProvider = 'elevenlabs' | 'gemini' | 'google-cloud' | 'azure' | 'edge';
+export type TTSProvider = 'elevenlabs' | 'gemini' | 'google-cloud' | 'google-cloud-long' | 'azure' | 'edge';
 
 /**
  * TTS Provider metadata for UI display
@@ -352,6 +353,15 @@ export const TTS_PROVIDERS: Record<TTSProvider, TTSProviderInfo> = {
     quality: 'high',
     requiresApiKey: true,
     envVar: 'GOOGLE_CLOUD_API_KEY',
+  },
+  'google-cloud-long': {
+    id: 'google-cloud-long',
+    name: 'Google Cloud Long Audio',
+    description: 'Async synthesis for long content (up to 1MB), outputs to GCS',
+    freeTier: '1M chars/month free',
+    quality: 'high',
+    requiresApiKey: true,
+    envVar: 'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON',
   },
   azure: {
     id: 'azure',

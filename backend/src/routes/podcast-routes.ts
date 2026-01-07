@@ -3,6 +3,7 @@ import path from 'path';
 import { PodcastScriptRefiner } from '../services/podcast/script-refiner.js';
 import { createPodcastPipeline, PipelineProgress } from '../services/podcast/podcast-pipeline.js';
 import { getAvailablePodcastProviders, PodcastTTSAdapter } from '../services/podcast/podcast-tts-adapter.js';
+import { getDefaultProvider } from '../services/audio/tts-provider-factory.js';
 import * as podcastRepo from '../db/repositories/podcast-export-repository.js';
 import { PodcastTTSClient } from '../services/podcast/podcast-tts-client.js';
 import { VoiceValidator } from '../services/podcast/voice-validator.js';
@@ -171,8 +172,8 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        // Determine TTS provider (defaults to elevenlabs for backward compatibility)
-        const ttsProvider = (config.ttsProvider || 'elevenlabs') as TTSProviderType;
+        // Determine TTS provider (uses getDefaultProvider() which prioritizes google-cloud-long)
+        const ttsProvider = (config.ttsProvider || getDefaultProvider()) as TTSProviderType;
 
         // Validate provider is available
         const availableProviders = getAvailablePodcastProviders();
@@ -664,6 +665,95 @@ router.delete('/:jobId/segment/:segmentIndex', async (req: Request, res: Respons
 });
 
 /**
+ * POST /api/exports/podcast/:jobId/segment
+ * Insert a new blank segment at a specific position
+ */
+router.post('/:jobId/segment', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { jobId } = req.params;
+        const { insertAfterIndex, speaker } = req.body as {
+            insertAfterIndex: number;
+            speaker: string;
+        };
+
+        const job = await podcastRepo.findById(jobId!);
+
+        if (!job || !job.refinedScript) {
+            res.status(404).json({ error: 'Job or script not found' });
+            return;
+        }
+
+        if (job.status !== 'pending' && job.status !== 'refining') {
+            res.status(400).json({ error: 'Cannot add segments after generation started' });
+            return;
+        }
+
+        // Get voice assignment for the speaker
+        const voiceAssignment = job.config.voiceAssignments?.[speaker]
+            || DEFAULT_VOICE_ASSIGNMENTS[speaker]
+            || DEFAULT_VOICE_ASSIGNMENTS['narrator'];
+
+        // Create new blank segment
+        const newSegment: PodcastSegment = {
+            index: 0, // Will be set during reindex
+            speaker: speaker || 'narrator',
+            voiceId: voiceAssignment.voiceId,
+            text: '', // Blank - user will fill in
+            voiceSettings: voiceAssignment.settings,
+        };
+
+        // Determine insert position
+        // insertAfterIndex of -1 means insert at the beginning
+        const insertPosition = insertAfterIndex + 1;
+
+        // Insert the segment
+        if (insertPosition >= job.refinedScript.segments.length) {
+            job.refinedScript.segments.push(newSegment);
+        } else {
+            job.refinedScript.segments.splice(insertPosition, 0, newSegment);
+        }
+
+        // Reindex all segments
+        let currentIndex = job.refinedScript.intro ? 1 : 0;
+        job.refinedScript.segments.forEach((seg) => {
+            seg.index = currentIndex++;
+        });
+        if (job.refinedScript.outro) {
+            job.refinedScript.outro.index = currentIndex;
+        }
+
+        // Recalculate totals (though new segment is empty)
+        const allSegments = [
+            job.refinedScript.intro,
+            ...job.refinedScript.segments,
+            job.refinedScript.outro
+        ].filter((s): s is PodcastSegment => !!s);
+
+        job.refinedScript.totalCharacters = allSegments.reduce(
+            (sum, s) => sum + s.text.length, 0
+        );
+        job.refinedScript.updatedAt = new Date();
+
+        await podcastRepo.saveRefinedScript(jobId!, job.refinedScript);
+
+        // Return the index of the newly inserted segment so UI can open it for editing
+        const newSegmentIndex = insertPosition;
+
+        res.json({
+            script: job.refinedScript,
+            newSegmentIndex,
+            estimatedCostCents: PodcastTTSClient.estimateCostCents(
+                job.refinedScript.totalCharacters
+            ),
+        });
+
+    } catch (error: any) {
+        logger.error({ error }, 'Add segment error');
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * POST /api/exports/podcast/:jobId/generate
  * Start TTS generation for a refined script
  */
@@ -696,8 +786,8 @@ router.post('/:jobId/generate', async (req: Request, res: Response): Promise<voi
             return;
         }
 
-        // Get provider from job config (defaults to elevenlabs for backward compatibility)
-        const ttsProvider = (job.config.ttsProvider || 'elevenlabs') as TTSProviderType;
+        // Get provider from job config (falls back to getDefaultProvider())
+        const ttsProvider = (job.config.ttsProvider || getDefaultProvider()) as TTSProviderType;
 
         // Start generation in background with the appropriate TTS provider
         const pipeline = createPodcastPipeline({ ttsProvider });
@@ -936,7 +1026,7 @@ router.get('/:jobId/stream', async (req: Request, res: Response): Promise<void> 
     res.setHeader('X-Accel-Buffering', 'no');
 
     // Get provider from job config
-    const ttsProvider = (job.config.ttsProvider || 'elevenlabs') as TTSProviderType;
+    const ttsProvider = (job.config.ttsProvider || getDefaultProvider()) as TTSProviderType;
 
     // Send initial connection message
     res.write(`data: ${JSON.stringify({ phase: 'connected', message: `Connected to progress stream (using ${ttsProvider})` })}\n\n`);

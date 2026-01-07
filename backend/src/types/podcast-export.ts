@@ -4,7 +4,7 @@ export type PodcastJobStatus = 'pending' | 'refining' | 'generating' | 'complete
 
 export type GenerationPhase = 'pending' | 'tts' | 'concat' | 'normalize' | 'tag' | 'complete' | 'error';
 
-export type TTSProviderType = 'elevenlabs' | 'gemini';
+export type TTSProviderType = 'elevenlabs' | 'gemini' | 'google-cloud-long';
 
 export type ElevenLabsModel =
   | 'eleven_v3'

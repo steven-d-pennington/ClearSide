@@ -12,6 +12,7 @@ import type { TTSProvider, ITTSService, TTSProviderInfo } from './types.js';
 import { ElevenLabsService, createElevenLabsService } from './elevenlabs-service.js';
 import { GeminiTTSService, createGeminiTTSService } from './gemini-tts-service.js';
 import { GoogleCloudTTSService, createGoogleCloudTTSService } from './google-cloud-tts-service.js';
+import { GoogleCloudLongAudioService, createGoogleCloudLongAudioService } from './google-cloud-long-audio-service.js';
 import { AzureTTSService, createAzureTTSService } from './azure-tts-service.js';
 import { EdgeTTSService, createEdgeTTSService } from './edge-tts-service.js';
 
@@ -41,6 +42,11 @@ export function getAvailableProviders(): TTSProvider[] {
     available.push('google-cloud');
   }
 
+  // Google Cloud Long Audio (requires service account + GCS bucket)
+  if (process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_CLOUD_TTS_BUCKET) {
+    available.push('google-cloud-long');
+  }
+
   // Azure Speech Services
   if (process.env.AZURE_SPEECH_KEY) {
     available.push('azure');
@@ -57,13 +63,18 @@ export function getAvailableProviders(): TTSProvider[] {
  * Get the default TTS provider based on available configuration
  *
  * Priority order:
- * 1. ElevenLabs (premium quality)
- * 2. Gemini (premium quality, newer)
- * 3. Azure (high quality, good free tier)
- * 4. Google Cloud (high quality, good free tier)
- * 5. Edge (free, no API key needed)
+ * 1. Google Cloud Long Audio (async, no chunking needed, high quality)
+ * 2. ElevenLabs (premium quality)
+ * 3. Gemini (premium quality, but requires chunking)
+ * 4. Azure (high quality, good free tier)
+ * 5. Google Cloud (high quality, good free tier)
+ * 6. Edge (free, no API key needed)
  */
 export function getDefaultProvider(): TTSProvider {
+  // Prefer Google Cloud Long Audio - async synthesis, no chunking needed
+  if (process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_CLOUD_TTS_BUCKET) {
+    return 'google-cloud-long';
+  }
   if (process.env.ELEVENLABS_API_KEY) return 'elevenlabs';
   if (process.env.GOOGLE_AI_API_KEY) return 'gemini';
   if (process.env.AZURE_SPEECH_KEY) return 'azure';
@@ -110,6 +121,22 @@ export function createTTSService(provider: TTSProvider): ITTSService {
         );
       }
       return createGoogleCloudTTSService();
+    }
+
+    case 'google-cloud-long': {
+      if (!process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON) {
+        throw new Error(
+          'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON is required for Google Cloud Long Audio. ' +
+            'Set the environment variable with your service account JSON.'
+        );
+      }
+      if (!process.env.GOOGLE_CLOUD_TTS_BUCKET) {
+        throw new Error(
+          'GOOGLE_CLOUD_TTS_BUCKET is required for Google Cloud Long Audio. ' +
+            'Set the environment variable with your GCS bucket name.'
+        );
+      }
+      return createGoogleCloudLongAudioService();
     }
 
     case 'azure': {
@@ -199,6 +226,15 @@ export function getProvidersWithStatus(): Array<
       requiresApiKey: true,
       envVar: 'GOOGLE_CLOUD_API_KEY',
     },
+    'google-cloud-long': {
+      id: 'google-cloud-long',
+      name: 'Google Cloud Long Audio',
+      description: 'Async synthesis for long content (up to 1MB), outputs to GCS',
+      freeTier: '1M chars/month free',
+      quality: 'high',
+      requiresApiKey: true,
+      envVar: 'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON',
+    },
     azure: {
       id: 'azure',
       name: 'Microsoft Azure TTS',
@@ -232,6 +268,7 @@ export {
   ElevenLabsService,
   GeminiTTSService,
   GoogleCloudTTSService,
+  GoogleCloudLongAudioService,
   AzureTTSService,
   EdgeTTSService,
 };
