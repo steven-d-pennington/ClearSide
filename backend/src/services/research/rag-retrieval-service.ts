@@ -20,7 +20,7 @@ export interface RAGConfig {
 
 export const DEFAULT_RAG_CONFIG: RAGConfig = {
   topK: 5,
-  minRelevanceScore: 0.6,
+  minRelevanceScore: 0.4, // Lowered to include more citations
   includeSourceLinks: true,
 };
 
@@ -87,9 +87,13 @@ export class RAGRetrievalService {
     }
 
     const citationBlocks = citations.map((c, index) => {
-      const dateStr = c.publishedAt
-        ? c.publishedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-        : 'recent';
+      let dateStr = 'recent';
+      if (c.publishedAt) {
+        const pubDate = c.publishedAt instanceof Date ? c.publishedAt : new Date(c.publishedAt);
+        if (!isNaN(pubDate.getTime())) {
+          dateStr = pubDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        }
+      }
 
       return `
 **Source ${index + 1}: ${c.sourceTitle}** (${c.sourceDomain}, ${dateStr})
@@ -99,24 +103,33 @@ Relevance: ${(c.relevanceScore * 100).toFixed(0)}%`;
     }).join('\n\n');
 
     const firstCitation = citations[0];
-    const sampleDateStr = firstCitation?.publishedAt
-      ? firstCitation.publishedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      : 'recent';
+    let sampleDateStr = 'recent';
+    if (firstCitation?.publishedAt) {
+      const pubDate = firstCitation.publishedAt instanceof Date
+        ? firstCitation.publishedAt
+        : new Date(firstCitation.publishedAt);
+      if (!isNaN(pubDate.getTime())) {
+        sampleDateStr = pubDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+    }
 
     return `
-## Available Research & Citations
+## REQUIRED RESEARCH SOURCES - YOU MUST USE THESE
 
-Use these sources to support your arguments. Cite them naturally in your response.
+CRITICAL INSTRUCTION: You MUST cite the following verified research sources in your response. DO NOT make up or invent citations. Only use the sources provided below.
 
 ${citationBlocks}
 
-### Citation Guidelines
-When citing, use natural language like:
-- "According to a ${sampleDateStr} ${firstCitation?.sourceDomain || ''} report..."
-- "A study published in ${firstCitation?.sourceTitle || '...'} found that..."
-- "As ${firstCitation?.sourceDomain || '...'} reported..."
+### MANDATORY Citation Format
+You MUST reference these sources using their exact names. Examples:
+- "According to ${firstCitation?.sourceTitle || 'the research'} (${firstCitation?.sourceDomain || ''})..."
+- "As reported by ${firstCitation?.sourceDomain || ''}..."
+- "Research from ${firstCitation?.sourceTitle || ''} indicates..."
 
-Do not include URLs in your spoken response - they will be added to the transcript automatically.
+IMPORTANT:
+- DO NOT cite sources that are not listed above (no OECD, McKinsey, etc. unless listed)
+- DO NOT invent statistics or studies
+- If you need to make a claim without a source, clearly state it as your position, not a fact
 `;
   }
 
@@ -124,9 +137,15 @@ Do not include URLs in your spoken response - they will be added to the transcri
    * Format a single citation for use in debate text
    */
   formatCitationForSpeech(citation: RAGCitation): string {
-    const dateStr = citation.publishedAt
-      ? citation.publishedAt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      : 'recently';
+    let dateStr = 'recently';
+    if (citation.publishedAt) {
+      const pubDate = citation.publishedAt instanceof Date
+        ? citation.publishedAt
+        : new Date(citation.publishedAt);
+      if (!isNaN(pubDate.getTime())) {
+        dateStr = pubDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      }
+    }
 
     return `According to ${citation.sourceDomain} (${dateStr}), "${citation.content.slice(0, 150)}..."`;
   }

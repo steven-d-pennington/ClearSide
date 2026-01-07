@@ -584,6 +584,7 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
 
   /**
    * Build prompt context from agent context
+   * Includes RAG citations if available for Duelogic debates
    */
   private buildPromptContext(context: AgentContext): PromptBuilderContext {
     // Extract proposition context from the context object
@@ -596,10 +597,17 @@ export class ConAdvocateAgent implements BaseAgent, IConAdvocateAgent {
         }
       : undefined;
 
+    // Build previous utterances with RAG citations if available
+    let previousUtterances = '';
+    if (context.ragCitations?.available && context.ragCitations.citationPrompt) {
+      previousUtterances += context.ragCitations.citationPrompt + '\n\n';
+    }
+    previousUtterances += this.formatUtterances(context.previousUtterances);
+
     return {
       proposition: context.proposition,
       propositionContext,
-      previousUtterances: this.formatUtterances(context.previousUtterances),
+      previousUtterances,
     };
   }
 

@@ -7,6 +7,9 @@ import {
     ElevenLabsModel,
     DEFAULT_VOICE_ASSIGNMENTS,
     TTSProviderType,
+    GeminiDirectorNotes,
+    GeminiSpeakerDirection,
+    GEMINI_TONE_PROFILES,
 } from '../../types/podcast-export.js';
 import { DebateTranscript } from '../transcript/transcript-recorder.js';
 import type { DebateTone } from '../../types/duelogic.js';
@@ -260,6 +263,11 @@ export class PodcastScriptRefiner {
         const wordCount = allSegments.reduce((sum, s) => sum + s.text.split(/\s+/).length, 0);
         const durationEstimateSeconds = Math.round((wordCount / WORDS_PER_MINUTE) * 60);
 
+        // Generate Gemini director's notes if using Gemini TTS
+        const geminiDirectorNotes = this.ttsProvider === 'gemini'
+            ? this.generateGeminiDirectorNotes(transcript, allSegments)
+            : undefined;
+
         return {
             title: this.generateTitle(transcript.proposition.normalized_question),
             totalCharacters,
@@ -269,6 +277,7 @@ export class PodcastScriptRefiner {
             outro,
             createdAt: new Date(),
             updatedAt: new Date(),
+            geminiDirectorNotes,
         };
     }
 
@@ -808,13 +817,33 @@ Output ONLY the outro text.`,
     /**
      * Get voice settings for a speaker role, adjusted for debate tone
      * Lower stability = more expressive/responsive to V3 audio tags
+     * For Gemini TTS, returns default settings (not used but needed for type)
      */
     private getVoiceSettings(speakerRole: string): ElevenLabsVoiceSettings {
+        // For Gemini, voice settings are not used - return defaults
+        if (this.ttsProvider === 'gemini') {
+            return {
+                stability: 0.5,
+                similarity_boost: 0.75,
+                style: 0.5,
+                speed: 1.0,
+                use_speaker_boost: false,
+            };
+        }
+
         const assignment = this.config.voiceAssignments[speakerRole]
             || DEFAULT_VOICE_ASSIGNMENTS[speakerRole]
             || DEFAULT_VOICE_ASSIGNMENTS['narrator'];
 
-        const baseSettings = assignment!.settings;
+        // Check if assignment has settings (ElevenLabs style)
+        const baseSettings = assignment?.settings || {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.5,
+            speed: 1.0,
+            use_speaker_boost: true,
+        };
+
         const toneAdjustments = TONE_VOICE_ADJUSTMENTS[this.tone];
 
         // Apply tone adjustments, keeping other settings from base
@@ -862,15 +891,19 @@ Output ONLY the outro text.`,
      */
     private cleanInterruptionMarkers(content: string): string {
         // Get phrases based on debate tone intensity and TTS provider
-        const intensity = TONE_TO_INTENSITY[this.tone];
+        // Default to 'moderate' if tone is not recognized
+        const intensity = TONE_TO_INTENSITY[this.tone] || 'moderate';
         const interruptionPhrases = this.ttsProvider === 'gemini'
-            ? INTERRUPTION_PHRASES_GEMINI[intensity]
-            : INTERRUPTION_PHRASES_ELEVENLABS[intensity];
+            ? (INTERRUPTION_PHRASES_GEMINI[intensity] || INTERRUPTION_PHRASES_GEMINI['moderate'])
+            : (INTERRUPTION_PHRASES_ELEVENLABS[intensity] || INTERRUPTION_PHRASES_ELEVENLABS['moderate']);
         const responsePhrases = this.ttsProvider === 'gemini'
-            ? RESPONSE_PHRASES_GEMINI[intensity]
-            : RESPONSE_PHRASES_ELEVENLABS[intensity];
+            ? (RESPONSE_PHRASES_GEMINI[intensity] || RESPONSE_PHRASES_GEMINI['moderate'])
+            : (RESPONSE_PHRASES_ELEVENLABS[intensity] || RESPONSE_PHRASES_ELEVENLABS['moderate']);
 
         const getRandomPhrase = (phrases: string[]): string => {
+            if (!phrases || phrases.length === 0) {
+                return ''; // Fallback for empty/undefined arrays
+            }
             return phrases[Math.floor(Math.random() * phrases.length)] ?? phrases[0]!;
         };
 
@@ -949,6 +982,174 @@ Output ONLY the outro text.`,
             .replace(/\[sigh\]/gi, '<break time="0.5s"/>')
             .replace(/\[laughs?\]/gi, '<break time="0.3s"/>')
             .replace(/\[exhales?\]/gi, '<break time="0.3s"/>');
+    }
+
+    /**
+     * Generate Gemini-specific director's notes for TTS performance guidance
+     *
+     * Based on Google's recommended prompt structure for natural language voice direction:
+     * - Show context and format
+     * - Per-speaker performance direction
+     * - Scene/emotional context
+     * - Pacing guidance
+     *
+     * @see https://ai.google.dev/gemini-api/docs/speech-generation
+     */
+    private generateGeminiDirectorNotes(
+        transcript: DebateTranscript,
+        segments: PodcastSegment[]
+    ): GeminiDirectorNotes {
+        // Get tone-specific profiles
+        const toneProfile = GEMINI_TONE_PROFILES[this.tone] || GEMINI_TONE_PROFILES['spirited'];
+
+        // Build show context
+        const showContext = this.buildShowContext(transcript);
+
+        // Build per-speaker directions from tone profile and custom personas
+        const speakerDirections = this.buildSpeakerDirections(segments, toneProfile);
+
+        // Build scene context based on debate topic and tone
+        const sceneContext = this.buildSceneContext(transcript, toneProfile);
+
+        // Build pacing notes
+        const pacingNotes = this.buildPacingNotes();
+
+        return {
+            showContext,
+            speakerDirections,
+            sceneContext,
+            pacingNotes,
+        };
+    }
+
+    /**
+     * Build show/podcast context description
+     */
+    private buildShowContext(transcript: DebateTranscript): string {
+        const debateMode = this.config.debateMode || 'turn_based';
+        const modeDescriptions: Record<string, string> = {
+            turn_based: 'a structured debate podcast with formal phases',
+            lively: 'a dynamic debate podcast with natural interruptions and reactions',
+            informal: 'a casual discussion podcast exploring multiple perspectives',
+            duelogic: 'Duelogic - an intellectual debate show featuring multiple philosophical perspectives',
+        };
+
+        const showFormat = modeDescriptions[debateMode] || modeDescriptions['turn_based'];
+
+        return `This is ${showFormat}. The topic being debated is: "${transcript.proposition.normalized_question}". ` +
+            `The tone should be ${this.tone} - ${this.getToneDescription()}. ` +
+            'Deliver as a polished podcast production with clear, engaging speech.';
+    }
+
+    /**
+     * Get human-readable tone description
+     */
+    private getToneDescription(): string {
+        const descriptions: Record<DebateTone, string> = {
+            respectful: 'professional and collegial, like an academic discussion',
+            spirited: 'energetic and passionate, like a lively but civil debate',
+            heated: 'intense and forceful, like a high-stakes intellectual confrontation',
+        };
+        return descriptions[this.tone] || descriptions['spirited'];
+    }
+
+    /**
+     * Build per-speaker direction map
+     */
+    private buildSpeakerDirections(
+        segments: PodcastSegment[],
+        toneProfile: typeof GEMINI_TONE_PROFILES[DebateTone]
+    ): Record<string, GeminiSpeakerDirection> {
+        const directions: Record<string, GeminiSpeakerDirection> = {};
+
+        // Get unique speakers from segments
+        const speakers = [...new Set(segments.map(s => s.speaker))];
+
+        for (const speaker of speakers) {
+            const normalizedSpeaker = this.normalizeSpeakerForProfile(speaker);
+            const baseProfile = this.getBaseProfile(normalizedSpeaker, toneProfile);
+
+            directions[speaker] = {
+                speakerId: speaker,
+                characterProfile: baseProfile.characterProfile,
+                vocalStyle: baseProfile.vocalStyle,
+                performanceNotes: baseProfile.performanceNotes,
+            };
+        }
+
+        return directions;
+    }
+
+    /**
+     * Normalize speaker names to match profile keys
+     */
+    private normalizeSpeakerForProfile(speaker: string): 'pro' | 'con' | 'moderator' | 'narrator' {
+        const lowerSpeaker = speaker.toLowerCase();
+
+        if (lowerSpeaker.includes('pro') || lowerSpeaker.includes('chair_1')) {
+            return 'pro';
+        }
+        if (lowerSpeaker.includes('con') || lowerSpeaker.includes('chair_2')) {
+            return 'con';
+        }
+        if (lowerSpeaker.includes('moderator') || lowerSpeaker.includes('arbiter')) {
+            return 'moderator';
+        }
+        if (lowerSpeaker.includes('narrator') || lowerSpeaker.includes('host')) {
+            return 'narrator';
+        }
+
+        // For numbered chairs (3-6), alternate between pro-like and con-like styles
+        if (lowerSpeaker.includes('chair_3') || lowerSpeaker.includes('chair_5')) {
+            return 'pro';
+        }
+        if (lowerSpeaker.includes('chair_4') || lowerSpeaker.includes('chair_6')) {
+            return 'con';
+        }
+
+        // Default to narrator for unknown speakers
+        return 'narrator';
+    }
+
+    /**
+     * Get base profile for a speaker type
+     */
+    private getBaseProfile(
+        speakerType: 'pro' | 'con' | 'moderator' | 'narrator',
+        toneProfile: typeof GEMINI_TONE_PROFILES[DebateTone]
+    ): GeminiSpeakerDirection {
+        return toneProfile[speakerType];
+    }
+
+    /**
+     * Build scene/emotional context
+     */
+    private buildSceneContext(
+        transcript: DebateTranscript,
+        toneProfile: typeof GEMINI_TONE_PROFILES[DebateTone]
+    ): string {
+        const topic = transcript.proposition.normalized_question;
+
+        return `Scene: A podcast studio recording an intellectual debate on "${topic}". ` +
+            `${toneProfile.overall} ` +
+            'The speakers are experts presenting well-reasoned arguments. ' +
+            'The atmosphere is intellectually stimulating and engaging for listeners.';
+    }
+
+    /**
+     * Build pacing guidance notes
+     */
+    private buildPacingNotes(): string {
+        const pacingByTone: Record<DebateTone, string> = {
+            respectful: 'Pace: Measured and thoughtful. Allow natural pauses between key points. ' +
+                'Speak clearly and deliberately. Let important ideas breathe.',
+            spirited: 'Pace: Energetic but clear. Vary speed - slower for emphasis, faster when building momentum. ' +
+                'Keep energy high but don\'t rush. Natural conversational rhythm.',
+            heated: 'Pace: Dynamic and urgent. Quick exchanges during disagreements, slower for powerful points. ' +
+                'Allow intensity to build. Use strategic pauses for dramatic effect.',
+        };
+
+        return pacingByTone[this.tone] || pacingByTone['spirited'];
     }
 
     /**

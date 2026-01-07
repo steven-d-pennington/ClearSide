@@ -11,6 +11,7 @@ import type {
   RefinedPodcastScript,
   PodcastSegment,
   VoiceAssignment,
+  GeminiDirectorNotes,
 } from '../../types/podcast';
 import styles from './ScriptPreviewEditor.module.css';
 
@@ -35,6 +36,10 @@ export function ScriptPreviewEditor({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+  const [showDirectorNotes, setShowDirectorNotes] = useState(false);
+
+  // Check if director's notes are available
+  const hasDirectorNotes = !!script.geminiDirectorNotes;
 
   // Combine all segments into a single list for display
   const allSegments = useMemo<DisplaySegment[]>(() => {
@@ -139,6 +144,58 @@ export function ScriptPreviewEditor({
     }
   };
 
+  // Render director's notes panel
+  const renderDirectorNotes = (notes: GeminiDirectorNotes) => (
+    <div className={styles.directorNotesPanel}>
+      <div className={styles.directorNotesSection}>
+        <h4 className={styles.directorNotesSectionTitle}>Show Context</h4>
+        <p className={styles.directorNotesText}>{notes.showContext}</p>
+      </div>
+
+      <div className={styles.directorNotesSection}>
+        <h4 className={styles.directorNotesSectionTitle}>Scene Context</h4>
+        <p className={styles.directorNotesText}>{notes.sceneContext}</p>
+      </div>
+
+      <div className={styles.directorNotesSection}>
+        <h4 className={styles.directorNotesSectionTitle}>Pacing Notes</h4>
+        <p className={styles.directorNotesText}>{notes.pacingNotes}</p>
+      </div>
+
+      <div className={styles.directorNotesSection}>
+        <h4 className={styles.directorNotesSectionTitle}>Speaker Directions</h4>
+        <div className={styles.speakerDirections}>
+          {Object.entries(notes.speakerDirections).map(([speaker, direction]) => (
+            <div key={speaker} className={styles.speakerDirection}>
+              <div className={styles.speakerDirectionHeader}>
+                <Badge
+                  variant="primary"
+                  className={`${styles.speakerBadge} ${getSpeakerColor(speaker)}`}
+                >
+                  {getSpeakerLabel(speaker)}
+                </Badge>
+              </div>
+              <div className={styles.speakerDirectionContent}>
+                <div className={styles.directionItem}>
+                  <span className={styles.directionLabel}>Character:</span>
+                  <span className={styles.directionValue}>{direction.characterProfile}</span>
+                </div>
+                <div className={styles.directionItem}>
+                  <span className={styles.directionLabel}>Voice Style:</span>
+                  <span className={styles.directionValue}>{direction.vocalStyle}</span>
+                </div>
+                <div className={styles.directionItem}>
+                  <span className={styles.directionLabel}>Performance:</span>
+                  <span className={styles.directionValue}>{direction.performanceNotes}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -147,6 +204,37 @@ export function ScriptPreviewEditor({
           {allSegments.length} segments | {script.totalCharacters.toLocaleString()} characters
         </span>
       </div>
+
+      {/* Director's Notes Toggle (only show for Gemini) */}
+      {hasDirectorNotes && (
+        <div className={styles.directorNotesContainer}>
+          <button
+            type="button"
+            className={styles.directorNotesToggle}
+            onClick={() => setShowDirectorNotes(!showDirectorNotes)}
+            aria-expanded={showDirectorNotes}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`${styles.toggleIcon} ${showDirectorNotes ? styles.expanded : ''}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+            <span className={styles.toggleLabel}>
+              Gemini Director's Notes
+            </span>
+            <Badge variant="secondary" className={styles.geminiLabel}>
+              TTS Guidance
+            </Badge>
+          </button>
+          {showDirectorNotes && script.geminiDirectorNotes && renderDirectorNotes(script.geminiDirectorNotes)}
+        </div>
+      )}
 
       <div className={styles.segmentList}>
         {allSegments.map((segment, index) => (

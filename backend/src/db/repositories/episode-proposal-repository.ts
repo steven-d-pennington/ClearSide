@@ -86,6 +86,14 @@ export class EpisodeProposalRepository {
     `, [scheduledFor, id]);
     }
 
+    async updateStatus(id: string, status: ProposalStatus): Promise<void> {
+        await this.pool.query(`
+      UPDATE episode_proposals
+      SET status = $1
+      WHERE id = $2
+    `, [status, id]);
+    }
+
     async updateContent(
         id: string,
         updates: Partial<Pick<EpisodeProposal, 'title' | 'subtitle' | 'description' | 'proposition' | 'contextForPanel' | 'chairs' | 'keyTensions'>>,

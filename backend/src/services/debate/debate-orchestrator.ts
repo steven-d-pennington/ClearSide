@@ -30,7 +30,11 @@ import type {
   OrchestratorAgent,
   AgentContext,
   NormalizedProposition,
+  RAGCitationContext,
 } from '../agents/types.js';
+import { createVectorDBClient } from '../research/vector-db-factory.js';
+import { createEmbeddingService } from '../research/embedding-service.js';
+import { RAGRetrievalService } from '../research/rag-retrieval-service.js';
 import type {
   OrchestratorUtterance,
   OrchestratorIntervention,
@@ -532,6 +536,15 @@ export class DebateOrchestrator {
       }
     }
 
+    // Fetch RAG citations if this is a Duelogic debate (has proposalId in context)
+    let ragCitations: RAGCitationContext | undefined;
+    const propositionContext = debate?.propositionContext as Record<string, unknown> | undefined;
+    const proposalId = propositionContext?.proposalId as string | undefined;
+
+    if (proposalId && (speaker === Speaker.PRO || speaker === Speaker.CON)) {
+      ragCitations = await this.fetchRAGCitations(proposalId, proposition, utterances);
+    }
+
     return {
       debateId: this.debateId,
       currentPhase: this.stateMachine.getCurrentPhase(),
@@ -541,7 +554,61 @@ export class DebateOrchestrator {
       propositionContext: debate?.propositionContext,
       configuration,
       persona,
+      ragCitations,
     };
+  }
+
+  /**
+   * Fetch RAG citations from Pinecone for Duelogic debates
+   */
+  private async fetchRAGCitations(
+    proposalId: string,
+    proposition: string,
+    previousUtterances: Utterance[]
+  ): Promise<RAGCitationContext> {
+    try {
+      const vectorDB = createVectorDBClient();
+      if (!vectorDB) {
+        return { available: false };
+      }
+
+      const embeddingService = createEmbeddingService();
+      const ragService = new RAGRetrievalService(vectorDB, embeddingService);
+
+      // Build query from proposition and recent utterances
+      const recentContent = previousUtterances
+        .slice(-3)
+        .map(u => u.content)
+        .join(' ');
+      const query = `${proposition} ${recentContent}`.trim();
+
+      // Get formatted citation context
+      const citationPrompt = await ragService.buildCitationContext(proposalId, query);
+      const citations = await ragService.retrieveCitations(proposalId, query);
+
+      if (citations.length === 0) {
+        logger.debug({ proposalId }, 'No RAG citations found');
+        return { available: false };
+      }
+
+      logger.info({ proposalId, citationCount: citations.length }, 'RAG citations retrieved');
+
+      return {
+        available: true,
+        citationPrompt,
+        citations: citations.map(c => ({
+          content: c.content,
+          sourceTitle: c.sourceTitle,
+          sourceDomain: c.sourceDomain,
+          sourceUrl: c.sourceUrl,
+          publishedAt: c.publishedAt,
+          relevanceScore: c.relevanceScore,
+        })),
+      };
+    } catch (error) {
+      logger.error({ error, proposalId }, 'Failed to fetch RAG citations');
+      return { available: false };
+    }
   }
 
   /**

@@ -5,15 +5,23 @@
 
 import express, { type Request, type Response } from 'express';
 import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../utils/logger.js';
 import { pool } from '../db/index.js';
 import { ResearchRepository } from '../db/repositories/research-repository.js';
 import { EpisodeProposalRepository } from '../db/repositories/episode-proposal-repository.js';
+import * as debateRepository from '../db/repositories/debate-repository.js';
 import { ProposalStatus, ResearchConfig } from '../types/duelogic-research.js';
 import { researchSSEManager } from '../services/sse/research-sse-manager.js';
+import { sseManager } from '../services/sse/index.js';
 import { DuelogicResearchService } from '../services/research/duelogic-research-service.js';
 import { EpisodeGenerator } from '../services/research/episode-generator.js';
 import { OpenRouterLLMClient } from '../services/llm/openrouter-adapter.js';
+import { createVectorDBClient } from '../services/research/vector-db-factory.js';
+import { createEmbeddingService } from '../services/research/embedding-service.js';
+import { ResearchIndexer } from '../services/research/research-indexer.js';
+import { createDuelogicOrchestrator } from '../services/debate/duelogic-orchestrator.js';
+import { mergeWithDuelogicDefaults, type PhilosophicalChair } from '../types/duelogic.js';
 
 const router = express.Router();
 const logger = createLogger({ module: 'DuelogicResearchRoutes' });
@@ -589,7 +597,7 @@ router.put('/proposals/:id', async (req: Request, res: Response) => {
 
 /**
  * POST /duelogic/proposals/:id/approve
- * Approve a proposal
+ * Approve a proposal and index research into Pinecone for RAG
  */
 router.post('/proposals/:id/approve', async (req: Request, res: Response) => {
   try {
@@ -597,16 +605,59 @@ router.post('/proposals/:id/approve', async (req: Request, res: Response) => {
     if (!id) return res.status(400).json({ error: 'ID required' });
     const { episodeNumber } = req.body;
 
+    // Get the proposal first
+    const proposal = await proposalRepo.findById(id);
+    if (!proposal) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+
     const nextNumber = episodeNumber || await proposalRepo.getNextEpisodeNumber();
     await proposalRepo.approve(id, 'admin', nextNumber);
 
     logger.info({ proposalId: id, episodeNumber: nextNumber }, 'Proposal approved');
+
+    // Index research into Pinecone for RAG (async, don't block response)
+    indexResearchAsync(proposal).catch(err => {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error({ errorMessage: errMsg, proposalId: id }, 'Failed to index research into Pinecone');
+    });
+
     return res.json({ success: true, episodeNumber: nextNumber });
   } catch (error) {
     logger.error({ error }, 'Failed to approve proposal');
     return res.status(500).json({ error: 'Failed to approve proposal' });
   }
 });
+
+/**
+ * Index research into Pinecone asynchronously
+ */
+async function indexResearchAsync(proposal: Awaited<ReturnType<typeof proposalRepo.findById>>): Promise<void> {
+  if (!proposal) return;
+
+  const vectorDB = createVectorDBClient();
+  if (!vectorDB) {
+    logger.info('Vector DB not configured, skipping research indexing');
+    return;
+  }
+
+  try {
+    const embeddingService = createEmbeddingService();
+    const indexer = new ResearchIndexer(vectorDB, embeddingService, researchRepo);
+
+    const chunksIndexed = await indexer.indexEpisodeResearch(proposal);
+    logger.info({ proposalId: proposal.id, chunksIndexed }, 'Research indexed into Pinecone');
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logger.error({
+      errorMessage,
+      errorStack,
+      proposalId: proposal.id
+    }, 'Failed to index research');
+    throw error;
+  }
+}
 
 /**
  * POST /duelogic/proposals/:id/reject
@@ -649,6 +700,139 @@ router.post('/proposals/:id/schedule', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, 'Failed to schedule proposal');
     return res.status(500).json({ error: 'Failed to schedule proposal' });
+  }
+});
+
+// Default philosophical frameworks to assign to proposal chairs
+const DEFAULT_CHAIR_FRAMEWORKS: PhilosophicalChair[] = [
+  'pragmatic',
+  'precautionary',
+  'utilitarian',
+  'deontological',
+  'virtue_ethics',
+  'libertarian',
+];
+
+/**
+ * POST /duelogic/proposals/:id/launch
+ * Launch a Duelogic debate from an approved proposal
+ * Creates a new debate using the proposal's content and the Duelogic orchestrator
+ */
+router.post('/proposals/:id/launch', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    // Get the proposal
+    const proposal = await proposalRepo.findById(id);
+    if (!proposal) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+
+    // Check proposal is approved or scheduled
+    if (proposal.status !== 'approved' && proposal.status !== 'scheduled') {
+      return res.status(400).json({
+        error: 'Proposal must be approved or scheduled to launch',
+        currentStatus: proposal.status,
+      });
+    }
+
+    const debateId = uuidv4();
+
+    // Map proposal chairs to Duelogic chairs with philosophical frameworks
+    // The proposal's chair positions become persona overlays
+    const proposalChairs = proposal.chairs || [];
+    const duelogicChairs = proposalChairs.map((chair, index) => ({
+      position: `chair_${index + 1}` as const,
+      framework: DEFAULT_CHAIR_FRAMEWORKS[index % DEFAULT_CHAIR_FRAMEWORKS.length],
+      modelId: 'gpt-4o', // Default model - TODO: make configurable
+      modelDisplayName: chair.name,
+      providerName: 'OpenAI',
+      // Include the custom position as persona context
+      persona: `You are "${chair.name}". Your core position: ${chair.position}. You must acknowledge: ${chair.mustAcknowledge}`,
+    }));
+
+    // Build proposition context string for the arbiter
+    const propositionContext = `
+Episode ${proposal.episodeNumber}: "${proposal.title}"
+${proposal.subtitle ? `Subtitle: ${proposal.subtitle}` : ''}
+
+${proposal.description}
+
+Background: ${proposal.contextForPanel}
+
+Key Tensions to Explore:
+${proposal.keyTensions?.map((t, i) => `${i + 1}. ${t}`).join('\n') || 'None specified'}
+
+Chair Positions:
+${proposalChairs.map(c => `- ${c.name}: ${c.position}`).join('\n')}
+`.trim();
+
+    // Build Duelogic config with the proposal's chairs
+    const duelogicConfig = mergeWithDuelogicDefaults({
+      chairs: duelogicChairs.length >= 2 ? duelogicChairs : undefined,
+      tone: 'professional',
+      podcastMode: {
+        enabled: true,
+        showName: 'Duelogic',
+        episodeTitle: proposal.title,
+        episodeNumber: proposal.episodeNumber || undefined,
+      },
+    });
+
+    // Create the debate in database with duelogic mode
+    await debateRepository.create({
+      id: debateId,
+      propositionText: proposal.proposition,
+      propositionContext: {
+        title: proposal.title,
+        subtitle: proposal.subtitle,
+        description: proposal.description,
+        contextForPanel: proposal.contextForPanel,
+        chairs: proposal.chairs,
+        keyTensions: proposal.keyTensions,
+        episodeNumber: proposal.episodeNumber,
+        proposalId: proposal.id,
+        researchResultId: proposal.researchResultId,
+      },
+      debateMode: 'duelogic',
+      duelogicConfig: duelogicConfig as unknown as Record<string, unknown>,
+    });
+
+    // Update proposal status to indicate it's been launched
+    await proposalRepo.updateStatus(id, 'launched');
+
+    logger.info({
+      proposalId: id,
+      debateId,
+      title: proposal.title,
+      chairCount: duelogicChairs.length,
+    }, 'Duelogic debate launched from proposal');
+
+    // Create and start the Duelogic orchestrator
+    const orchestrator = createDuelogicOrchestrator({
+      debateId,
+      proposition: proposal.proposition,
+      propositionContext,
+      config: duelogicConfig,
+      sseManager,
+    });
+
+    // Start debate in background (non-blocking)
+    orchestrator.start().catch((error) => {
+      logger.error({ debateId, error }, 'Duelogic debate failed');
+    });
+
+    return res.status(201).json({
+      success: true,
+      debateId,
+      proposalId: id,
+      chairCount: duelogicChairs.length,
+      message: `Duelogic debate created and starting: ${proposal.title}`,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to launch debate from proposal');
+    return res.status(500).json({ error: 'Failed to launch debate' });
   }
 });
 

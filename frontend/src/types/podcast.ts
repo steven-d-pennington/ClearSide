@@ -103,6 +103,50 @@ export interface RefinedPodcastScript {
   outro?: PodcastSegment;
   createdAt: string;
   updatedAt: string;
+
+  /** Gemini-specific director's notes for TTS performance guidance */
+  geminiDirectorNotes?: GeminiDirectorNotes;
+}
+
+// ============================================================================
+// Gemini Director's Notes
+// ============================================================================
+
+/**
+ * Gemini Director's Notes - Natural language guidance for TTS performance
+ *
+ * Based on Google's recommended prompt structure for voice direction.
+ * @see https://ai.google.dev/gemini-api/docs/speech-generation
+ */
+export interface GeminiDirectorNotes {
+  /** Show/podcast identity and format */
+  showContext: string;
+
+  /** Per-speaker performance direction */
+  speakerDirections: Record<string, GeminiSpeakerDirection>;
+
+  /** Overall scene/emotional context */
+  sceneContext: string;
+
+  /** Pacing and delivery guidance */
+  pacingNotes: string;
+}
+
+/**
+ * Per-speaker direction for Gemini TTS
+ */
+export interface GeminiSpeakerDirection {
+  /** Speaker identifier */
+  speakerId: string;
+
+  /** Character archetype/identity */
+  characterProfile: string;
+
+  /** Emotional tone and vocal style */
+  vocalStyle: string;
+
+  /** Specific performance notes */
+  performanceNotes: string;
 }
 
 // ============================================================================

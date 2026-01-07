@@ -158,6 +158,12 @@ export class PodcastGenerationPipeline extends EventEmitter {
         throw new Error('Script has no segments to generate');
       }
 
+      // Set Gemini director's notes if available and using adapter
+      if (this.ttsAdapter && script.geminiDirectorNotes) {
+        this.ttsAdapter.setGeminiDirectorNotes(script.geminiDirectorNotes);
+        logger.debug({ jobId }, 'Gemini director\'s notes configured for TTS');
+      }
+
       logger.info({ jobId, totalSegments, resumePhase: job.generationPhase }, 'Starting podcast generation');
 
       // Initialize segment tracking if not resuming

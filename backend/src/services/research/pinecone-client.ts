@@ -36,21 +36,33 @@ export class PineconeClient implements VectorDBClient {
   async upsert(entries: VectorEntry[]): Promise<void> {
     if (entries.length === 0) return;
 
-    const vectors = entries.map(entry => ({
-      id: entry.id,
-      values: entry.embedding!,
-      metadata: {
-        episodeId: entry.episodeId,
-        researchResultId: entry.researchResultId,
-        content: entry.content.slice(0, 1000), // Pinecone metadata limit
-        sourceUrl: entry.metadata.sourceUrl,
-        sourceTitle: entry.metadata.sourceTitle,
-        sourceDomain: entry.metadata.sourceDomain,
-        publishedAt: entry.metadata.publishedAt?.toISOString() || '',
-        category: entry.metadata.category,
-        excerpt: entry.metadata.excerpt.slice(0, 500),
-      },
-    }));
+    const vectors = entries.map(entry => {
+      // Handle publishedAt that could be a Date or ISO string
+      let publishedAtStr = '';
+      if (entry.metadata.publishedAt) {
+        if (entry.metadata.publishedAt instanceof Date) {
+          publishedAtStr = entry.metadata.publishedAt.toISOString();
+        } else if (typeof entry.metadata.publishedAt === 'string') {
+          publishedAtStr = entry.metadata.publishedAt;
+        }
+      }
+
+      return {
+        id: entry.id,
+        values: entry.embedding!,
+        metadata: {
+          episodeId: entry.episodeId,
+          researchResultId: entry.researchResultId,
+          content: entry.content.slice(0, 1000), // Pinecone metadata limit
+          sourceUrl: entry.metadata.sourceUrl,
+          sourceTitle: entry.metadata.sourceTitle,
+          sourceDomain: entry.metadata.sourceDomain,
+          publishedAt: publishedAtStr,
+          category: entry.metadata.category,
+          excerpt: entry.metadata.excerpt.slice(0, 500),
+        },
+      };
+    });
 
     // Upsert in batches of 100
     const batchSize = 100;

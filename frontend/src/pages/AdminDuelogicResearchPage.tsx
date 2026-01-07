@@ -71,6 +71,39 @@ export function AdminDuelogicResearchPage() {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const [creatingConfig, setCreatingConfig] = useState(false);
 
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const [statsRes, jobsRes, proposalsRes, configsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/duelogic/dashboard/stats`),
+        fetch(`${API_BASE_URL}/api/duelogic/research/jobs?limit=5`),
+        fetch(`${API_BASE_URL}/api/duelogic/proposals?status=pending`),
+        fetch(`${API_BASE_URL}/api/duelogic/research/configs`),
+      ]);
+
+      if (!statsRes.ok || !jobsRes.ok || !proposalsRes.ok || !configsRes.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+
+      const [statsData, jobsData, proposalsData, configsData] = await Promise.all([
+        statsRes.json(),
+        jobsRes.json(),
+        proposalsRes.json(),
+        configsRes.json(),
+      ]);
+
+      setStats(statsData);
+      setRecentJobs(jobsData);
+      setPendingProposals(proposalsData.slice(0, 5));
+      setConfigs(configsData);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching dashboard:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Connect to SSE stream when a job starts
   const connectToJobStream = useCallback((jobId: string) => {
     // Close existing connection if any
@@ -257,39 +290,6 @@ export function AdminDuelogicResearchPage() {
         eventSourceRef.current.close();
       }
     };
-  }, []);
-
-  const fetchDashboard = useCallback(async () => {
-    try {
-      const [statsRes, jobsRes, proposalsRes, configsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/duelogic/dashboard/stats`),
-        fetch(`${API_BASE_URL}/api/duelogic/research/jobs?limit=5`),
-        fetch(`${API_BASE_URL}/api/duelogic/proposals?status=pending`),
-        fetch(`${API_BASE_URL}/api/duelogic/research/configs`),
-      ]);
-
-      if (!statsRes.ok || !jobsRes.ok || !proposalsRes.ok || !configsRes.ok) {
-        throw new Error('Failed to fetch dashboard data');
-      }
-
-      const [statsData, jobsData, proposalsData, configsData] = await Promise.all([
-        statsRes.json(),
-        jobsRes.json(),
-        proposalsRes.json(),
-        configsRes.json(),
-      ]);
-
-      setStats(statsData);
-      setRecentJobs(jobsData);
-      setPendingProposals(proposalsData.slice(0, 5));
-      setConfigs(configsData);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching dashboard:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard');
-    } finally {
-      setIsLoading(false);
-    }
   }, []);
 
   useEffect(() => {

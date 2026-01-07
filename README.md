@@ -369,10 +369,16 @@ OPENAI_API_KEY=sk-...                  # Your OpenAI API key
 # Database
 DATABASE_URL=postgresql://...          # PostgreSQL connection
 
-# TTS Providers (optional - for audio export)
-# ELEVENLABS_API_KEY=...               # ElevenLabs TTS
-# PLAYHT_API_KEY=...                   # PlayHT TTS
-# PLAYHT_USER_ID=...
+# TTS Providers (optional - for podcast/audio export)
+# ELEVENLABS_API_KEY=...               # ElevenLabs TTS (premium voices)
+# GOOGLE_AI_API_KEY=...                # Gemini TTS (cost-effective)
+# GEMINI_API_KEY=...                   # Alternative name for Gemini
+
+# Vector Database for RAG (optional - for Duelogic research features)
+# VECTOR_DB_PROVIDER=pinecone          # Currently only Pinecone supported
+# PINECONE_API_KEY=...                 # Pinecone API key
+# PINECONE_INDEX_NAME=...              # Pinecone index name (e.g., duelogic-research)
+# FETCH_FULL_ARTICLES=false            # Set true to fetch full article content for RAG
 
 # Server
 PORT=3001

@@ -703,14 +703,22 @@ export class ProAdvocateAgent implements BaseAgent, IProAdvocateAgent {
   /**
    * Build context summary from previous utterances
    * Summarizes debate history for agent context
+   * Includes RAG citations if available for Duelogic debates
    */
   private buildContextSummary(context: AgentContext): string {
+    let summary = '';
+
+    // Include RAG citations if available (Duelogic debates)
+    if (context.ragCitations?.available && context.ragCitations.citationPrompt) {
+      summary += context.ragCitations.citationPrompt + '\n\n';
+    }
+
     if (!context.previousUtterances || context.previousUtterances.length === 0) {
-      return 'No previous utterances.';
+      return summary + 'No previous utterances.';
     }
 
     // Build chronological summary of debate so far
-    let summary = 'Debate context:\n\n';
+    summary += 'Debate context:\n\n';
 
     for (const utterance of context.previousUtterances) {
       const speaker = utterance.speaker.toUpperCase();

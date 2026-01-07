@@ -255,8 +255,10 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
         });
 
     } catch (error: any) {
-        logger.error({ error }, 'Script refinement error');
-        res.status(500).json({ error: error.message });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        logger.error({ errorMessage, errorStack }, 'Script refinement error');
+        res.status(500).json({ error: errorMessage });
     }
 });
 

@@ -20,6 +20,7 @@ export function AdminDuelogicProposalDetailPage() {
   const [editedProposal, setEditedProposal] = useState<Partial<EpisodeProposal>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -135,6 +136,40 @@ export function AdminDuelogicProposalDetailPage() {
       setActionMessage({ type: 'error', text: 'Failed to schedule proposal' });
     }
     setTimeout(() => setActionMessage(null), 5000);
+  };
+
+  const handleLaunchDebate = async () => {
+    if (!id) return;
+    if (!confirm('Launch this proposal as a live debate? This will create a new debate and start the AI agents.')) {
+      return;
+    }
+
+    setIsLaunching(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/duelogic/proposals/${id}/launch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setActionMessage({
+          type: 'success',
+          text: `Debate launched! Debate ID: ${data.debateId.slice(0, 8)}...`,
+        });
+        fetchProposal();
+        // Optionally redirect to the debate view
+        // navigate(`/debates/${data.debateId}`);
+      } else {
+        const data = await response.json();
+        setActionMessage({ type: 'error', text: data.error || 'Failed to launch debate' });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Failed to launch debate' });
+    } finally {
+      setIsLaunching(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
   };
 
   const updateField = (field: keyof EpisodeProposal, value: any) => {
@@ -259,10 +294,20 @@ export function AdminDuelogicProposalDetailPage() {
                 </Button>
               </>
             )}
-            {proposal.status === 'approved' && (
-              <Button onClick={handleSchedule} variant="primary">
-                Schedule
-              </Button>
+            {(proposal.status === 'approved' || proposal.status === 'scheduled') && (
+              <>
+                <Button onClick={handleLaunchDebate} variant="primary" loading={isLaunching}>
+                  🚀 Launch Debate
+                </Button>
+                {proposal.status === 'approved' && (
+                  <Button onClick={handleSchedule} variant="secondary">
+                    Schedule
+                  </Button>
+                )}
+              </>
+            )}
+            {proposal.status === 'launched' && (
+              <span className={styles.launchedBadge}>Debate Launched</span>
             )}
           </>
         )}

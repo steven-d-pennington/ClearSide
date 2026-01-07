@@ -10,6 +10,7 @@ import Bottleneck from 'bottleneck';
 import type {
   PodcastSegment,
   TTSProviderType,
+  GeminiDirectorNotes,
 } from '../../types/podcast-export.js';
 import type { ITTSService, VoiceType } from '../audio/types.js';
 import { getTTSService, isProviderAvailable } from '../audio/tts-provider-factory.js';
@@ -60,6 +61,7 @@ export class PodcastTTSAdapter {
   private readonly tagConverter: AudioTagConverter;
   private readonly limiter: Bottleneck;
   private usageStats: PodcastTTSUsageStats;
+  private geminiDirectorNotes?: GeminiDirectorNotes;
 
   constructor(provider: TTSProviderType = 'elevenlabs') {
     this.provider = provider;
@@ -95,6 +97,20 @@ export class PodcastTTSAdapter {
   }
 
   /**
+   * Set Gemini director's notes for performance guidance
+   * These notes influence how Gemini TTS delivers the speech
+   */
+  setGeminiDirectorNotes(notes: GeminiDirectorNotes | undefined): void {
+    this.geminiDirectorNotes = notes;
+    if (notes && this.provider === 'gemini') {
+      logger.info(
+        { speakerCount: Object.keys(notes.speakerDirections).length },
+        'Gemini director\'s notes configured'
+      );
+    }
+  }
+
+  /**
    * Generate audio for a single podcast segment
    */
   async generateSegmentAudio(segment: PodcastSegment): Promise<PodcastTTSResponse> {
@@ -105,18 +121,25 @@ export class PodcastTTSAdapter {
       // Map speaker role to voice type
       const voiceType = this.mapSpeakerToVoiceType(segment.speaker);
 
+      // For Gemini, prepend director's notes if available
+      const textWithDirection = this.provider === 'gemini'
+        ? this.prependGeminiDirectorNotes(convertedText, segment.speaker)
+        : convertedText;
+
       logger.debug({
         speaker: segment.speaker,
         voiceType,
         provider: this.provider,
         originalLength: segment.text.length,
         convertedLength: convertedText.length,
+        withDirectionLength: textWithDirection.length,
+        hasDirectorNotes: !!this.geminiDirectorNotes,
       }, 'Generating segment audio');
 
       // Generate speech using the underlying service
-      const result = await this.service.generateSpeech(convertedText, voiceType);
+      const result = await this.service.generateSpeech(textWithDirection, voiceType);
 
-      // Track usage
+      // Track usage (only count the actual transcript text, not director's notes)
       this.trackUsage(convertedText.length);
 
       return {
@@ -125,6 +148,54 @@ export class PodcastTTSAdapter {
         durationMs: result.durationMs,
       };
     });
+  }
+
+  /**
+   * Prepend Gemini director's notes to the text for performance guidance
+   *
+   * The director's notes are included as a preamble that Gemini TTS uses
+   * to understand how to deliver the speech, but are not spoken aloud.
+   */
+  private prependGeminiDirectorNotes(text: string, speaker: string): string {
+    if (!this.geminiDirectorNotes) {
+      return text;
+    }
+
+    const { showContext, speakerDirections, sceneContext, pacingNotes } = this.geminiDirectorNotes;
+
+    // Get speaker-specific direction
+    const speakerDirection = speakerDirections[speaker];
+
+    // Build the director's notes preamble
+    const directorNotesParts: string[] = [
+      '--- Director\'s Notes (for voice performance guidance) ---',
+      '',
+      `Show: ${showContext}`,
+      '',
+      `Scene: ${sceneContext}`,
+      '',
+    ];
+
+    // Add speaker-specific direction
+    if (speakerDirection) {
+      directorNotesParts.push(
+        `Speaking as: ${speakerDirection.characterProfile}`,
+        `Voice style: ${speakerDirection.vocalStyle}`,
+        `Performance: ${speakerDirection.performanceNotes}`,
+        ''
+      );
+    }
+
+    directorNotesParts.push(
+      pacingNotes,
+      '',
+      '--- Transcript to speak ---',
+      ''
+    );
+
+    const directorNotesText = directorNotesParts.join('\n');
+
+    return directorNotesText + text;
   }
 
   /**

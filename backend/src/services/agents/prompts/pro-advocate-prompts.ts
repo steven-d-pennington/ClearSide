@@ -624,6 +624,11 @@ export function buildProOpeningUserPrompt(context: PromptBuilderContext): string
     }
   }
 
+  // Include RAG research if available
+  if (context.previousUtterances && context.previousUtterances.includes('REQUIRED RESEARCH SOURCES')) {
+    prompt += `\n\n${context.previousUtterances}`;
+  }
+
   prompt += '\n\nDeliver your opening statement arguing FOR this proposition.';
 
   return prompt;

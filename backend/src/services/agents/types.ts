@@ -57,6 +57,30 @@ export interface AgentContext {
 
   /** Partial content from before interruption */
   partialContent?: string;
+
+  /** RAG citations from Pinecone for Duelogic debates */
+  ragCitations?: RAGCitationContext;
+}
+
+/**
+ * RAG citation context for agents
+ */
+export interface RAGCitationContext {
+  /** Whether RAG is available for this debate */
+  available: boolean;
+
+  /** Formatted citation prompt to include in agent prompts */
+  citationPrompt?: string;
+
+  /** Raw citations for reference */
+  citations?: Array<{
+    content: string;
+    sourceTitle: string;
+    sourceDomain: string;
+    sourceUrl: string;
+    publishedAt?: Date;
+    relevanceScore: number;
+  }>;
 }
 
 /**

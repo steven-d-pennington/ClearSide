@@ -53,6 +53,9 @@ export interface RefinedPodcastScript {
   outro?: PodcastSegment;
   createdAt: Date;
   updatedAt: Date;
+
+  /** Gemini-specific director's notes for TTS performance guidance */
+  geminiDirectorNotes?: GeminiDirectorNotes;
 }
 
 export interface PodcastExportConfig {
@@ -359,3 +362,134 @@ export const GEMINI_VOICE_ASSIGNMENTS: Record<string, GeminiVoiceAssignment> = {
 export const GEMINI_AVAILABLE_VOICES = [
   'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede',
 ];
+
+/**
+ * Gemini Director's Notes - Natural language guidance for TTS performance
+ *
+ * Based on Google's recommended prompt structure:
+ * - Audio Profile: Character identity/archetype
+ * - Scene: Environment and emotional context
+ * - Director's Notes: Style, accent, pacing guidance
+ *
+ * @see https://ai.google.dev/gemini-api/docs/speech-generation
+ */
+export interface GeminiDirectorNotes {
+  /** Show/podcast identity and format */
+  showContext: string;
+
+  /** Per-speaker performance direction */
+  speakerDirections: Record<string, GeminiSpeakerDirection>;
+
+  /** Overall scene/emotional context */
+  sceneContext: string;
+
+  /** Pacing and delivery guidance */
+  pacingNotes: string;
+}
+
+export interface GeminiSpeakerDirection {
+  /** Speaker identifier (matches segment speaker) */
+  speakerId: string;
+
+  /** Character archetype/identity */
+  characterProfile: string;
+
+  /** Emotional tone and vocal style */
+  vocalStyle: string;
+
+  /** Specific performance notes */
+  performanceNotes: string;
+}
+
+/**
+ * Tone-specific performance profiles for debate speakers
+ */
+export const GEMINI_TONE_PROFILES: Record<DebateTone, {
+  overall: string;
+  pro: GeminiSpeakerDirection;
+  con: GeminiSpeakerDirection;
+  moderator: GeminiSpeakerDirection;
+  narrator: GeminiSpeakerDirection;
+}> = {
+  respectful: {
+    overall: 'Professional, collegial intellectual discourse. Think academic conference meets quality podcast.',
+    pro: {
+      speakerId: 'pro_advocate',
+      characterProfile: 'Thoughtful academic presenting a well-reasoned position',
+      vocalStyle: 'Measured, confident but not aggressive. Warm yet authoritative.',
+      performanceNotes: 'Speak with conviction but maintain respect. Allow natural pauses for emphasis. Project intellectual confidence without arrogance.',
+    },
+    con: {
+      speakerId: 'con_advocate',
+      characterProfile: 'Constructive critic offering valuable counterpoints',
+      vocalStyle: 'Thoughtfully skeptical, fair-minded. Curious rather than combative.',
+      performanceNotes: 'Question with genuine curiosity. Acknowledge valid points before countering. Sound like someone seeking truth, not winning.',
+    },
+    moderator: {
+      speakerId: 'moderator',
+      characterProfile: 'Wise facilitator ensuring productive dialogue',
+      vocalStyle: 'Calm, neutral, gently authoritative. Like an NPR host.',
+      performanceNotes: 'Maintain warm neutrality. Guide without taking sides. Project quiet authority that commands respect.',
+    },
+    narrator: {
+      speakerId: 'narrator',
+      characterProfile: 'Welcoming podcast host',
+      vocalStyle: 'Warm, inviting, professional. Clear enunciation.',
+      performanceNotes: 'Sound genuinely interested in the topic. Create atmosphere of intellectual curiosity.',
+    },
+  },
+  spirited: {
+    overall: 'Energetic intellectual debate. Think passionate but civil discourse - the best dinner party argument.',
+    pro: {
+      speakerId: 'pro_advocate',
+      characterProfile: 'Passionate advocate with strong convictions',
+      vocalStyle: 'Confident, energetic, occasionally emphatic. Conviction without aggression.',
+      performanceNotes: 'Vary pace - slower for key points, faster when building momentum. Let enthusiasm come through. Emphasize with conviction.',
+    },
+    con: {
+      speakerId: 'con_advocate',
+      characterProfile: 'Sharp-minded challenger who loves the intellectual sparring',
+      vocalStyle: 'Engaged, probing, intellectually playful. Quick-witted.',
+      performanceNotes: 'Sound genuinely interested in dismantling weak arguments. Allow occasional wry humor. Be incisive but not mean.',
+    },
+    moderator: {
+      speakerId: 'moderator',
+      characterProfile: 'Engaged referee who appreciates good debate',
+      vocalStyle: 'Alert, interested, occasionally amused. Professional but not stiff.',
+      performanceNotes: 'React subtly to good points. Keep energy up while maintaining control. Sound like you\'re enjoying this.',
+    },
+    narrator: {
+      speakerId: 'narrator',
+      characterProfile: 'Enthusiastic podcast host who loves this topic',
+      vocalStyle: 'Warm, engaging, energetic. Build anticipation.',
+      performanceNotes: 'Convey genuine excitement about the debate to come. Draw listeners in.',
+    },
+  },
+  heated: {
+    overall: 'Intense intellectual confrontation. High stakes, strong emotions, but still substantive. Think cable news debate done right.',
+    pro: {
+      speakerId: 'pro_advocate',
+      characterProfile: 'Fierce defender of an important cause',
+      vocalStyle: 'Forceful, passionate, occasionally frustrated. Righteous conviction.',
+      performanceNotes: 'Allow emotion to color delivery - controlled intensity. Speak with urgency. Don\'t be afraid of dramatic emphasis.',
+    },
+    con: {
+      speakerId: 'con_advocate',
+      characterProfile: 'Tenacious challenger who won\'t let bad arguments stand',
+      vocalStyle: 'Sharp, persistent, occasionally exasperated. Determined truth-seeker.',
+      performanceNotes: 'Push back firmly. Allow frustration at weak arguments to show. Be relentless but not cruel.',
+    },
+    moderator: {
+      speakerId: 'moderator',
+      characterProfile: 'Firm referee keeping a heated match civil',
+      vocalStyle: 'Authoritative, calming presence. Cuts through tension.',
+      performanceNotes: 'Project calm authority. Occasionally use firm tone to redirect. Be the stable center in the storm.',
+    },
+    narrator: {
+      speakerId: 'narrator',
+      characterProfile: 'Host setting up a consequential debate',
+      vocalStyle: 'Serious, weighty, builds tension. Conveys importance.',
+      performanceNotes: 'Communicate that this matters. Create sense of stakes and significance.',
+    },
+  },
+};

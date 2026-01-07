@@ -1532,4 +1532,5 @@ router.get('/presets/:presetId', async (req: Request, res: Response) => {
   }
 });
 
+export { startDebateOrchestrator };
 export default router;

@@ -16,7 +16,7 @@ export type ResearchCategory =
   | 'education_culture';
 
 export type ResearchJobStatus = 'pending' | 'running' | 'completed' | 'failed';
-export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'scheduled';
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'scheduled' | 'launched';
 
 export interface ResearchJob {
   id: string;
