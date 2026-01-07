@@ -153,8 +153,13 @@ export class PodcastTTSAdapter {
   /**
    * Prepend Gemini director's notes to the text for performance guidance
    *
-   * The director's notes are included as a preamble that Gemini TTS uses
-   * to understand how to deliver the speech, but are not spoken aloud.
+   * Uses the structured prompt format that Gemini TTS recognizes:
+   * - # AUDIO PROFILE: Character description
+   * - ## THE SCENE: Context
+   * - ### DIRECTOR'S NOTES: Performance guidance
+   * - #### TRANSCRIPT: Text to speak (ONLY this part is vocalized)
+   *
+   * @see https://ai.google.dev/gemini-api/docs/speech-generation
    */
   private prependGeminiDirectorNotes(text: string, speaker: string): string {
     if (!this.geminiDirectorNotes) {
@@ -166,36 +171,49 @@ export class PodcastTTSAdapter {
     // Get speaker-specific direction
     const speakerDirection = speakerDirections[speaker];
 
-    // Build the director's notes preamble
-    const directorNotesParts: string[] = [
-      '--- Director\'s Notes (for voice performance guidance) ---',
-      '',
-      `Show: ${showContext}`,
-      '',
-      `Scene: ${sceneContext}`,
-      '',
-    ];
+    // Build the structured prompt using Gemini's expected markdown format
+    const promptParts: string[] = [];
 
-    // Add speaker-specific direction
+    // Audio Profile section - character identity
     if (speakerDirection) {
-      directorNotesParts.push(
-        `Speaking as: ${speakerDirection.characterProfile}`,
-        `Voice style: ${speakerDirection.vocalStyle}`,
-        `Performance: ${speakerDirection.performanceNotes}`,
+      promptParts.push(
+        `# AUDIO PROFILE: ${speakerDirection.characterProfile}`,
+        '',
+        speakerDirection.vocalStyle,
         ''
       );
     }
 
-    directorNotesParts.push(
-      pacingNotes,
+    // Scene section - environment and context
+    promptParts.push(
+      '## THE SCENE',
       '',
-      '--- Transcript to speak ---',
+      sceneContext,
+      '',
+      showContext,
       ''
     );
 
-    const directorNotesText = directorNotesParts.join('\n');
+    // Director's Notes section - performance guidance
+    promptParts.push(
+      '### DIRECTOR\'S NOTES',
+      ''
+    );
 
-    return directorNotesText + text;
+    if (speakerDirection) {
+      promptParts.push(speakerDirection.performanceNotes, '');
+    }
+
+    promptParts.push(pacingNotes, '');
+
+    // Transcript section - ONLY this part gets spoken
+    promptParts.push(
+      '#### TRANSCRIPT',
+      '',
+      text
+    );
+
+    return promptParts.join('\n');
   }
 
   /**

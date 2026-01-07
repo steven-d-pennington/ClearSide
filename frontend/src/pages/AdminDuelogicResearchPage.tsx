@@ -752,6 +752,34 @@ export function AdminDuelogicResearchPage() {
                   <span className={styles.proposalSubtitle}>{proposal.subtitle}</span>
                 </div>
                 <p className={styles.proposalDescription}>{proposal.description}</p>
+                {proposal.viralMetrics && (
+                  <div className={styles.viralMetrics}>
+                    <div className={styles.viralScores}>
+                      <span className={styles.viralScore} title="Title Hook Strength">
+                        <span className={styles.viralLabel}>Hook</span>
+                        <span className={styles.viralValue}>{Math.round(proposal.viralMetrics.titleHookStrength * 100)}%</span>
+                      </span>
+                      <span className={styles.viralScore} title="Trend Alignment">
+                        <span className={styles.viralLabel}>Trend</span>
+                        <span className={styles.viralValue}>{Math.round(proposal.viralMetrics.trendAlignment * 100)}%</span>
+                      </span>
+                      <span className={styles.viralScore} title="Controversy Balance">
+                        <span className={styles.viralLabel}>Debate</span>
+                        <span className={styles.viralValue}>{Math.round(proposal.viralMetrics.controversyBalance * 100)}%</span>
+                      </span>
+                    </div>
+                    {proposal.viralMetrics.titlePattern && (
+                      <span className={styles.titlePattern}>{proposal.viralMetrics.titlePattern}</span>
+                    )}
+                    {proposal.viralMetrics.suggestedHashtags && proposal.viralMetrics.suggestedHashtags.length > 0 && (
+                      <div className={styles.hashtags}>
+                        {proposal.viralMetrics.suggestedHashtags.slice(0, 3).map((tag, i) => (
+                          <span key={i} className={styles.hashtag}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className={styles.proposalMeta}>
                   <span>Generated: {formatDate(proposal.generatedAt)}</span>
                 </div>

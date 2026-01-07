@@ -44,6 +44,8 @@ export interface ChairAgentOptions {
   chair: DuelogicChair;
   config: DuelogicConfig;
   debateId: string;
+  /** Key tensions from the proposal to guide the debate */
+  keyTensions?: string[];
 }
 
 /**
@@ -71,6 +73,7 @@ export class ChairAgent {
   private systemPrompt: string;
   private conversationHistory: ConversationEntry[];
   private frameworkInfo: typeof PHILOSOPHICAL_CHAIR_INFO[PhilosophicalChair];
+  private keyTensions?: string[];
 
   constructor(options: ChairAgentOptions) {
     // Create model-specific OpenRouter client or use provided
@@ -79,10 +82,16 @@ export class ChairAgent {
     this.chair = options.chair;
     this.debateId = options.debateId;
     this.frameworkInfo = PHILOSOPHICAL_CHAIR_INFO[options.chair.framework];
+    this.keyTensions = options.keyTensions;
 
-    // Build system prompt with opponents
+    // Build system prompt with opponents and key tensions
     const opponents = options.config.chairs.filter(c => c.position !== options.chair.position);
-    this.systemPrompt = buildChairSystemPrompt(options.chair, opponents, options.config.tone);
+    this.systemPrompt = buildChairSystemPrompt(
+      options.chair,
+      opponents,
+      options.config.tone,
+      options.keyTensions
+    );
 
     // Initialize conversation history with system prompt
     this.conversationHistory = [
@@ -95,6 +104,8 @@ export class ChairAgent {
         position: options.chair.position,
         framework: options.chair.framework,
         modelId: options.chair.modelId,
+        hasProposalContext: !!options.chair.proposalContext,
+        keyTensionsCount: options.keyTensions?.length ?? 0,
       },
       'ChairAgent initialized'
     );
@@ -177,7 +188,12 @@ export class ChairAgent {
       'Generating opening statement'
     );
 
-    const prompt = buildOpeningStatementPrompt(this.chair, proposition, propositionContext);
+    const prompt = buildOpeningStatementPrompt(
+      this.chair,
+      proposition,
+      propositionContext,
+      this.keyTensions
+    );
 
     try {
       const content = await this.generate(prompt, 'opening', 0.8, 600);
@@ -560,7 +576,8 @@ export function createChairAgent(options: ChairAgentOptions): ChairAgent {
 export function createChairAgents(
   config: DuelogicConfig,
   debateId: string,
-  sseManager?: SSEManager
+  sseManager?: SSEManager,
+  keyTensions?: string[]
 ): Map<string, ChairAgent> {
   const agents = new Map<string, ChairAgent>();
 
@@ -570,6 +587,7 @@ export function createChairAgents(
       config,
       debateId,
       sseManager,
+      keyTensions,
     });
     agents.set(chair.position, agent);
   }
@@ -579,6 +597,7 @@ export function createChairAgents(
       debateId,
       chairCount: agents.size,
       positions: Array.from(agents.keys()),
+      hasKeyTensions: !!keyTensions?.length,
     },
     'Created all chair agents for debate'
   );

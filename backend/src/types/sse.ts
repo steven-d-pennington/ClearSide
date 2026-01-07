@@ -68,6 +68,7 @@ export type SSEEventType =
   | 'research_category_complete' // Completed research on a category
   | 'research_topic_found'     // Found a potential topic
   | 'research_topic_scored'    // Topic scored for quality
+  | 'topic_prescreened'        // Topic pre-screened for viral potential
   | 'research_topic_filtered'  // Topic filtered out (low quality)
   | 'episode_generating'       // Generating episode proposal
   | 'episode_generated'        // Episode proposal generated

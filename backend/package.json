@@ -27,7 +27,7 @@
     "ajv-formats": "^3.0.1",
     "axios": "^1.13.2",
     "bottleneck": "^2.19.5",
-    "chromadb": "^2.0.0",
+    "chromadb": "^2.4.6",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "fluent-ffmpeg": "^2.1.3",

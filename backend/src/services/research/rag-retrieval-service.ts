@@ -103,15 +103,6 @@ Relevance: ${(c.relevanceScore * 100).toFixed(0)}%`;
     }).join('\n\n');
 
     const firstCitation = citations[0];
-    let sampleDateStr = 'recent';
-    if (firstCitation?.publishedAt) {
-      const pubDate = firstCitation.publishedAt instanceof Date
-        ? firstCitation.publishedAt
-        : new Date(firstCitation.publishedAt);
-      if (!isNaN(pubDate.getTime())) {
-        sampleDateStr = pubDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      }
-    }
 
     return `
 ## REQUIRED RESEARCH SOURCES - YOU MUST USE THESE

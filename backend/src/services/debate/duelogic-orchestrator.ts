@@ -67,6 +67,8 @@ export interface DuelogicOrchestratorOptions {
   propositionContext?: string;
   config: Partial<DuelogicConfig>;
   sseManager: SSEManager;
+  /** Key tensions from the proposal to guide the debate */
+  keyTensions?: string[];
 }
 
 /**
@@ -126,6 +128,7 @@ export class DuelogicOrchestrator {
   private propositionContext?: string;
   private config: DuelogicConfig;
   private sseManager: SSEManager;
+  private keyTensions?: string[];
 
   // Components
   private arbiter: ArbiterAgent;
@@ -151,6 +154,7 @@ export class DuelogicOrchestrator {
     this.propositionContext = options.propositionContext;
     this.config = mergeWithDuelogicDefaults(options.config);
     this.sseManager = options.sseManager;
+    this.keyTensions = options.keyTensions;
 
     // Initialize arbiter
     this.arbiter = createArbiterAgent({
@@ -159,11 +163,12 @@ export class DuelogicOrchestrator {
       sseManager: this.sseManager,
     });
 
-    // Initialize chair agents
+    // Initialize chair agents with key tensions from proposal
     this.chairAgents = createChairAgents(
       this.config,
       this.debateId,
-      this.sseManager
+      this.sseManager,
+      this.keyTensions
     );
 
     // Initialize evaluator
@@ -186,6 +191,9 @@ export class DuelogicOrchestrator {
         debateId: this.debateId,
         chairCount: this.config.chairs.length,
         maxExchanges: this.config.flow.maxExchanges,
+        hasKeyTensions: !!this.keyTensions?.length,
+        keyTensionsCount: this.keyTensions?.length ?? 0,
+        hasProposalContext: this.config.chairs.some(c => !!c.proposalContext),
       },
       'DuelogicOrchestrator created'
     );

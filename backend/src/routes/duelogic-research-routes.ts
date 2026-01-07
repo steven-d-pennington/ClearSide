@@ -22,6 +22,8 @@ import { createEmbeddingService } from '../services/research/embedding-service.j
 import { ResearchIndexer } from '../services/research/research-indexer.js';
 import { createDuelogicOrchestrator } from '../services/debate/duelogic-orchestrator.js';
 import { mergeWithDuelogicDefaults, type PhilosophicalChair } from '../types/duelogic.js';
+import { getTrendingTopicsService } from '../services/research/trending-topics-service.js';
+import { getListenNotesClient } from '../services/research/listen-notes-client.js';
 
 const router = express.Router();
 const logger = createLogger({ module: 'DuelogicResearchRoutes' });
@@ -87,6 +89,9 @@ async function executeResearchJob(jobId: string, config: ResearchConfig): Promis
 
     const episodeGenerator = new EpisodeGenerator(llmClient, proposalRepo);
 
+    // Refresh trending context before generating proposals
+    await episodeGenerator.refreshTrendingContext();
+
     // Process each category
     for (let i = 0; i < config.categories.length; i++) {
       const category = config.categories[i];
@@ -133,11 +138,39 @@ async function executeResearchJob(jobId: string, config: ResearchConfig): Promis
             timestampMs: Date.now(),
           });
 
-          // Generate episode proposal
+          // Pre-screen topic for viral potential before generating full proposal
+          const minTrendAlignment = config.minTrendAlignment ?? 0;
+          const preScreenResult = episodeGenerator.preScreenTopic(result, minTrendAlignment);
+
+          researchSSEManager.broadcastToJob(jobId, 'topic_prescreened', {
+            jobId,
+            topic: result.topic,
+            category: result.category,
+            estimatedTrendAlignment: preScreenResult.estimatedTrendAlignment,
+            matchedTrends: preScreenResult.matchedTrends,
+            passesThreshold: preScreenResult.passesThreshold,
+            reason: preScreenResult.reason,
+            timestampMs: Date.now(),
+          });
+
+          // Skip episode generation if topic doesn't meet trend threshold
+          if (!preScreenResult.passesThreshold) {
+            researchSSEManager.broadcastToJob(jobId, 'research_log', {
+              jobId,
+              level: 'info',
+              message: `Skipping "${result.topic.slice(0, 40)}..." - ${preScreenResult.reason}`,
+              timestampMs: Date.now(),
+            });
+            continue;
+          }
+
+          // Generate episode proposal (only for topics that passed pre-screening)
           researchSSEManager.broadcastToJob(jobId, 'episode_generating', {
             jobId,
             topic: result.topic,
             category: result.category,
+            estimatedTrendAlignment: preScreenResult.estimatedTrendAlignment,
+            matchedTrends: preScreenResult.matchedTrends,
             timestampMs: Date.now(),
           });
 
@@ -151,6 +184,8 @@ async function executeResearchJob(jobId: string, config: ResearchConfig): Promis
               title: proposal.title,
               subtitle: proposal.subtitle,
               category: result.category,
+              trendAlignment: proposal.viralMetrics?.trendAlignment,
+              matchedTrends: proposal.viralMetrics?.matchedTrends,
               tokensUsed: 0,
               timestampMs: Date.now(),
             });
@@ -680,6 +715,39 @@ router.post('/proposals/:id/reject', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /duelogic/proposals/:id/unapprove
+ * Unapprove a proposal (reset to pending status)
+ */
+router.post('/proposals/:id/unapprove', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    // Get the proposal first
+    const proposal = await proposalRepo.findById(id);
+    if (!proposal) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+
+    // Check proposal is approved or scheduled
+    if (proposal.status !== 'approved' && proposal.status !== 'scheduled') {
+      return res.status(400).json({
+        error: 'Only approved or scheduled proposals can be unapproved',
+        currentStatus: proposal.status,
+      });
+    }
+
+    await proposalRepo.unapprove(id);
+
+    logger.info({ proposalId: id }, 'Proposal unapproved');
+    return res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, 'Failed to unapprove proposal');
+    return res.status(500).json({ error: 'Failed to unapprove proposal' });
+  }
+});
+
+/**
  * POST /duelogic/proposals/:id/schedule
  * Schedule a proposal for a specific date
  */
@@ -713,6 +781,13 @@ const DEFAULT_CHAIR_FRAMEWORKS: PhilosophicalChair[] = [
   'libertarian',
 ];
 
+// Chair model configuration for launch requests
+interface ChairModelConfig {
+  modelId: string;
+  modelDisplayName?: string;
+  providerName?: string;
+}
+
 /**
  * POST /duelogic/proposals/:id/launch
  * Launch a Duelogic debate from an approved proposal
@@ -722,6 +797,9 @@ router.post('/proposals/:id/launch', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: 'ID required' });
+
+    // Extract optional chair model configurations from request
+    const { chairModels } = req.body as { chairModels?: ChairModelConfig[] };
 
     // Get the proposal
     const proposal = await proposalRepo.findById(id);
@@ -740,17 +818,28 @@ router.post('/proposals/:id/launch', async (req: Request, res: Response) => {
     const debateId = uuidv4();
 
     // Map proposal chairs to Duelogic chairs with philosophical frameworks
-    // The proposal's chair positions become persona overlays
+    // The proposal's chair positions become structured context for the LLM
+    // Use provided model configs or fall back to defaults
     const proposalChairs = proposal.chairs || [];
-    const duelogicChairs = proposalChairs.map((chair, index) => ({
-      position: `chair_${index + 1}` as const,
-      framework: DEFAULT_CHAIR_FRAMEWORKS[index % DEFAULT_CHAIR_FRAMEWORKS.length],
-      modelId: 'gpt-4o', // Default model - TODO: make configurable
-      modelDisplayName: chair.name,
-      providerName: 'OpenAI',
-      // Include the custom position as persona context
-      persona: `You are "${chair.name}". Your core position: ${chair.position}. You must acknowledge: ${chair.mustAcknowledge}`,
-    }));
+    const duelogicChairs = proposalChairs.map((chair, index) => {
+      const modelConfig = chairModels?.[index];
+      return {
+        position: `chair_${index + 1}` as const,
+        framework: DEFAULT_CHAIR_FRAMEWORKS[index % DEFAULT_CHAIR_FRAMEWORKS.length]!,
+        modelId: modelConfig?.modelId ?? 'openai/gpt-4o',
+        modelDisplayName: modelConfig?.modelDisplayName ?? chair.name,
+        providerName: modelConfig?.providerName ?? 'OpenAI',
+        // Include the custom position as structured proposal context
+        proposalContext: {
+          characterName: chair.name,
+          customPosition: chair.position,
+          mustAcknowledge: chair.mustAcknowledge,
+        },
+      };
+    });
+
+    // Extract key tensions from the proposal
+    const keyTensions = proposal.keyTensions || [];
 
     // Build proposition context string for the arbiter
     const propositionContext = `
@@ -771,12 +860,12 @@ ${proposalChairs.map(c => `- ${c.name}: ${c.position}`).join('\n')}
     // Build Duelogic config with the proposal's chairs
     const duelogicConfig = mergeWithDuelogicDefaults({
       chairs: duelogicChairs.length >= 2 ? duelogicChairs : undefined,
-      tone: 'professional',
+      tone: 'respectful',
       podcastMode: {
         enabled: true,
         showName: 'Duelogic',
-        episodeTitle: proposal.title,
         episodeNumber: proposal.episodeNumber || undefined,
+        includeCallToAction: true,
       },
     });
 
@@ -809,13 +898,14 @@ ${proposalChairs.map(c => `- ${c.name}: ${c.position}`).join('\n')}
       chairCount: duelogicChairs.length,
     }, 'Duelogic debate launched from proposal');
 
-    // Create and start the Duelogic orchestrator
+    // Create and start the Duelogic orchestrator with full proposal context
     const orchestrator = createDuelogicOrchestrator({
       debateId,
       proposition: proposal.proposition,
       propositionContext,
       config: duelogicConfig,
       sseManager,
+      keyTensions, // Pass key tensions to guide the debate
     });
 
     // Start debate in background (non-blocking)
@@ -861,6 +951,152 @@ router.post('/proposals/bulk-action', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, 'Failed to perform bulk action');
     return res.status(500).json({ error: 'Failed to perform bulk action' });
+  }
+});
+
+// ============================================================================
+// Trending Topics Endpoints
+// ============================================================================
+
+/**
+ * GET /duelogic/trending
+ * Get current trending podcast topics from Listen Notes
+ */
+router.get('/trending', async (_req: Request, res: Response) => {
+  try {
+    const listenNotesClient = getListenNotesClient();
+    const trendingService = getTrendingTopicsService();
+
+    // Check if Listen Notes is configured
+    if (!listenNotesClient.isConfigured()) {
+      return res.json({
+        available: false,
+        message: 'Listen Notes API key not configured. Add LISTEN_NOTES_API_KEY to enable trending features.',
+        trendingSearches: [],
+        categoryTrends: {},
+        cacheStats: null,
+        attribution: null,
+      });
+    }
+
+    // Get trending context
+    const context = await trendingService.getTrendingContext();
+
+    // Convert Map to object for JSON serialization
+    const categoryTrends: Record<string, string[]> = {};
+    context.hotTopicsByCategory.forEach((topics, category) => {
+      categoryTrends[category] = topics;
+    });
+
+    return res.json({
+      available: true,
+      trendingSearches: context.trendingSearches,
+      categoryTrends,
+      suggestedTitlePatterns: context.suggestedTitlePatterns,
+      powerWords: context.powerWords.slice(0, 20),
+      topPodcastTitles: context.topPodcastTitles,
+      lastUpdated: context.lastUpdated,
+      cacheStats: listenNotesClient.getCacheStats(),
+      attribution: context.attribution,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch trending topics');
+    return res.status(500).json({ error: 'Failed to fetch trending topics' });
+  }
+});
+
+/**
+ * GET /duelogic/trending/category/:category
+ * Get trending topics for a specific category
+ */
+router.get('/trending/category/:category', async (req: Request, res: Response) => {
+  try {
+    const { category } = req.params;
+    const trendingService = getTrendingTopicsService();
+
+    if (!trendingService.isAvailable()) {
+      return res.json({
+        available: false,
+        message: 'Listen Notes API key not configured',
+        category,
+        trendingTerms: [],
+        hotPodcasts: [],
+        suggestedAngles: [],
+      });
+    }
+
+    const categoryData = await trendingService.getCategoryTrending(category as any);
+
+    return res.json({
+      available: true,
+      ...categoryData,
+      attribution: 'Powered by Listen Notes',
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch category trending');
+    return res.status(500).json({ error: 'Failed to fetch category trending' });
+  }
+});
+
+/**
+ * POST /duelogic/trending/score-title
+ * Score a title for viral potential
+ */
+router.post('/trending/score-title', async (req: Request, res: Response) => {
+  try {
+    const { title } = req.body;
+
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const trendingService = getTrendingTopicsService();
+    const score = trendingService.scoreTitleForVirality(title);
+
+    return res.json({
+      title,
+      ...score,
+      suggestions: score.score < 0.6 ? [
+        'Try starting with "The" followed by a mysterious compound noun',
+        'Consider adding a power word like "secret", "hidden", or "truth"',
+        'Pose a provocative question in the subtitle',
+        'Make it more specific - name specific actors or technologies',
+      ] : [],
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to score title');
+    return res.status(500).json({ error: 'Failed to score title' });
+  }
+});
+
+/**
+ * POST /duelogic/trending/refresh-cache
+ * Force refresh of trending data cache (admin use)
+ */
+router.post('/trending/refresh-cache', async (_req: Request, res: Response) => {
+  try {
+    const listenNotesClient = getListenNotesClient();
+
+    if (!listenNotesClient.isConfigured()) {
+      return res.status(400).json({ error: 'Listen Notes not configured' });
+    }
+
+    // Clear cache
+    listenNotesClient.clearCache();
+
+    // Fetch fresh data
+    const trendingService = getTrendingTopicsService();
+    const context = await trendingService.getTrendingContext();
+
+    return res.json({
+      success: true,
+      message: 'Cache refreshed',
+      trendingSearches: context.trendingSearches.length,
+      lastUpdated: context.lastUpdated,
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to refresh cache');
+    return res.status(500).json({ error: 'Failed to refresh cache' });
   }
 });
 

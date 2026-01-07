@@ -33,13 +33,54 @@ export const TONE_INSTRUCTIONS: Record<DebateTone, string> = {
 export function buildChairSystemPrompt(
   chair: DuelogicChair,
   opponentChairs: DuelogicChair[],
-  tone: DebateTone
+  tone: DebateTone,
+  keyTensions?: string[]
 ): string {
   const info = PHILOSOPHICAL_CHAIR_INFO[chair.framework];
   const opponentDescriptions = opponentChairs.map(opp => {
     const oppInfo = PHILOSOPHICAL_CHAIR_INFO[opp.framework];
-    return `- ${opp.modelDisplayName || opp.modelId} (${oppInfo.name}): ${oppInfo.description}`;
+    const oppContext = opp.proposalContext;
+    // Include opponent's custom position if available
+    const positionInfo = oppContext
+      ? ` Their position: "${oppContext.customPosition.slice(0, 150)}${oppContext.customPosition.length > 150 ? '...' : ''}"`
+      : '';
+    return `- ${opp.modelDisplayName || opp.modelId} (${oppInfo.name}): ${oppInfo.description}${positionInfo}`;
   }).join('\n');
+
+  // Build proposal-specific persona section
+  let personaSection = '';
+  if (chair.proposalContext) {
+    const ctx = chair.proposalContext;
+    personaSection = `
+---
+
+**YOUR CHARACTER & POSITION:**
+You are "${ctx.characterName}".
+
+**Your Core Position:**
+${ctx.customPosition}
+
+**You Must Specifically Acknowledge:**
+In addition to general framework blind spots, you MUST acknowledge this specific limitation:
+"${ctx.mustAcknowledge}"
+
+This acknowledgment should appear naturally in your responses when relevant.
+`;
+  }
+
+  // Build key tensions section
+  let tensionsSection = '';
+  if (keyTensions && keyTensions.length > 0) {
+    tensionsSection = `
+---
+
+**KEY TENSIONS TO ADDRESS:**
+These are the critical questions at the heart of this debate:
+${keyTensions.map(t => `- ${t}`).join('\n')}
+
+Reference these tensions when they naturally arise in your arguments.
+`;
+  }
 
   return `You are holding the ${info.name} in this Duelogic debate.
 
@@ -47,10 +88,10 @@ export function buildChairSystemPrompt(
 ${info.description}
 
 Core Question: "${info.coreQuestion}"
-
+${personaSection}
 **Your Opponents:**
 ${opponentDescriptions}
-
+${tensionsSection}
 ---
 
 **MANDATORY OBLIGATIONS:**
@@ -98,24 +139,47 @@ paper over them.`;
 export function buildOpeningStatementPrompt(
   chair: DuelogicChair,
   proposition: string,
-  propositionContext?: string
+  propositionContext?: string,
+  keyTensions?: string[]
 ): string {
   const info = PHILOSOPHICAL_CHAIR_INFO[chair.framework];
+
+  // Build custom position section
+  let customPositionSection = '';
+  if (chair.proposalContext) {
+    const ctx = chair.proposalContext;
+    customPositionSection = `
+**YOUR ASSIGNED POSITION:**
+As "${ctx.characterName}", your core argument is:
+"${ctx.customPosition}"
+
+You must eventually acknowledge: "${ctx.mustAcknowledge}"
+`;
+  }
+
+  // Build key tensions hint
+  let tensionsHint = '';
+  if (keyTensions && keyTensions.length > 0) {
+    tensionsHint = `
+**KEY TENSIONS TO FORESHADOW:**
+${keyTensions.slice(0, 2).map(t => `- ${t}`).join('\n')}
+`;
+  }
 
   return `You are opening the debate from the ${info.name} perspective.
 
 **PROPOSITION:** "${proposition}"
 ${propositionContext ? `\n**CONTEXT:** ${propositionContext}` : ''}
-
+${customPositionSection}${tensionsHint}
 **YOUR TASK:**
 Present your framework's initial position on this proposition. This is your opening
 statement—set up your core argument.
 
 **REQUIREMENTS:**
 1. Explain why this question matters from your framework's perspective
-2. State your framework's key principles as they apply here
-3. Preview your main argument
-4. Acknowledge one limitation of your approach (briefly)
+2. State your framework's key principles as they apply here${chair.proposalContext ? '\n3. Incorporate your assigned position into your argument' : ''}
+${chair.proposalContext ? '4' : '3'}. Preview your main argument
+${chair.proposalContext ? '5' : '4'}. Acknowledge one limitation of your approach (briefly)
 
 **TONE:** Confident but humble. You have a perspective, not the final word.
 

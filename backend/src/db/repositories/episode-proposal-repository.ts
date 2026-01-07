@@ -13,9 +13,9 @@ export class EpisodeProposalRepository {
         const result = await this.pool.query(`
       INSERT INTO episode_proposals (
         research_result_id, status, title, subtitle, description,
-        proposition, context_for_panel, chairs, key_tensions
+        proposition, context_for_panel, chairs, key_tensions, viral_metrics
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `, [
             proposal.researchResultId,
@@ -26,7 +26,8 @@ export class EpisodeProposalRepository {
             proposal.proposition,
             proposal.contextForPanel,
             JSON.stringify(proposal.chairs),
-            proposal.keyTensions
+            proposal.keyTensions,
+            proposal.viralMetrics ? JSON.stringify(proposal.viralMetrics) : null
         ]);
 
         return this.mapRow(result.rows[0]);
@@ -84,6 +85,14 @@ export class EpisodeProposalRepository {
       SET status = 'scheduled', scheduled_for = $1
       WHERE id = $2
     `, [scheduledFor, id]);
+    }
+
+    async unapprove(id: string): Promise<void> {
+        await this.pool.query(`
+      UPDATE episode_proposals
+      SET status = 'pending', episode_number = NULL, reviewed_at = NULL, reviewed_by = NULL, scheduled_for = NULL
+      WHERE id = $1
+    `, [id]);
     }
 
     async updateStatus(id: string, status: ProposalStatus): Promise<void> {
@@ -229,6 +238,7 @@ export class EpisodeProposalRepository {
             adminNotes: row.admin_notes,
             wasEdited: row.was_edited,
             editHistory: row.edit_history,
+            viralMetrics: row.viral_metrics,
         };
     }
 }

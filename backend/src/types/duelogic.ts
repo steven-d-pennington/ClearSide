@@ -199,6 +199,21 @@ export const PHILOSOPHICAL_CHAIR_INFO: Record<PhilosophicalChair, PhilosophicalC
 // ============================================================================
 
 /**
+ * Proposal-specific context for a chair
+ * Contains the custom position and critique requirements from the episode proposal
+ */
+export interface ProposalChairContext {
+  /** Character name from the proposal (e.g., "Dr. Marcus Chen") */
+  characterName: string;
+
+  /** The chair's specific position/argument from the proposal */
+  customPosition: string;
+
+  /** What this chair must acknowledge/self-critique */
+  mustAcknowledge: string;
+}
+
+/**
  * A Chair participant in a Duelogic debate
  */
 export interface DuelogicChair {
@@ -217,8 +232,11 @@ export interface DuelogicChair {
   /** Provider name (e.g., "xAI", "Anthropic", "OpenAI") */
   providerName?: string;
 
-  /** Optional custom persona overlay */
+  /** Optional custom persona overlay (legacy) */
   persona?: string;
+
+  /** Proposal-specific context for this chair */
+  proposalContext?: ProposalChairContext;
 }
 
 // ============================================================================

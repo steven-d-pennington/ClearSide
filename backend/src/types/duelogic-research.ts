@@ -23,10 +23,26 @@ export interface ResearchConfig {
     perplexityModel: string;             // e.g., "perplexity/sonar-pro"
     maxTopicsPerRun: number;
     minControversyScore: number;         // 0-1, filter boring topics
+    minTrendAlignment: number;           // 0-1, filter topics not aligned with trends
     searchQueries: string[];             // Custom research prompts
     excludeTopics: string[];             // Topics to avoid
     createdAt: Date;
     updatedAt: Date;
+}
+
+/**
+ * Pre-screening result for a research topic
+ * Used to decide whether to generate a full proposal
+ */
+export interface TopicPreScreenResult {
+    researchResultId: string;
+    topic: string;
+    category: ResearchCategory;
+    estimatedTrendAlignment: number;
+    matchedTrends: string[];
+    controversyScore: number;
+    passesThreshold: boolean;
+    reason?: string;
 }
 
 export interface ResearchJob {
@@ -105,6 +121,30 @@ export interface EpisodeProposal {
     // Edits tracking
     wasEdited: boolean;
     editHistory?: EpisodeEdit[];
+
+    // Viral optimization metrics
+    viralMetrics?: ViralMetrics;
+}
+
+/**
+ * Viral optimization metrics for episode proposals
+ * Tracks how well the episode aligns with trending topics and engagement patterns
+ */
+export interface ViralMetrics {
+    /** 0-1 score of how well the topic aligns with current trends */
+    trendAlignment: number;
+    /** 0-1 score of predicted title click appeal */
+    titleHookStrength: number;
+    /** 0-1 score of controversy balance (debatable but not toxic) */
+    controversyBalance: number;
+    /** Suggested hashtags for social promotion */
+    suggestedHashtags: string[];
+    /** Target audience description */
+    targetAudience: string;
+    /** Trending terms this episode connects to */
+    matchedTrends: string[];
+    /** Title pattern used (e.g., "Compound Mystery", "Provocative Question") */
+    titlePattern?: string;
 }
 
 // Quality thresholds for filtering research results
@@ -125,6 +165,7 @@ export const DEFAULT_RESEARCH_CONFIG: Partial<ResearchConfig> = {
     perplexityModel: 'perplexity/sonar-pro',
     maxTopicsPerRun: 20,
     minControversyScore: 0.6,
+    minTrendAlignment: 0.1,              // 10% minimum trend alignment (0 = disabled)
     enabled: true,
     categories: [
         'technology_ethics',

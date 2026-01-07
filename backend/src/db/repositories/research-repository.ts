@@ -15,9 +15,9 @@ export class ResearchRepository {
         const result = await this.pool.query(`
       INSERT INTO research_configs (
         name, schedule, enabled, categories, perplexity_model,
-        max_topics_per_run, min_controversy_score, search_queries, exclude_topics
+        max_topics_per_run, min_controversy_score, min_trend_alignment, search_queries, exclude_topics
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `, [
             config.name,
@@ -27,6 +27,7 @@ export class ResearchRepository {
             config.perplexityModel,
             config.maxTopicsPerRun,
             config.minControversyScore,
+            config.minTrendAlignment ?? 0.1,
             config.searchQueries,
             config.excludeTopics
         ]);
@@ -90,6 +91,10 @@ export class ResearchRepository {
         if (updates.minControversyScore !== undefined) {
             fields.push(`min_controversy_score = $${paramIndex++}`);
             values.push(updates.minControversyScore);
+        }
+        if (updates.minTrendAlignment !== undefined) {
+            fields.push(`min_trend_alignment = $${paramIndex++}`);
+            values.push(updates.minTrendAlignment);
         }
         if (updates.searchQueries !== undefined) {
             fields.push(`search_queries = $${paramIndex++}`);
@@ -241,6 +246,7 @@ export class ResearchRepository {
             perplexityModel: row.perplexity_model,
             maxTopicsPerRun: row.max_topics_per_run,
             minControversyScore: row.min_controversy_score,
+            minTrendAlignment: row.min_trend_alignment ?? 0.1,
             searchQueries: row.search_queries || [],
             excludeTopics: row.exclude_topics || [],
             createdAt: row.created_at,

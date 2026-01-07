@@ -38,6 +38,16 @@ export interface PhilosophicalChair {
   mustAcknowledge: string;
 }
 
+export interface ViralMetrics {
+  trendAlignment: number;
+  titleHookStrength: number;
+  controversyBalance: number;
+  suggestedHashtags: string[];
+  targetAudience: string;
+  matchedTrends: string[];
+  titlePattern?: string;
+}
+
 export interface EpisodeProposal {
   id: string;
   researchResultId: string;
@@ -58,6 +68,7 @@ export interface EpisodeProposal {
   wasEdited: boolean;
   category?: ResearchCategory;
   qualityScore?: number;
+  viralMetrics?: ViralMetrics;
 }
 
 export interface ResearchConfig {
@@ -69,8 +80,20 @@ export interface ResearchConfig {
   perplexityModel: string;
   maxTopicsPerRun: number;
   minControversyScore: number;
+  minTrendAlignment: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TopicPreScreenResult {
+  researchResultId: string;
+  topic: string;
+  category: ResearchCategory;
+  estimatedTrendAlignment: number;
+  matchedTrends: string[];
+  controversyScore: number;
+  passesThreshold: boolean;
+  reason?: string;
 }
 
 export interface DashboardStats {

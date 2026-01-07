@@ -375,10 +375,10 @@ DATABASE_URL=postgresql://...          # PostgreSQL connection
 # GEMINI_API_KEY=...                   # Alternative name for Gemini
 
 # Vector Database for RAG (optional - for Duelogic research features)
-# VECTOR_DB_PROVIDER=pinecone          # Currently only Pinecone supported
-# PINECONE_API_KEY=...                 # Pinecone API key
-# PINECONE_INDEX_NAME=...              # Pinecone index name (e.g., duelogic-research)
-# FETCH_FULL_ARTICLES=false            # Set true to fetch full article content for RAG
+VECTOR_DB_PROVIDER=pinecone          # Currently only Pinecone supported
+PINECONE_API_KEY=...                 # Pinecone API key
+PINECONE_INDEX_NAME=...              # Pinecone index name (e.g., duelogic-research)
+FETCH_FULL_ARTICLES=false            # Set true to fetch full article content for RAG
 
 # Server
 PORT=3001

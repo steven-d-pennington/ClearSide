@@ -158,20 +158,48 @@ export class GeminiTTSService implements ITTSService {
       'Generating speech with Gemini'
     );
 
-    // Split long text into chunks to avoid timeout
-    const chunks = this.splitIntoChunks(text);
+    // Check if this is a structured prompt with director's notes
+    // If so, extract them and pass as system_instruction (not spoken)
+    const transcriptMarker = '#### TRANSCRIPT';
+    const hasStructuredPrompt = text.includes(transcriptMarker);
+
+    let systemInstruction: string | undefined;
+    let transcript: string;
+
+    if (hasStructuredPrompt) {
+      // Extract director's notes and transcript separately
+      const markerIndex = text.indexOf(transcriptMarker);
+      systemInstruction = text.substring(0, markerIndex).trim();
+      transcript = text.substring(markerIndex + transcriptMarker.length).trim();
+
+      logger.debug(
+        { systemInstructionLength: systemInstruction.length, transcriptLength: transcript.length },
+        'Structured prompt detected - using system_instruction for director\'s notes'
+      );
+    } else {
+      transcript = text;
+    }
+
+    // Split transcript into chunks to avoid timeout (director's notes handled separately)
+    const chunks = this.splitIntoChunks(transcript);
 
     if (chunks.length === 1) {
-      // Single chunk - use existing logic
+      // Single chunk - use existing logic with optional system instruction
       return this.limiter.schedule(async () => {
-        return this.generateSpeechWithRetry(text, voice);
+        return this.generateSpeechWithRetry(transcript, voice, 1, systemInstruction);
       });
     }
 
     // Multiple chunks - generate each and concatenate
+    // System instruction (director's notes) applies to ALL chunks for consistent voice
     logger.info(
-      { totalLength: text.length, chunkCount: chunks.length, chunkSizes: chunks.map(c => c.length) },
-      'Splitting text into chunks for Gemini TTS'
+      {
+        totalLength: transcript.length,
+        chunkCount: chunks.length,
+        chunkSizes: chunks.map(c => c.length),
+        hasSystemInstruction: !!systemInstruction,
+      },
+      'Splitting transcript into chunks for Gemini TTS'
     );
 
     const pcmBuffers: Buffer[] = [];
@@ -185,7 +213,8 @@ export class GeminiTTSService implements ITTSService {
       );
 
       const pcmBuffer = await this.limiter.schedule(async () => {
-        return this.generatePcmForChunk(chunk, voice);
+        // Pass system instruction to ALL chunks for consistent voice performance
+        return this.generatePcmForChunk(chunk, voice, 1, systemInstruction);
       });
 
       pcmBuffers.push(pcmBuffer);
@@ -284,30 +313,41 @@ export class GeminiTTSService implements ITTSService {
   private async generatePcmForChunk(
     text: string,
     voice: VoiceConfig,
-    attempt: number = 1
+    attempt: number = 1,
+    systemInstruction?: string
   ): Promise<Buffer> {
     try {
       const startTime = Date.now();
 
-      const response = await this.client.post(
-        `/models/${this.modelId}:generateContent`,
-        {
-          contents: [
-            {
-              parts: [{ text }],
-            },
-          ],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: voice.voiceId,
-                },
+      // Build request body with optional system instruction
+      const requestBody: Record<string, unknown> = {
+        contents: [
+          {
+            parts: [{ text }],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voice.voiceId,
               },
             },
           },
         },
+      };
+
+      // Add system instruction for voice performance guidance (not spoken)
+      if (systemInstruction) {
+        requestBody.system_instruction = {
+          parts: [{ text: systemInstruction }],
+        };
+      }
+
+      const response = await this.client.post(
+        `/models/${this.modelId}:generateContent`,
+        requestBody,
         {
           params: {
             key: this.apiKey,
@@ -349,7 +389,7 @@ export class GeminiTTSService implements ITTSService {
         );
 
         await this.sleep(delay);
-        return this.generatePcmForChunk(text, voice, attempt + 1);
+        return this.generatePcmForChunk(text, voice, attempt + 1, systemInstruction);
       }
 
       throw new Error(`Gemini TTS chunk failed: ${axiosError.message}`);
@@ -359,31 +399,46 @@ export class GeminiTTSService implements ITTSService {
   private async generateSpeechWithRetry(
     text: string,
     voice: VoiceConfig,
-    attempt: number = 1
+    attempt: number = 1,
+    systemInstruction?: string
   ): Promise<TTSResult> {
     try {
       const startTime = Date.now();
 
-      // Gemini TTS uses the generateContent endpoint with audio output
-      const response = await this.client.post(
-        `/models/${this.modelId}:generateContent`,
-        {
-          contents: [
-            {
-              parts: [{ text }],
-            },
-          ],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: voice.voiceId,
-                },
+      // Build request body with optional system instruction
+      const requestBody: Record<string, unknown> = {
+        contents: [
+          {
+            parts: [{ text }],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voice.voiceId,
               },
             },
           },
         },
+      };
+
+      // Add system instruction for voice performance guidance (not spoken)
+      if (systemInstruction) {
+        requestBody.system_instruction = {
+          parts: [{ text: systemInstruction }],
+        };
+        logger.debug(
+          { systemInstructionLength: systemInstruction.length },
+          'Using system_instruction for voice guidance'
+        );
+      }
+
+      // Gemini TTS uses the generateContent endpoint with audio output
+      const response = await this.client.post(
+        `/models/${this.modelId}:generateContent`,
+        requestBody,
         {
           params: {
             key: this.apiKey,
@@ -442,7 +497,7 @@ export class GeminiTTSService implements ITTSService {
         );
 
         await this.sleep(delay);
-        return this.generateSpeechWithRetry(text, voice, attempt + 1);
+        return this.generateSpeechWithRetry(text, voice, attempt + 1, systemInstruction);
       }
 
       logger.error(

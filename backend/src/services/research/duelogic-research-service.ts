@@ -11,6 +11,11 @@ import {
 } from '../../types/duelogic-research.js';
 import { CATEGORY_PROMPTS } from './category-prompts.js';
 import { DEFAULT_PERPLEXITY_CONFIG, PerplexityConfig } from './perplexity-config.js';
+import {
+    getTrendingTopicsService,
+    TrendingTopicsService,
+    type TrendingContext,
+} from './trending-topics-service.js';
 import pino from 'pino';
 
 const logger = pino({
@@ -40,15 +45,40 @@ interface PerplexityResponse {
 export class DuelogicResearchService {
     private perplexityConfig: PerplexityConfig;
     private qualityThresholds: QualityThresholds;
+    private trendingService: TrendingTopicsService;
+    private trendingContext: TrendingContext | null = null;
 
     constructor(
         private llmClient: OpenRouterLLMClient,
         private researchRepo: ResearchRepository,
         config?: Partial<PerplexityConfig>,
-        thresholds?: Partial<QualityThresholds>
+        thresholds?: Partial<QualityThresholds>,
+        trendingService?: TrendingTopicsService
     ) {
         this.perplexityConfig = { ...DEFAULT_PERPLEXITY_CONFIG, ...config };
         this.qualityThresholds = { ...DEFAULT_QUALITY_THRESHOLDS, ...thresholds };
+        this.trendingService = trendingService || getTrendingTopicsService();
+    }
+
+    /**
+     * Refresh trending context before research run
+     */
+    async refreshTrendingContext(): Promise<void> {
+        try {
+            if (this.trendingService.isAvailable()) {
+                this.trendingContext = await this.trendingService.getTrendingContext();
+                logger.info(
+                    { trendingCount: this.trendingContext.trendingSearches.length },
+                    'Loaded trending context for research queries'
+                );
+            } else {
+                logger.info('Trending service not available - using standard prompts');
+                this.trendingContext = null;
+            }
+        } catch (error) {
+            logger.warn({ error }, 'Failed to fetch trending context - continuing without');
+            this.trendingContext = null;
+        }
     }
 
     /**
@@ -60,6 +90,9 @@ export class DuelogicResearchService {
     ): Promise<ResearchResult[]> {
         const results: ResearchResult[] = [];
         let totalTokensUsed = 0;
+
+        // Refresh trending context at start of research run
+        await this.refreshTrendingContext();
 
         for (const category of config.categories) {
             try {
@@ -128,9 +161,12 @@ export class DuelogicResearchService {
             ? `\n\nExclude topics similar to: ${excludeTopics.join(', ')}`
             : '';
 
+        // Build trending context for this category
+        const trendingClause = this.buildTrendingClause(category);
+
         const response = await this.queryPerplexity(
             prompt.systemPrompt,
-            `${prompt.searchPrompt}${excludeClause}
+            `${prompt.searchPrompt}${excludeClause}${trendingClause}
 
 Return your findings as a JSON array with this structure:
 {
@@ -154,7 +190,8 @@ Return your findings as a JSON array with this structure:
   ]
 }
 
-Find up to ${maxTopics} topics. Quality over quantity - only include genuinely debatable topics.`
+Find up to ${maxTopics} topics. Quality over quantity - only include genuinely debatable topics.
+${this.trendingContext ? 'PRIORITY: Topics that connect to current trending discussions will score higher for timeliness.' : ''}`
         );
 
         const parsed = this.parseTopicsResponse(response.content, category);
@@ -164,6 +201,40 @@ Find up to ${maxTopics} topics. Quality over quantity - only include genuinely d
             tokensUsed: response.usage?.total_tokens || 0,
             rawResponse: response.content,
         };
+    }
+
+    /**
+     * Build trending context clause for research prompts
+     */
+    private buildTrendingClause(category: ResearchCategory): string {
+        if (!this.trendingContext) {
+            return '';
+        }
+
+        const parts: string[] = [];
+
+        // Add global trending searches
+        if (this.trendingContext.trendingSearches.length > 0) {
+            parts.push(`
+CURRENT TRENDING PODCAST TOPICS (prioritize topics that intersect with these):
+${this.trendingContext.trendingSearches.slice(0, 8).map(t => `- "${t}"`).join('\n')}`);
+        }
+
+        // Add category-specific hot topics
+        const categoryHotTopics = this.trendingContext.hotTopicsByCategory.get(category);
+        if (categoryHotTopics && categoryHotTopics.length > 0) {
+            parts.push(`
+HOT TOPICS IN ${category.toUpperCase().replace(/_/g, ' ')}:
+${categoryHotTopics.slice(0, 5).map(t => `- "${t}"`).join('\n')}`);
+        }
+
+        // Add viral guidance
+        if (parts.length > 0) {
+            parts.push(`
+Look for debate-worthy angles that connect to these trending topics. Topics that tap into current conversations will have higher viral potential.`);
+        }
+
+        return parts.join('\n');
     }
 
     /**

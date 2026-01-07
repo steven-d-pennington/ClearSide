@@ -68,14 +68,18 @@ export interface VectorDBClient {
   ping(): Promise<boolean>;
 }
 
+export type EmbeddingProvider = 'openai' | 'openrouter';
+
 export interface EmbeddingConfig {
   model: string;
   dimensions: number;
   batchSize: number;
+  provider: EmbeddingProvider;
 }
 
 export const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
   model: 'text-embedding-3-small',
   dimensions: 1536,
   batchSize: 100, // OpenAI limit is 2048
+  provider: 'openrouter', // Default to OpenRouter to avoid OpenAI quota issues
 };

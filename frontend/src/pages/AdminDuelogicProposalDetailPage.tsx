@@ -2,15 +2,25 @@
  * AdminDuelogicProposalDetailPage
  *
  * Detailed view and edit page for an episode proposal
+ * Design: Command Center Editorial - Proposal Deep Dive
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button, Alert } from '../components/ui';
+import { LaunchDebateModal } from '../components/LaunchDebateModal';
 import styles from './AdminDuelogicProposalDetailPage.module.css';
 import type { EpisodeProposal, PhilosophicalChair } from '../types/duelogic-research';
+import { CATEGORY_LABELS, type ResearchCategory } from '../types/duelogic-research';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+// Helper to get score class
+const getScoreClass = (score: number): string => {
+  if (score >= 0.6) return styles.scoreHigh;
+  if (score >= 0.3) return styles.scoreMedium;
+  return styles.scoreLow;
+};
 
 export function AdminDuelogicProposalDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +31,7 @@ export function AdminDuelogicProposalDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [showLaunchModal, setShowLaunchModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -57,7 +68,7 @@ export function AdminDuelogicProposalDetailPage() {
       });
 
       if (response.ok) {
-        setActionMessage({ type: 'success', text: 'Proposal updated' });
+        setActionMessage({ type: 'success', text: 'Proposal updated successfully' });
         setIsEditing(false);
         fetchProposal();
       } else {
@@ -81,13 +92,36 @@ export function AdminDuelogicProposalDetailPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setActionMessage({ type: 'success', text: `Approved as Episode ${data.episodeNumber}` });
+        setActionMessage({ type: 'success', text: `Approved as Episode #${data.episodeNumber}` });
         fetchProposal();
       } else {
         setActionMessage({ type: 'error', text: 'Failed to approve proposal' });
       }
     } catch {
       setActionMessage({ type: 'error', text: 'Failed to approve proposal' });
+    }
+    setTimeout(() => setActionMessage(null), 5000);
+  };
+
+  const handleUnapprove = async () => {
+    if (!id) return;
+    if (!confirm('Are you sure you want to unapprove this proposal? It will return to pending status.')) {
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/duelogic/proposals/${id}/unapprove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        setActionMessage({ type: 'success', text: 'Proposal returned to pending' });
+        fetchProposal();
+      } else {
+        setActionMessage({ type: 'error', text: 'Failed to unapprove proposal' });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Failed to unapprove proposal' });
     }
     setTimeout(() => setActionMessage(null), 5000);
   };
@@ -138,28 +172,31 @@ export function AdminDuelogicProposalDetailPage() {
     setTimeout(() => setActionMessage(null), 5000);
   };
 
-  const handleLaunchDebate = async () => {
+  interface ChairModelSelection {
+    modelId: string;
+    modelDisplayName: string;
+    providerName: string;
+  }
+
+  const handleLaunchDebate = async (chairModels: ChairModelSelection[]) => {
     if (!id) return;
-    if (!confirm('Launch this proposal as a live debate? This will create a new debate and start the AI agents.')) {
-      return;
-    }
 
     setIsLaunching(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/duelogic/proposals/${id}/launch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chairModels }),
       });
 
       if (response.ok) {
         const data = await response.json();
+        setShowLaunchModal(false);
         setActionMessage({
           type: 'success',
-          text: `Debate launched! Debate ID: ${data.debateId.slice(0, 8)}...`,
+          text: `Debate launched! ID: ${data.debateId.slice(0, 8)}...`,
         });
         fetchProposal();
-        // Optionally redirect to the debate view
-        // navigate(`/debates/${data.debateId}`);
       } else {
         const data = await response.json();
         setActionMessage({ type: 'error', text: data.error || 'Failed to launch debate' });
@@ -172,7 +209,7 @@ export function AdminDuelogicProposalDetailPage() {
     }
   };
 
-  const updateField = (field: keyof EpisodeProposal, value: any) => {
+  const updateField = (field: keyof EpisodeProposal, value: unknown) => {
     setEditedProposal(prev => ({ ...prev, [field]: value }));
   };
 
@@ -190,13 +227,28 @@ export function AdminDuelogicProposalDetailPage() {
 
   const formatDate = (dateStr: string | undefined): string => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString();
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = (dateStr: string | undefined): string => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (isLoading) {
     return (
       <div className={styles.container}>
-        <div className={styles.loading}>Loading proposal...</div>
+        <div className={styles.loading}>
+          <div className={styles.loadingSpinner} />
+          <span>Loading proposal...</span>
+        </div>
       </div>
     );
   }
@@ -215,6 +267,8 @@ export function AdminDuelogicProposalDetailPage() {
   const displayProposal = isEditing ? editedProposal : proposal;
   const chairs = displayProposal.chairs || [];
   const keyTensions = displayProposal.keyTensions || [];
+  const viralMetrics = proposal.viralMetrics;
+  const statusClass = `status${proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}`;
 
   return (
     <div className={styles.container}>
@@ -231,8 +285,24 @@ export function AdminDuelogicProposalDetailPage() {
         </Alert>
       )}
 
-      {/* Header */}
-      <header className={styles.header}>
+      {/* Hero Header */}
+      <header className={`${styles.header} ${styles[statusClass]}`}>
+        <div className={styles.headerTop}>
+          <div className={styles.headerMeta}>
+            <span className={`${styles.status} ${styles[statusClass]}`}>
+              {proposal.status}
+            </span>
+            {proposal.episodeNumber && (
+              <span className={styles.episodeNumber}>EP #{proposal.episodeNumber}</span>
+            )}
+            {proposal.category && (
+              <span className={styles.categoryBadge}>
+                {CATEGORY_LABELS[proposal.category as ResearchCategory] || proposal.category}
+              </span>
+            )}
+          </div>
+        </div>
+
         <div className={styles.headerContent}>
           {isEditing ? (
             <>
@@ -258,14 +328,34 @@ export function AdminDuelogicProposalDetailPage() {
             </>
           )}
         </div>
-        <div className={styles.headerMeta}>
-          <span className={`${styles.status} ${styles[`status${proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}`]}`}>
-            {proposal.status}
-          </span>
-          {proposal.episodeNumber && (
-            <span className={styles.episodeNumber}>Episode #{proposal.episodeNumber}</span>
-          )}
-        </div>
+
+        {/* Viral Metrics Panel */}
+        {viralMetrics && (
+          <div className={styles.viralPanel}>
+            <div className={`${styles.viralScore} ${getScoreClass(viralMetrics.titleHookStrength)}`}>
+              <span className={styles.scoreLabel}>Hook</span>
+              <span className={styles.scoreValue}>{Math.round(viralMetrics.titleHookStrength * 100)}%</span>
+            </div>
+            <div className={`${styles.viralScore} ${getScoreClass(viralMetrics.trendAlignment)}`}>
+              <span className={styles.scoreLabel}>Trend</span>
+              <span className={styles.scoreValue}>{Math.round(viralMetrics.trendAlignment * 100)}%</span>
+            </div>
+            <div className={`${styles.viralScore} ${getScoreClass(viralMetrics.controversyBalance)}`}>
+              <span className={styles.scoreLabel}>Debate</span>
+              <span className={styles.scoreValue}>{Math.round(viralMetrics.controversyBalance * 100)}%</span>
+            </div>
+            {viralMetrics.matchedTrends && viralMetrics.matchedTrends.length > 0 && (
+              <div className={styles.matchedTrends}>
+                <div className={styles.trendsLabel}>Matched Trends</div>
+                <div className={styles.trendsList}>
+                  {viralMetrics.matchedTrends.map((trend, i) => (
+                    <span key={i} className={styles.trendTag}>{trend}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Actions */}
@@ -294,20 +384,37 @@ export function AdminDuelogicProposalDetailPage() {
                 </Button>
               </>
             )}
-            {(proposal.status === 'approved' || proposal.status === 'scheduled') && (
+            {proposal.status === 'approved' && (
               <>
-                <Button onClick={handleLaunchDebate} variant="primary" loading={isLaunching}>
-                  🚀 Launch Debate
+                <Button onClick={() => setShowLaunchModal(true)} variant="primary">
+                  Launch Debate
                 </Button>
-                {proposal.status === 'approved' && (
-                  <Button onClick={handleSchedule} variant="secondary">
-                    Schedule
-                  </Button>
-                )}
+                <Button onClick={handleSchedule} variant="secondary">
+                  Schedule
+                </Button>
+                <Button onClick={handleUnapprove} variant="secondary">
+                  Unapprove
+                </Button>
+              </>
+            )}
+            {proposal.status === 'scheduled' && (
+              <>
+                <Button onClick={() => setShowLaunchModal(true)} variant="primary">
+                  Launch Debate
+                </Button>
+                <Button onClick={handleUnapprove} variant="secondary">
+                  Unapprove
+                </Button>
               </>
             )}
             {proposal.status === 'launched' && (
-              <span className={styles.launchedBadge}>Debate Launched</span>
+              <span className={styles.launchedBadge}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                Debate Launched
+              </span>
             )}
           </>
         )}
@@ -317,147 +424,282 @@ export function AdminDuelogicProposalDetailPage() {
       <div className={styles.content}>
         {/* Description */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Description</h2>
-          {isEditing ? (
-            <textarea
-              value={displayProposal.description || ''}
-              onChange={e => updateField('description', e.target.value)}
-              className={styles.textarea}
-              rows={4}
-              placeholder="Episode description"
-            />
-          ) : (
-            <p className={styles.description}>{proposal.description}</p>
-          )}
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+            </div>
+            <h2 className={styles.sectionTitle}>Description</h2>
+          </div>
+          <div className={styles.sectionBody}>
+            {isEditing ? (
+              <textarea
+                value={displayProposal.description || ''}
+                onChange={e => updateField('description', e.target.value)}
+                className={styles.textarea}
+                rows={4}
+                placeholder="Episode description"
+              />
+            ) : (
+              <p className={styles.description}>{proposal.description}</p>
+            )}
+          </div>
         </section>
 
         {/* Proposition */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Proposition</h2>
-          {isEditing ? (
-            <textarea
-              value={displayProposal.proposition || ''}
-              onChange={e => updateField('proposition', e.target.value)}
-              className={styles.textarea}
-              rows={2}
-              placeholder="The debate proposition"
-            />
-          ) : (
-            <blockquote className={styles.proposition}>{proposal.proposition}</blockquote>
-          )}
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </div>
+            <h2 className={styles.sectionTitle}>Proposition</h2>
+          </div>
+          <div className={styles.sectionBody}>
+            {isEditing ? (
+              <textarea
+                value={displayProposal.proposition || ''}
+                onChange={e => updateField('proposition', e.target.value)}
+                className={styles.textarea}
+                rows={2}
+                placeholder="The debate proposition"
+              />
+            ) : (
+              <blockquote className={styles.proposition}>{proposal.proposition}</blockquote>
+            )}
+          </div>
         </section>
 
         {/* Context for Panel */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Context for Panel</h2>
-          {isEditing ? (
-            <textarea
-              value={displayProposal.contextForPanel || ''}
-              onChange={e => updateField('contextForPanel', e.target.value)}
-              className={styles.textarea}
-              rows={6}
-              placeholder="Background context for AI debaters"
-            />
-          ) : (
-            <p className={styles.contextForPanel}>{proposal.contextForPanel}</p>
-          )}
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+            </div>
+            <h2 className={styles.sectionTitle}>Context for Panel</h2>
+          </div>
+          <div className={styles.sectionBody}>
+            {isEditing ? (
+              <textarea
+                value={displayProposal.contextForPanel || ''}
+                onChange={e => updateField('contextForPanel', e.target.value)}
+                className={styles.textarea}
+                rows={6}
+                placeholder="Background context for AI debaters"
+              />
+            ) : (
+              <p className={styles.contextForPanel}>{proposal.contextForPanel}</p>
+            )}
+          </div>
         </section>
 
         {/* Philosophical Chairs */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Philosophical Chairs</h2>
-          <div className={styles.chairsGrid}>
-            {chairs.map((chair, index) => (
-              <div key={index} className={styles.chairCard}>
-                {isEditing ? (
-                  <>
-                    <input
-                      type="text"
-                      value={chair.name || ''}
-                      onChange={e => updateChair(index, 'name', e.target.value)}
-                      className={styles.input}
-                      placeholder="Chair name"
-                    />
-                    <textarea
-                      value={chair.position || ''}
-                      onChange={e => updateChair(index, 'position', e.target.value)}
-                      className={styles.textareaSmall}
-                      rows={3}
-                      placeholder="Chair position"
-                    />
-                    <textarea
-                      value={chair.mustAcknowledge || ''}
-                      onChange={e => updateChair(index, 'mustAcknowledge', e.target.value)}
-                      className={styles.textareaSmall}
-                      rows={2}
-                      placeholder="Must acknowledge"
-                    />
-                  </>
-                ) : (
-                  <>
-                    <h3 className={styles.chairName}>{chair.name}</h3>
-                    <p className={styles.chairPosition}>{chair.position}</p>
-                    <p className={styles.chairAcknowledge}>
-                      <strong>Must acknowledge:</strong> {chair.mustAcknowledge}
-                    </p>
-                  </>
-                )}
-              </div>
-            ))}
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <h2 className={styles.sectionTitle}>Philosophical Chairs</h2>
+          </div>
+          <div className={styles.sectionBody}>
+            <div className={styles.chairsGrid}>
+              {chairs.map((chair, index) => (
+                <div key={index} className={styles.chairCard}>
+                  <span className={styles.chairLabel}>
+                    {index === 0 ? 'Chair A' : 'Chair B'}
+                  </span>
+                  {isEditing ? (
+                    <>
+                      <input
+                        type="text"
+                        value={chair.name || ''}
+                        onChange={e => updateChair(index, 'name', e.target.value)}
+                        className={styles.input}
+                        placeholder="Chair name"
+                      />
+                      <textarea
+                        value={chair.position || ''}
+                        onChange={e => updateChair(index, 'position', e.target.value)}
+                        className={styles.textareaSmall}
+                        rows={3}
+                        placeholder="Chair position"
+                      />
+                      <textarea
+                        value={chair.mustAcknowledge || ''}
+                        onChange={e => updateChair(index, 'mustAcknowledge', e.target.value)}
+                        className={styles.textareaSmall}
+                        rows={2}
+                        placeholder="Must acknowledge"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <h3 className={styles.chairName}>{chair.name}</h3>
+                      <p className={styles.chairPosition}>{chair.position}</p>
+                      <p className={styles.chairAcknowledge}>
+                        <strong>Must Acknowledge</strong>
+                        {chair.mustAcknowledge}
+                      </p>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
         {/* Key Tensions */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Key Tensions</h2>
-          <ul className={styles.tensionList}>
-            {keyTensions.map((tension, index) => (
-              <li key={index}>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={tension || ''}
-                    onChange={e => updateKeyTension(index, e.target.value)}
-                    className={styles.tensionInput}
-                    placeholder={`Tension ${index + 1}`}
-                  />
-                ) : (
-                  tension
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+              </svg>
+            </div>
+            <h2 className={styles.sectionTitle}>Key Tensions</h2>
+          </div>
+          <div className={styles.sectionBody}>
+            <ul className={styles.tensionList}>
+              {keyTensions.map((tension, index) => (
+                <li key={index} className={styles.tensionItem}>
+                  <span className={styles.tensionNumber}>{index + 1}</span>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={tension || ''}
+                      onChange={e => updateKeyTension(index, e.target.value)}
+                      className={styles.tensionInput}
+                      placeholder={`Tension ${index + 1}`}
+                    />
+                  ) : (
+                    <span className={styles.tensionText}>{tension}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
+
+        {/* Viral Optimization Details */}
+        {viralMetrics && (viralMetrics.suggestedHashtags?.length > 0 || viralMetrics.targetAudience) && (
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+              </div>
+              <h2 className={styles.sectionTitle}>Viral Optimization</h2>
+            </div>
+            <div className={styles.sectionBody}>
+              {viralMetrics.suggestedHashtags && viralMetrics.suggestedHashtags.length > 0 && (
+                <div className={styles.hashtagsSection}>
+                  <span className={styles.hashtagLabel}>Suggested Hashtags</span>
+                  {viralMetrics.suggestedHashtags.map((tag, i) => (
+                    <span key={i} className={styles.hashtag}>{tag}</span>
+                  ))}
+                </div>
+              )}
+              {viralMetrics.targetAudience && (
+                <div className={styles.audienceSection}>
+                  <span className={styles.audienceLabel}>Target Audience</span>
+                  <p className={styles.audienceText}>{viralMetrics.targetAudience}</p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Metadata */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Metadata</h2>
-          <dl className={styles.metadataGrid}>
-            <dt>Generated</dt>
-            <dd>{formatDate(proposal.generatedAt)}</dd>
-            {proposal.reviewedAt && (
-              <>
-                <dt>Reviewed</dt>
-                <dd>{formatDate(proposal.reviewedAt)} by {proposal.reviewedBy}</dd>
-              </>
-            )}
-            {proposal.scheduledFor && (
-              <>
-                <dt>Scheduled for</dt>
-                <dd>{formatDate(proposal.scheduledFor)}</dd>
-              </>
-            )}
-            {proposal.adminNotes && (
-              <>
-                <dt>Notes</dt>
-                <dd>{proposal.adminNotes}</dd>
-              </>
-            )}
-            <dt>Edited</dt>
-            <dd>{proposal.wasEdited ? 'Yes' : 'No'}</dd>
-          </dl>
+          <div className={styles.sectionHeader}>
+            <div className={styles.sectionIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </div>
+            <h2 className={styles.sectionTitle}>Metadata</h2>
+          </div>
+          <div className={styles.sectionBody}>
+            <div className={styles.metadataGrid}>
+              <div className={styles.metaItem}>
+                <span className={styles.metaLabel}>Generated</span>
+                <span className={styles.metaValue}>
+                  {formatDate(proposal.generatedAt)}
+                  {formatTime(proposal.generatedAt) && (
+                    <span style={{ opacity: 0.6, marginLeft: '0.5rem' }}>
+                      {formatTime(proposal.generatedAt)}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {proposal.reviewedAt && (
+                <div className={styles.metaItem}>
+                  <span className={styles.metaLabel}>Reviewed</span>
+                  <span className={styles.metaValue}>
+                    {formatDate(proposal.reviewedAt)}
+                    {proposal.reviewedBy && (
+                      <span style={{ opacity: 0.6, marginLeft: '0.5rem' }}>
+                        by {proposal.reviewedBy}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {proposal.scheduledFor && (
+                <div className={styles.metaItem}>
+                  <span className={styles.metaLabel}>Scheduled For</span>
+                  <span className={styles.metaValue}>{formatDate(proposal.scheduledFor)}</span>
+                </div>
+              )}
+              <div className={styles.metaItem}>
+                <span className={styles.metaLabel}>Edited</span>
+                <span className={styles.metaValue}>{proposal.wasEdited ? 'Yes' : 'No'}</span>
+              </div>
+              {viralMetrics?.titlePattern && (
+                <div className={styles.metaItem}>
+                  <span className={styles.metaLabel}>Title Pattern</span>
+                  <span className={styles.metaValue}>{viralMetrics.titlePattern}</span>
+                </div>
+              )}
+              {proposal.adminNotes && (
+                <div className={styles.metaItem} style={{ gridColumn: '1 / -1' }}>
+                  <span className={styles.metaLabel}>Admin Notes</span>
+                  <span className={styles.metaValue}>{proposal.adminNotes}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       </div>
+
+      {/* Launch Debate Modal */}
+      <LaunchDebateModal
+        proposal={proposal}
+        isOpen={showLaunchModal}
+        onClose={() => setShowLaunchModal(false)}
+        onLaunch={handleLaunchDebate}
+        isLaunching={isLaunching}
+      />
     </div>
   );
 }

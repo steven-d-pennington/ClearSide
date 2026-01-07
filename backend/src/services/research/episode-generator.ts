@@ -1,7 +1,14 @@
 
 import { OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 import { EpisodeProposalRepository } from '../../db/repositories/episode-proposal-repository.js';
-import { ResearchResult, EpisodeProposal, PhilosophicalChair } from '../../types/duelogic-research.js';
+import { ResearchResult, EpisodeProposal, PhilosophicalChair, ViralMetrics, TopicPreScreenResult } from '../../types/duelogic-research.js';
+import {
+    getTrendingTopicsService,
+    TrendingTopicsService,
+    VIRAL_TITLE_PATTERNS,
+    POWER_WORDS,
+    type TrendingContext,
+} from './trending-topics-service.js';
 import pino from 'pino';
 
 const logger = pino({
@@ -32,17 +39,214 @@ interface GeneratedEpisode {
     chairs: PhilosophicalChair[];
     keyTensions: string[];
     qualityScore: number;
+    // Viral optimization fields
+    suggestedHashtags?: string[];
+    targetAudience?: string;
 }
 
 export class EpisodeGenerator {
     private config: GeneratorConfig;
+    private trendingService: TrendingTopicsService;
+    private trendingContext: TrendingContext | null = null;
 
     constructor(
         private llmClient: OpenRouterLLMClient,
         private proposalRepo: EpisodeProposalRepository,
-        config?: Partial<GeneratorConfig>
+        config?: Partial<GeneratorConfig>,
+        trendingService?: TrendingTopicsService
     ) {
         this.config = { ...DEFAULT_GENERATOR_CONFIG, ...config };
+        this.trendingService = trendingService || getTrendingTopicsService();
+    }
+
+    /**
+     * Refresh trending context (call at start of batch generation)
+     */
+    async refreshTrendingContext(): Promise<void> {
+        try {
+            if (this.trendingService.isAvailable()) {
+                this.trendingContext = await this.trendingService.getTrendingContext();
+                logger.info(
+                    { trendingCount: this.trendingContext.trendingSearches.length },
+                    'Refreshed trending context for viral optimization'
+                );
+            } else {
+                logger.info('Trending service not available - using default prompts');
+                this.trendingContext = null;
+            }
+        } catch (error) {
+            logger.warn({ error }, 'Failed to fetch trending context - continuing without');
+            this.trendingContext = null;
+        }
+    }
+
+    /**
+     * Pre-screen a research result for viral potential BEFORE generating a full proposal.
+     * This saves LLM tokens by filtering out low-potential topics early.
+     *
+     * @param research The research result to evaluate
+     * @param minTrendAlignment Minimum trend alignment threshold (0-1, 0 = disabled)
+     * @returns Pre-screening result with pass/fail and reasons
+     */
+    preScreenTopic(
+        research: ResearchResult,
+        minTrendAlignment: number = 0
+    ): TopicPreScreenResult {
+        // Calculate trend alignment from research content (no title needed yet)
+        const { matchedTrends, trendAlignment } = this.calculateResearchTrendAlignment(research);
+
+        // Check if it passes the threshold
+        const passesThreshold = minTrendAlignment === 0 || trendAlignment >= minTrendAlignment;
+
+        let reason: string | undefined;
+        if (!passesThreshold) {
+            reason = `Trend alignment ${(trendAlignment * 100).toFixed(0)}% below threshold ${(minTrendAlignment * 100).toFixed(0)}%`;
+        } else if (matchedTrends.length === 0 && minTrendAlignment > 0) {
+            reason = 'No trending topics matched';
+        }
+
+        const result: TopicPreScreenResult = {
+            researchResultId: research.id,
+            topic: research.topic,
+            category: research.category,
+            estimatedTrendAlignment: trendAlignment,
+            matchedTrends,
+            controversyScore: research.controversyScore,
+            passesThreshold,
+            reason,
+        };
+
+        logger.info({
+            topic: research.topic.slice(0, 50),
+            trendAlignment: `${(trendAlignment * 100).toFixed(0)}%`,
+            matchedTrends: matchedTrends.slice(0, 3),
+            passesThreshold,
+            minThreshold: `${(minTrendAlignment * 100).toFixed(0)}%`,
+        }, passesThreshold ? 'Topic passed pre-screening' : 'Topic filtered by pre-screening');
+
+        return result;
+    }
+
+    /**
+     * Calculate trend alignment from research result alone (without generated title)
+     * Used for pre-screening before spending tokens on full proposal generation
+     */
+    private calculateResearchTrendAlignment(
+        research: ResearchResult
+    ): { matchedTrends: string[]; trendAlignment: number } {
+        const matchedTrends: string[] = [];
+        let alignmentScore = 0;
+
+        if (!this.trendingContext || this.trendingContext.trendingSearches.length === 0) {
+            return { matchedTrends, trendAlignment: 0 };
+        }
+
+        // Build content from research only (no generated title/description)
+        const contentToMatch = [
+            research.topic,
+            research.summary,
+            research.category.replace(/_/g, ' '),
+            ...research.sources.map(s => s.title).slice(0, 3),
+        ].join(' ').toLowerCase();
+
+        const contentKeywords = this.extractKeywords(contentToMatch);
+
+        // Same matching logic as calculateTrendAlignment but without generated content
+        const figureTopicMap: Record<string, string[]> = {
+            'dario amodei': ['ai', 'anthropic', 'artificial intelligence', 'safety', 'ethics', 'claude'],
+            'sam altman': ['ai', 'openai', 'artificial intelligence', 'chatgpt', 'gpt'],
+            'elon musk': ['ai', 'technology', 'twitter', 'tesla', 'space', 'spacex', 'x'],
+            'jd vance': ['politics', 'government', 'senate', 'republican', 'trump', 'vice president', 'vp'],
+            'trump': ['politics', 'government', 'president', 'republican', 'white house', 'administration'],
+            'biden': ['politics', 'government', 'president', 'democrat', 'white house', 'administration'],
+            'zohran mamdani': ['politics', 'democrat', 'progressive', 'nyc', 'new york'],
+            'scott bessent': ['economics', 'treasury', 'finance', 'policy', 'economic'],
+            'ozempic': ['health', 'medicine', 'pharmaceutical', 'obesity', 'diabetes', 'wegovy', 'weight'],
+            'susan wojcicki': ['technology', 'youtube', 'google', 'media', 'video'],
+            'openai': ['ai', 'artificial intelligence', 'chatgpt', 'gpt', 'machine learning'],
+            'anthropic': ['ai', 'artificial intelligence', 'claude', 'safety', 'ethics'],
+            'google': ['ai', 'technology', 'search', 'gemini', 'bard'],
+            'climate': ['environment', 'carbon', 'emissions', 'green', 'sustainability', 'warming'],
+            'ukraine': ['war', 'russia', 'conflict', 'nato', 'military', 'international'],
+            'israel': ['gaza', 'palestine', 'conflict', 'middle east', 'war'],
+            'congress': ['politics', 'government', 'legislation', 'senate', 'house'],
+            'supreme court': ['law', 'court', 'justice', 'legal', 'constitutional', 'ruling'],
+        };
+
+        for (const trend of this.trendingContext.trendingSearches) {
+            const trendLower = trend.toLowerCase();
+            let matched = false;
+
+            // Direct match
+            if (contentToMatch.includes(trendLower)) {
+                matchedTrends.push(trend);
+                alignmentScore += 1.0;
+                continue;
+            }
+
+            // Keyword match
+            const trendKeywords = this.extractKeywords(trendLower);
+            if (trendKeywords.size > 0) {
+                const keywordOverlap = [...trendKeywords].filter(kw => contentKeywords.has(kw)).length;
+                const overlapRatio = keywordOverlap / trendKeywords.size;
+                if (overlapRatio >= 0.5) {
+                    matchedTrends.push(trend);
+                    alignmentScore += overlapRatio * 0.8;
+                    continue;
+                }
+            }
+
+            // Figure-to-topic mapping
+            for (const [figure, associatedTopics] of Object.entries(figureTopicMap)) {
+                if (trendLower.includes(figure) || figure.includes(trendLower)) {
+                    const topicMatches = associatedTopics.filter(topic =>
+                        contentToMatch.includes(topic) || contentKeywords.has(topic)
+                    );
+                    if (topicMatches.length > 0) {
+                        matchedTrends.push(`${trend} → ${topicMatches[0]}`);
+                        alignmentScore += 0.6 * (topicMatches.length / associatedTopics.length);
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+            if (matched) continue;
+
+            // Reverse mapping
+            for (const [figure, associatedTopics] of Object.entries(figureTopicMap)) {
+                if (contentToMatch.includes(figure)) {
+                    const trendRelatedToTopics = associatedTopics.some(topic =>
+                        trendLower.includes(topic) || this.extractKeywords(trendLower).has(topic)
+                    );
+                    if (trendRelatedToTopics) {
+                        matchedTrends.push(`${figure} ← ${trend}`);
+                        alignmentScore += 0.5;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check category hot topics
+        if (this.trendingContext.hotTopicsByCategory) {
+            const categoryHotTopics = this.trendingContext.hotTopicsByCategory.get(research.category);
+            if (categoryHotTopics && categoryHotTopics.length > 0) {
+                for (const hotTerm of categoryHotTopics.slice(0, 5)) {
+                    const hotTermLower = hotTerm.toLowerCase();
+                    if (contentToMatch.includes(hotTermLower)) {
+                        if (!matchedTrends.some(t => t.toLowerCase().includes(hotTermLower))) {
+                            matchedTrends.push(`[${research.category}] ${hotTerm}`);
+                            alignmentScore += 0.4;
+                        }
+                    }
+                }
+            }
+        }
+
+        return {
+            matchedTrends: matchedTrends.slice(0, 5),
+            trendAlignment: Math.min(alignmentScore / 3, 1),
+        };
     }
 
     /**
@@ -68,6 +272,9 @@ export class EpisodeGenerator {
             return null;
         }
 
+        // Calculate viral metrics
+        const viralMetrics = this.calculateViralMetrics(generated, research);
+
         // Create the proposal in database
         const proposal = await this.proposalRepo.create({
             researchResultId: research.id,
@@ -79,10 +286,270 @@ export class EpisodeGenerator {
             contextForPanel: generated.contextForPanel,
             chairs: generated.chairs,
             keyTensions: generated.keyTensions,
+            viralMetrics,
         });
 
-        logger.info({ title: generated.title }, 'Generated episode proposal');
+        logger.info(
+            { title: generated.title, viralScore: viralMetrics.titleHookStrength },
+            'Generated episode proposal with viral optimization'
+        );
         return proposal;
+    }
+
+    /**
+     * Calculate viral metrics for generated episode
+     */
+    private calculateViralMetrics(
+        generated: GeneratedEpisode,
+        research: ResearchResult
+    ): ViralMetrics {
+        // Score the title for viral potential
+        const titleScore = this.trendingService.scoreTitleForVirality(generated.title);
+
+        // Find which trending terms this episode matches (using keyword extraction)
+        const { matchedTrends, trendAlignment } = this.calculateTrendAlignment(
+            generated,
+            research
+        );
+
+        // Determine title pattern
+        let titlePattern: string | undefined;
+        if (generated.title.startsWith('The ')) {
+            titlePattern = 'Compound Mystery';
+        } else if (generated.title.includes('?') || generated.subtitle.includes('Should')) {
+            titlePattern = 'Provocative Question';
+        } else if (generated.title.includes(' vs ')) {
+            titlePattern = 'Binary Choice';
+        }
+
+        // Calculate controversy balance (high controversy but not toxic)
+        const controversyBalance = Math.min(research.controversyScore * 1.2, 1);
+
+        return {
+            trendAlignment,
+            titleHookStrength: titleScore.score,
+            controversyBalance,
+            suggestedHashtags: generated.suggestedHashtags || this.generateHashtags(generated, research),
+            targetAudience: generated.targetAudience || this.inferTargetAudience(research),
+            matchedTrends,
+            titlePattern,
+        };
+    }
+
+    /**
+     * Calculate trend alignment using keyword matching and semantic similarity
+     */
+    private calculateTrendAlignment(
+        generated: GeneratedEpisode,
+        research: ResearchResult
+    ): { matchedTrends: string[]; trendAlignment: number } {
+        const matchedTrends: string[] = [];
+        let alignmentScore = 0;
+
+        if (!this.trendingContext || this.trendingContext.trendingSearches.length === 0) {
+            logger.debug('No trending context available for trend alignment calculation');
+            return { matchedTrends, trendAlignment: 0 };
+        }
+
+        // Build content to match against
+        const contentToMatch = [
+            research.topic,
+            generated.title,
+            generated.subtitle,
+            generated.description,
+            research.summary,
+            research.category.replace(/_/g, ' '),
+        ].join(' ').toLowerCase();
+
+        // Extract keywords from content
+        const contentKeywords = this.extractKeywords(contentToMatch);
+
+        logger.debug({
+            trendCount: this.trendingContext.trendingSearches.length,
+            trends: this.trendingContext.trendingSearches.slice(0, 5),
+            contentKeywordsSample: [...contentKeywords].slice(0, 20),
+            contentPreview: contentToMatch.slice(0, 200),
+        }, 'Calculating trend alignment');
+
+        // Known figure mappings - associate trending people/terms with related topics
+        // This enables matching when a trending person relates to the debate topic
+        const figureTopicMap: Record<string, string[]> = {
+            'dario amodei': ['ai', 'anthropic', 'artificial intelligence', 'safety', 'ethics', 'claude'],
+            'sam altman': ['ai', 'openai', 'artificial intelligence', 'chatgpt', 'gpt'],
+            'elon musk': ['ai', 'technology', 'twitter', 'tesla', 'space', 'spacex', 'x'],
+            'jd vance': ['politics', 'government', 'senate', 'republican', 'trump', 'vice president', 'vp'],
+            'trump': ['politics', 'government', 'president', 'republican', 'white house', 'administration'],
+            'biden': ['politics', 'government', 'president', 'democrat', 'white house', 'administration'],
+            'zohran mamdani': ['politics', 'democrat', 'progressive', 'nyc', 'new york'],
+            'scott bessent': ['economics', 'treasury', 'finance', 'policy', 'economic'],
+            'ozempic': ['health', 'medicine', 'pharmaceutical', 'obesity', 'diabetes', 'wegovy', 'weight'],
+            'susan wojcicki': ['technology', 'youtube', 'google', 'media', 'video'],
+            'openai': ['ai', 'artificial intelligence', 'chatgpt', 'gpt', 'machine learning'],
+            'anthropic': ['ai', 'artificial intelligence', 'claude', 'safety', 'ethics'],
+            'google': ['ai', 'technology', 'search', 'gemini', 'bard'],
+            'climate': ['environment', 'carbon', 'emissions', 'green', 'sustainability', 'warming'],
+            'ukraine': ['war', 'russia', 'conflict', 'nato', 'military', 'international'],
+            'israel': ['gaza', 'palestine', 'conflict', 'middle east', 'war'],
+            'congress': ['politics', 'government', 'legislation', 'senate', 'house'],
+            'supreme court': ['law', 'court', 'justice', 'legal', 'constitutional', 'ruling'],
+        };
+
+        // Check each trending term
+        for (const trend of this.trendingContext.trendingSearches) {
+            const trendLower = trend.toLowerCase();
+            let matched = false;
+
+            // 1. Direct match - trend appears in content
+            if (contentToMatch.includes(trendLower)) {
+                matchedTrends.push(trend);
+                alignmentScore += 1.0;
+                logger.debug({ trend, matchType: 'direct' }, 'Found direct trend match');
+                continue;
+            }
+
+            // 2. Keyword match from trend - significant keyword overlap
+            const trendKeywords = this.extractKeywords(trendLower);
+            if (trendKeywords.size > 0) {
+                const keywordOverlap = [...trendKeywords].filter(kw => contentKeywords.has(kw)).length;
+                const overlapRatio = keywordOverlap / trendKeywords.size;
+                if (overlapRatio >= 0.5) {
+                    matchedTrends.push(trend);
+                    alignmentScore += overlapRatio * 0.8;
+                    logger.debug({ trend, keywordOverlap, overlapRatio, matchType: 'keyword' }, 'Found keyword trend match');
+                    continue;
+                }
+            }
+
+            // 3. Figure-to-topic mapping - check if trend matches a known figure/term
+            //    AND the content relates to that figure's associated topics
+            for (const [figure, associatedTopics] of Object.entries(figureTopicMap)) {
+                // Check if this trending term contains or matches a known figure
+                if (trendLower.includes(figure) || figure.includes(trendLower)) {
+                    const topicMatches = associatedTopics.filter(topic =>
+                        contentToMatch.includes(topic) || contentKeywords.has(topic)
+                    );
+                    if (topicMatches.length > 0) {
+                        matchedTrends.push(`${trend} → ${topicMatches[0]}`);
+                        alignmentScore += 0.6 * (topicMatches.length / associatedTopics.length);
+                        matched = true;
+                        logger.debug({
+                            trend, figure, topicMatches, matchType: 'figure-to-topic'
+                        }, 'Found figure-to-topic match');
+                        break;
+                    }
+                }
+            }
+            if (matched) continue;
+
+            // 4. Reverse mapping - content mentions a figure that's related to a trending topic
+            for (const [figure, associatedTopics] of Object.entries(figureTopicMap)) {
+                if (contentToMatch.includes(figure)) {
+                    // Content mentions this figure - check if trend relates to their topics
+                    const trendRelatedToTopics = associatedTopics.some(topic =>
+                        trendLower.includes(topic) || this.extractKeywords(trendLower).has(topic)
+                    );
+                    if (trendRelatedToTopics) {
+                        matchedTrends.push(`${figure} ← ${trend}`);
+                        alignmentScore += 0.5;
+                        matched = true;
+                        logger.debug({
+                            trend, figure, matchType: 'reverse-figure'
+                        }, 'Found reverse figure match');
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check category-specific trending from hotTopicsByCategory
+        if (this.trendingContext.hotTopicsByCategory) {
+            const categoryHotTopics = this.trendingContext.hotTopicsByCategory.get(research.category);
+            if (categoryHotTopics && categoryHotTopics.length > 0) {
+                for (const hotTerm of categoryHotTopics.slice(0, 5)) {
+                    const hotTermLower = hotTerm.toLowerCase();
+                    if (contentToMatch.includes(hotTermLower)) {
+                        if (!matchedTrends.some(t => t.toLowerCase().includes(hotTermLower))) {
+                            matchedTrends.push(`[${research.category}] ${hotTerm}`);
+                            alignmentScore += 0.4;
+                            logger.debug({ hotTerm, category: research.category, matchType: 'category-hot' }, 'Found category hot topic match');
+                        }
+                    }
+                }
+            }
+        }
+
+        // Normalize score to 0-1 range
+        // Max reasonable score would be ~3-4 matches
+        const normalizedAlignment = Math.min(alignmentScore / 3, 1);
+
+        logger.info({
+            title: generated.title,
+            matchedTrends,
+            alignmentScore,
+            normalizedAlignment,
+        }, 'Trend alignment calculated');
+
+        return {
+            matchedTrends: matchedTrends.slice(0, 5), // Cap at 5 matches
+            trendAlignment: normalizedAlignment,
+        };
+    }
+
+    /**
+     * Generate hashtags for social promotion
+     */
+    private generateHashtags(generated: GeneratedEpisode, research: ResearchResult): string[] {
+        const hashtags: string[] = ['#Duelogic', '#AIDebate'];
+
+        // Add category-based hashtag
+        const categoryHashtags: Record<string, string> = {
+            technology_ethics: '#TechEthics',
+            ai_automation: '#AIFuture',
+            climate_environment: '#ClimateDebate',
+            politics_governance: '#PoliticalDebate',
+            bioethics_medicine: '#Bioethics',
+            economics_inequality: '#EconomicJustice',
+            social_justice: '#SocialJustice',
+            privacy_surveillance: '#PrivacyMatters',
+            education_culture: '#EdDebate',
+            international_relations: '#GlobalPolitics',
+        };
+
+        const categoryTag = categoryHashtags[research.category];
+        if (categoryTag) {
+            hashtags.push(categoryTag);
+        }
+
+        // Extract key terms for hashtags
+        const titleWords = generated.title.split(/\s+/)
+            .filter(w => w.length > 4 && !['The', 'And', 'For'].includes(w))
+            .slice(0, 2);
+
+        for (const word of titleWords) {
+            hashtags.push(`#${word.replace(/[^a-zA-Z]/g, '')}`);
+        }
+
+        return hashtags.slice(0, 5);
+    }
+
+    /**
+     * Infer target audience from research
+     */
+    private inferTargetAudience(research: ResearchResult): string {
+        const audienceMap: Record<string, string> = {
+            technology_ethics: 'Tech professionals, ethicists, and policy makers interested in responsible innovation',
+            ai_automation: 'AI enthusiasts, workers concerned about automation, and futurists',
+            climate_environment: 'Environmentally conscious listeners and sustainability advocates',
+            politics_governance: 'Politically engaged citizens and policy wonks',
+            bioethics_medicine: 'Healthcare professionals, patients, and medical ethics enthusiasts',
+            economics_inequality: 'Economics enthusiasts and social mobility advocates',
+            social_justice: 'Activists, advocates, and those passionate about equity',
+            privacy_surveillance: 'Privacy advocates, security professionals, and civil libertarians',
+            education_culture: 'Educators, parents, and cultural commentators',
+            international_relations: 'Foreign policy enthusiasts and global citizens',
+        };
+
+        return audienceMap[research.category] || 'Curious thinkers who enjoy intellectual debate';
     }
 
     /**
@@ -92,6 +559,9 @@ export class EpisodeGenerator {
         results: ResearchResult[],
         maxProposals: number = 10
     ): Promise<EpisodeProposal[]> {
+        // Refresh trending context at start of batch
+        await this.refreshTrendingContext();
+
         const proposals: EpisodeProposal[] = [];
 
         // Sort by quality scores (controversy * depth * timeliness)
@@ -145,26 +615,64 @@ export class EpisodeGenerator {
      * System prompt for episode generation
      */
     private getSystemPrompt(): string {
-        return `You are an episode writer for Duelogic, an AI debate podcast focused on controversial moral and ethical questions.
+        const basePrompt = `You are an episode writer for Duelogic, an AI debate podcast focused on controversial moral and ethical questions.
 
-Your job is to transform research findings into compelling episode proposals that will spark genuine intellectual debate.
+Your job is to transform research findings into VIRAL episode proposals that will spark genuine intellectual debate AND attract a large audience.
 
-Style guidelines:
-- Titles should be evocative and slightly provocative (e.g., "The Algorithm's Gavel", "The Immortality Gap")
-- Subtitles pose the core question in engaging form (e.g., "Can Code Be Fairer Than Conscience?")
-- Descriptions hook the listener with stakes and tension (2-3 sentences)
+## VIRAL TITLE ENGINEERING
+
+Your titles MUST:
+1. Hook within 3 words - front-load the intrigue
+2. Create a "curiosity gap" - make people NEED to know more
+3. Suggest conflict or tension - debates need two sides
+4. Be specific over generic ("The AI Judge" > "Technology and Justice")
+
+PROVEN VIRAL PATTERNS:
+${VIRAL_TITLE_PATTERNS.map(p => `- ${p.name}: "${p.pattern}" (e.g., "${p.examples[0]}")`).join('\n')}
+
+POWER WORDS (use 1-2 naturally):
+${POWER_WORDS.slice(0, 15).join(', ')}
+
+## CONTENT GUIDELINES
+
+- Subtitles pose the core question in personal terms ("Should WE...", "What happens when YOU...")
+- Descriptions hook with stakes in the FIRST sentence - state the conflict immediately
 - Propositions are clear binary statements that reasonable people can disagree on
 - Philosophical chairs represent genuinely different frameworks, not strawmen
 - Each chair MUST acknowledge a real weakness in their position
 - Key tensions highlight the most interesting friction points
 
-Match the tone of these example titles:
+## QUALITY OVER CLICKBAIT
+
+We want viral QUALITY content, not outrage bait:
+- Topics must have genuine intellectual depth
+- Both sides must have legitimate arguments
+- Avoid strawmen or obvious one-sided takes
+- The goal is thoughtful controversy, not cheap engagement
+
+## EXAMPLES OF EXCELLENT TITLES
+
 - "The Algorithm's Gavel: Can Code Be Fairer Than Conscience?"
 - "The Consent Dilemma: Who Decides What's Best for a Child's Future Self?"
 - "The Immortality Gap: Should We Cure Death If Only the Rich Survive?"
 - "The Deepfake Defense: When Synthetic Evidence Meets Real Justice"
+- "The Silicon Throne: Should We Let Big Tech Be AI's Gatekeeper?"
 
 Return your response as valid JSON.`;
+
+        // Add trending context if available
+        if (this.trendingContext && this.trendingContext.trendingSearches.length > 0) {
+            return basePrompt + `
+
+## CURRENT TRENDING TOPICS (incorporate if relevant)
+
+People are currently searching for:
+${this.trendingContext.trendingSearches.slice(0, 8).map(t => `- "${t}"`).join('\n')}
+
+Look for natural ways to connect your topic to these trends for maximum relevance.`;
+        }
+
+        return basePrompt;
     }
 
     /**
@@ -176,7 +684,7 @@ Return your response as valid JSON.`;
             .map(s => `- ${s.title} (${s.domain}): "${s.excerpt}"`)
             .join('\n');
 
-        return `Based on the following research, generate a Duelogic episode proposal.
+        return `Based on the following research, generate a VIRAL Duelogic episode proposal.
 
 RESEARCH TOPIC: ${research.topic}
 CATEGORY: ${research.category}
@@ -189,11 +697,11 @@ ${research.summary}
 KEY SOURCES:
 ${sourceSummaries}
 
-Generate an episode with this exact JSON structure:
+Generate an episode optimized for both intellectual depth AND viral appeal:
 {
-  "title": "Short evocative title (2-4 words)",
-  "subtitle": "Question form subtitle that poses the core dilemma",
-  "description": "2-3 sentence hook that draws the listener in with stakes and relevance",
+  "title": "Short evocative title (2-4 words) - USE A VIRAL PATTERN",
+  "subtitle": "Question form subtitle that creates urgency and personal stakes",
+  "description": "2-3 sentence hook - START with conflict, END with why it matters NOW",
   "proposition": "Clear binary statement that reasonable people can disagree on. Format: 'X should/should not Y because Z'",
   "contextForPanel": "Paragraph providing background for AI debaters - key facts, current state of debate, relevant history",
   "chairs": [
@@ -215,10 +723,15 @@ Generate an episode with this exact JSON structure:
     "Fourth tension point",
     "Fifth tension point (optional)"
   ],
-  "qualityScore": 0.0-1.0
+  "qualityScore": 0.0-1.0,
+  "suggestedHashtags": ["#Hashtag1", "#Hashtag2", "#Hashtag3"],
+  "targetAudience": "Brief description of who this episode appeals to most"
 }
 
-The qualityScore should reflect how well this topic fits Duelogic's mission of genuine intellectual debate (not outrage bait or one-sided issues).`;
+IMPORTANT:
+- qualityScore should reflect intellectual depth (genuine debate potential)
+- Title MUST follow one of the viral patterns (Compound Mystery, Provocative Question, etc.)
+- Description first sentence MUST state the conflict immediately`;
     }
 
     /**
@@ -245,6 +758,8 @@ The qualityScore should reflect how well this topic fits Duelogic's mission of g
                 chairs: this.parseChairs(parsed.chairs),
                 keyTensions: parsed.keyTensions || parsed.key_tensions || [],
                 qualityScore: parsed.qualityScore || parsed.quality_score || 0.7,
+                suggestedHashtags: parsed.suggestedHashtags || parsed.suggested_hashtags,
+                targetAudience: parsed.targetAudience || parsed.target_audience,
             };
         } catch (error) {
             logger.error({ err: error }, 'Failed to parse episode response');
