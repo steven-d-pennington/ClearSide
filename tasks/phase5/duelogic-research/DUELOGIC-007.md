@@ -699,7 +699,73 @@ RAG_CITATION_STYLE=natural   # natural, academic, minimal
 
 ---
 
+## Implementation Notes (2026-01-07)
+
+**Status: COMPLETED**
+
+### Files Created
+
+1. **Types:**
+   - `backend/src/types/rag.ts` - RAG configuration and citation metadata types
+
+2. **Services:**
+   - `backend/src/services/research/rag-context-builder.ts` - Builds formatted citation prompts
+   - `backend/src/services/debate/rag-enhanced-orchestrator.ts` - RAG enhancement wrapper
+
+3. **Database Migration:**
+   - `backend/src/db/migrations/015_add_episode_linkage.sql` - Adds episode_id to debates and citation_metadata to utterances
+
+### Key Implementation Details
+
+- RAGContextBuilder supports 3 citation styles: natural, academic, minimal
+- RAGEnhancement class can wrap any orchestrator to add citation support
+- Uses factory pattern to detect if vector DB is configured
+- Automatically falls back gracefully if RAG is not available
+- Tracks which citations were actually used in responses
+
+### Architecture
+
+The RAG integration uses a modular design:
+
+```
+RAGEnhancement (wrapper)
+├── RAGContextBuilder
+│   └── RAGRetrievalService
+│       ├── EmbeddingService
+│       └── VectorDBClient (Pinecone/ChromaDB)
+```
+
+### Usage Example
+
+```typescript
+import { createRAGEnhancement } from './rag-enhanced-orchestrator';
+
+// Create RAG enhancement for an episode
+const rag = createRAGEnhancement({
+  episodeId: proposal.id,
+  config: { citationStyle: 'natural' }
+});
+
+// Check if RAG is available
+if (rag.isRAGEnabled()) {
+  // Get citations for a turn
+  const context = await rag.getCitationContext(currentArgument);
+
+  // Enhance the agent prompt
+  const enhancedPrompt = rag.enhancePrompt(basePrompt, context);
+}
+```
+
+### Future Improvements
+
+- Integrate directly into DuelogicOrchestrator chair agent calls
+- Add LLM-based citation usage detection (more accurate than heuristic)
+- Cache RAG context for regenerated turns
+- Add citation quality scoring
+
+---
+
 **Estimated Time:** 4-8 hours
-**Assigned To:** _Unassigned_
+**Assigned To:** _Completed_
 **Created:** 2026-01-03
-**Updated:** 2026-01-03
+**Updated:** 2026-01-07

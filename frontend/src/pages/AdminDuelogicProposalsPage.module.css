@@ -1,0 +1,216 @@
+/**
+ * AdminDuelogicProposalsPage styles
+ */
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+  transition: color 0.2s ease;
+}
+
+.backLink:hover {
+  color: var(--color-text-primary);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.filters {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.filterSelect {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.loading {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--color-text-secondary);
+}
+
+.retryButton {
+  margin-top: var(--space-4);
+}
+
+.actionAlert {
+  margin-bottom: var(--space-4);
+}
+
+/* Bulk actions bar */
+.bulkActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+}
+
+.selectedCount {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-right: var(--space-2);
+}
+
+/* Table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.table th,
+.table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table th {
+  background: var(--color-surface-secondary);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.table td {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr.edited {
+  background: var(--color-warning-bg);
+}
+
+.checkboxCol {
+  width: 40px;
+  text-align: center;
+}
+
+.dateCol {
+  white-space: nowrap;
+}
+
+/* Proposal link */
+.proposalLink {
+  display: block;
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.proposalLink:hover {
+  color: var(--color-primary);
+}
+
+.proposalLink strong {
+  display: block;
+}
+
+.proposalLink .subtitle {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-1);
+}
+
+/* Status badges */
+.status {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.statusPending {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.statusApproved {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.statusRejected {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.statusScheduled {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.editedBadge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-tertiary);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+/* View button */
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  transition: all 0.2s ease;
+}
+
+.viewBtn:hover {
+  background: var(--color-surface-tertiary);
+}
+
+.noData {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}

@@ -20,6 +20,7 @@ import modelRoutes from './routes/model-routes.js';
 import adminRoutes from './routes/admin-routes.js';
 import duelogicRoutes from './routes/duelogic-routes.js';
 import podcastRoutes from './routes/podcast-routes.js';
+import duelogicResearchRoutes from './routes/duelogic-research-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 import { runMigrationsOnStartup } from './db/runMigrations.js';
@@ -95,6 +96,7 @@ app.use('/api/models', modelRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', duelogicRoutes);
 app.use('/api/exports/podcast', podcastRoutes);
+app.use('/api/duelogic', duelogicResearchRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
