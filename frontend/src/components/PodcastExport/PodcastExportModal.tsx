@@ -15,6 +15,7 @@ import { QualitySettingsPanel } from './QualitySettingsPanel';
 import { ScriptPreviewEditor } from './ScriptPreviewEditor';
 import { GenerationProgress } from './GenerationProgress';
 import { usePodcastExport } from '../../hooks/usePodcastExport';
+import { TTS_PROVIDERS } from '../../types/podcast';
 import styles from './PodcastExportModal.module.css';
 
 interface PodcastExportModalProps {
@@ -246,10 +247,40 @@ export function PodcastExportModal({
     );
   };
 
+  // Get current provider
+  const selectedProvider = config.ttsProvider || 'elevenlabs';
+
+  // Render provider selector (at top of configure step)
+  const renderProviderSelector = () => (
+    <div className={styles.providerSelector}>
+      <span className={styles.providerLabel}>TTS Provider</span>
+      <div className={styles.providerOptions}>
+        {TTS_PROVIDERS.map((provider) => (
+          <button
+            key={provider.id}
+            type="button"
+            className={`${styles.providerOption} ${
+              selectedProvider === provider.id ? styles.selected : ''
+            }`}
+            onClick={() => updateConfig({ ttsProvider: provider.id })}
+          >
+            <span className={styles.providerName}>{provider.name}</span>
+            <span className={styles.providerDescription}>{provider.description}</span>
+            <span className={styles.providerCost}>
+              ~${(provider.costPer1000Chars / 100).toFixed(3)}/1K chars
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   // Render configuration step
   const renderConfigureStep = () => (
     <div className={styles.configureStep}>
       {renderExistingJobBanner()}
+
+      {renderProviderSelector()}
 
       {renderConfigTabs()}
 
@@ -260,6 +291,7 @@ export function PodcastExportModal({
             onChange={(assignments) =>
               updateConfig({ voiceAssignments: assignments })
             }
+            provider={selectedProvider}
           />
         )}
         {activeTab === 'options' && (

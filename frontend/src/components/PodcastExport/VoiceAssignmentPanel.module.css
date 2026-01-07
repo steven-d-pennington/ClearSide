@@ -198,6 +198,30 @@
   margin: 0;
 }
 
+/* Gemini Voice Display (read-only) */
+.geminiVoice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-primary-alpha-10);
+  border: 1px solid var(--color-primary-alpha-20);
+  border-radius: var(--radius-md);
+  min-width: 150px;
+}
+
+.geminiVoiceName {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.geminiVoiceDesc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .roleHeader {

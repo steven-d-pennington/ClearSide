@@ -76,8 +76,9 @@ export class AudioExportOrchestrator {
     this.audioProcessor = createAudioProcessor();
     this.id3Manager = createID3Manager();
 
-    this.workDir = config.workDir || '/tmp/clearside-audio/work';
-    this.outputDir = config.outputDir || '/tmp/clearside-audio/output';
+    // Use persistent storage (mounted in Docker) instead of /tmp
+    this.workDir = config.workDir || './temp/audio';
+    this.outputDir = config.outputDir || './exports/audio';
     this.baseUrl = config.baseUrl || '/api/exports/audio';
 
     logger.info(

@@ -2,7 +2,8 @@
  * QualitySettingsPanel Component
  *
  * Allows users to configure audio quality settings
- * including ElevenLabs model and output format.
+ * including voice model and output format.
+ * Note: TTS provider is now selected at the top of the modal.
  */
 
 // React import not needed with new JSX transform
@@ -19,46 +20,50 @@ export function QualitySettingsPanel({
   config,
   onChange,
 }: QualitySettingsPanelProps) {
+  const selectedProvider = config.ttsProvider || 'elevenlabs';
+
   return (
     <div className={styles.container}>
       <p className={styles.description}>
-        Configure audio quality and processing options.
+        Configure audio quality and processing settings.
       </p>
 
-      {/* ElevenLabs Model Selection */}
-      <div className={styles.section}>
-        <h4 className={styles.sectionTitle}>Voice Model</h4>
-        <p className={styles.sectionHint}>
-          Higher quality models produce more natural speech but cost more
-        </p>
+      {/* ElevenLabs Model Selection - only show for ElevenLabs provider */}
+      {selectedProvider === 'elevenlabs' && (
+        <div className={styles.section}>
+          <h4 className={styles.sectionTitle}>Voice Model</h4>
+          <p className={styles.sectionHint}>
+            Higher quality models produce more natural speech but cost more
+          </p>
 
-        <div className={styles.optionGrid}>
-          {ELEVENLABS_MODELS.map((model) => (
-            <button
-              key={model.id}
-              type="button"
-              className={`${styles.optionCard} ${
-                config.elevenLabsModel === model.id ? styles.selected : ''
-              }`}
-              onClick={() => onChange({ elevenLabsModel: model.id })}
-            >
-              <span className={styles.optionName}>{model.name}</span>
-              <span className={styles.optionDescription}>{model.description}</span>
-              {config.elevenLabsModel === model.id && (
-                <svg
-                  className={styles.checkIcon}
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
-              )}
-            </button>
-          ))}
+          <div className={styles.optionGrid}>
+            {ELEVENLABS_MODELS.map((model) => (
+              <button
+                key={model.id}
+                type="button"
+                className={`${styles.optionCard} ${
+                  config.elevenLabsModel === model.id ? styles.selected : ''
+                }`}
+                onClick={() => onChange({ elevenLabsModel: model.id })}
+              >
+                <span className={styles.optionName}>{model.name}</span>
+                <span className={styles.optionDescription}>{model.description}</span>
+                {config.elevenLabsModel === model.id && (
+                  <svg
+                    className={styles.checkIcon}
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Audio Format Selection */}
       <div className={styles.section}>
@@ -139,8 +144,17 @@ export function QualitySettingsPanel({
           <line x1="12" y1="8" x2="12.01" y2="8" />
         </svg>
         <span>
-          ElevenLabs pricing is approximately <strong>$0.15 per 1,000 characters</strong>.
-          The exact cost depends on your subscription plan.
+          {selectedProvider === 'elevenlabs' ? (
+            <>
+              ElevenLabs pricing is approximately <strong>$0.15 per 1,000 characters</strong>.
+              The exact cost depends on your subscription plan.
+            </>
+          ) : (
+            <>
+              Gemini TTS pricing is approximately <strong>$0.015 per 1,000 characters</strong>{' '}
+              (10x cheaper than ElevenLabs). Cost-effective for longer podcasts.
+            </>
+          )}
         </span>
       </div>
     </div>

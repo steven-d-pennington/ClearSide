@@ -6,6 +6,15 @@
  */
 
 // ============================================================================
+// TTS Provider Types
+// ============================================================================
+
+/**
+ * Available TTS providers for podcast generation
+ */
+export type TTSProviderType = 'elevenlabs' | 'gemini';
+
+// ============================================================================
 // ElevenLabs Models and Formats
 // ============================================================================
 
@@ -104,13 +113,16 @@ export interface RefinedPodcastScript {
  * Podcast export configuration options
  */
 export interface PodcastExportConfig {
+  // TTS Provider selection (defaults to 'elevenlabs')
+  ttsProvider?: TTSProviderType;
+
   // Script refinement options
   refinementModel: string;        // LLM for script polish (e.g., "gpt-4o")
   includeIntro: boolean;
   includeOutro: boolean;
   addTransitions: boolean;
 
-  // ElevenLabs settings
+  // ElevenLabs settings (used when ttsProvider is 'elevenlabs')
   elevenLabsModel: ElevenLabsModel;
   outputFormat: AudioOutputFormat;
 
@@ -272,6 +284,7 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
  * Default podcast export configuration
  */
 export const DEFAULT_PODCAST_CONFIG: PodcastExportConfig = {
+  ttsProvider: 'elevenlabs',  // Default for backward compatibility
   refinementModel: 'google/gemini-3-flash-preview',
   includeIntro: true,
   includeOutro: true,
@@ -337,5 +350,28 @@ export const AUDIO_FORMATS: Array<{ id: AudioOutputFormat; name: string; descrip
     id: 'pcm_44100',
     name: 'WAV Lossless',
     description: '44.1kHz PCM (largest file)',
+  },
+];
+
+/**
+ * TTS provider options
+ */
+export const TTS_PROVIDERS: Array<{
+  id: TTSProviderType;
+  name: string;
+  description: string;
+  costPer1000Chars: number;
+}> = [
+  {
+    id: 'elevenlabs',
+    name: 'ElevenLabs',
+    description: 'Premium AI voices with expressive audio tags',
+    costPer1000Chars: 15,  // ~$0.15 per 1K chars
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini TTS',
+    description: 'Cost-effective multi-speaker TTS',
+    costPer1000Chars: 1.5,  // ~$0.015 per 1K chars
   },
 ];

@@ -4,6 +4,8 @@ export type PodcastJobStatus = 'pending' | 'refining' | 'generating' | 'complete
 
 export type GenerationPhase = 'pending' | 'tts' | 'concat' | 'normalize' | 'tag' | 'complete' | 'error';
 
+export type TTSProviderType = 'elevenlabs' | 'gemini';
+
 export type ElevenLabsModel =
   | 'eleven_v3'
   | 'eleven_multilingual_v2'
@@ -54,13 +56,16 @@ export interface RefinedPodcastScript {
 }
 
 export interface PodcastExportConfig {
+  // TTS Provider selection (defaults to 'elevenlabs')
+  ttsProvider?: TTSProviderType;
+
   // Script refinement options
   refinementModel: string;        // LLM for script polish (e.g., "gpt-4o")
   includeIntro: boolean;
   includeOutro: boolean;
   addTransitions: boolean;
 
-  // ElevenLabs settings
+  // ElevenLabs settings (used when ttsProvider is 'elevenlabs')
   elevenLabsModel: ElevenLabsModel;
   outputFormat: AudioOutputFormat;
 
@@ -274,3 +279,83 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
     },
   },
 };
+
+// Gemini voice assignments for debate roles
+// Uses Gemini 2.5 TTS native voices (no settings needed - Gemini handles tone via voice selection)
+export interface GeminiVoiceAssignment {
+  speakerId: string;
+  voiceId: string;    // Gemini voice name (e.g., 'Kore', 'Charon')
+  voiceName: string;  // Display name
+}
+
+export const GEMINI_VOICE_ASSIGNMENTS: Record<string, GeminiVoiceAssignment> = {
+  moderator: {
+    speakerId: 'moderator',
+    voiceId: 'Aoede',    // Neutral, calm voice
+    voiceName: 'Aoede',
+  },
+  pro_advocate: {
+    speakerId: 'pro_advocate',
+    voiceId: 'Kore',     // Firm, clear female voice
+    voiceName: 'Kore',
+  },
+  con_advocate: {
+    speakerId: 'con_advocate',
+    voiceId: 'Charon',   // Thoughtful male voice
+    voiceName: 'Charon',
+  },
+  narrator: {
+    speakerId: 'narrator',
+    voiceId: 'Puck',     // Clear narrator voice
+    voiceName: 'Puck',
+  },
+
+  // Duelogic extended chairs
+  chair_3: {
+    speakerId: 'chair_3',
+    voiceId: 'Fenrir',
+    voiceName: 'Fenrir',
+  },
+  chair_4: {
+    speakerId: 'chair_4',
+    voiceId: 'Leda',
+    voiceName: 'Leda',
+  },
+  chair_5: {
+    speakerId: 'chair_5',
+    voiceId: 'Orus',
+    voiceName: 'Orus',
+  },
+  chair_6: {
+    speakerId: 'chair_6',
+    voiceId: 'Zephyr',
+    voiceName: 'Zephyr',
+  },
+
+  // Informal discussion participants
+  participant_1: {
+    speakerId: 'participant_1',
+    voiceId: 'Kore',
+    voiceName: 'Kore',
+  },
+  participant_2: {
+    speakerId: 'participant_2',
+    voiceId: 'Charon',
+    voiceName: 'Charon',
+  },
+  participant_3: {
+    speakerId: 'participant_3',
+    voiceId: 'Fenrir',
+    voiceName: 'Fenrir',
+  },
+  participant_4: {
+    speakerId: 'participant_4',
+    voiceId: 'Leda',
+    voiceName: 'Leda',
+  },
+};
+
+// Available Gemini TTS voices
+export const GEMINI_AVAILABLE_VOICES = [
+  'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede',
+];

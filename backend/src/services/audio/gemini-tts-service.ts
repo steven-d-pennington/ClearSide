@@ -10,6 +10,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import pino from 'pino';
 import Bottleneck from 'bottleneck';
+import ffmpeg from 'fluent-ffmpeg';
+import { PassThrough } from 'stream';
 import type {
   VoiceConfig,
   VoiceType,
@@ -23,6 +25,14 @@ const logger = pino({
   name: 'gemini-tts-service',
   level: process.env.LOG_LEVEL || 'info',
 });
+
+/**
+ * Maximum characters per chunk for Gemini TTS
+ * Gemini processing time scales non-linearly with text length.
+ * ~1000 chars takes ~45s, ~2000 chars can take >120s or timeout.
+ * Keep chunks small for reliable generation.
+ */
+const MAX_CHUNK_SIZE = 1000;
 
 /**
  * Gemini voice configuration
@@ -103,7 +113,7 @@ export class GeminiTTSService implements ITTSService {
   constructor(config: GeminiTTSConfig) {
     this.apiKey = config.apiKey;
     this.modelId = config.modelId || 'gemini-2.5-flash-preview-tts';
-    this.maxRetries = config.maxRetries || 3;
+    this.maxRetries = config.maxRetries || 5; // More retries for rate limits
 
     this.voiceProfiles = {
       ...GEMINI_VOICE_PROFILES,
@@ -111,17 +121,18 @@ export class GeminiTTSService implements ITTSService {
     };
 
     // Create axios client for Gemini API
+    // Longer timeout (6 min) since TTS generation can take time for longer segments
     this.client = axios.create({
       baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-      timeout: config.timeout || 60000,
+      timeout: config.timeout || 360000,
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
-    // Rate limiter
+    // Rate limiter - moderate for paid tier (30 RPM, 2 concurrent)
     this.limiter = new Bottleneck({
-      minTime: Math.ceil(60000 / (config.requestsPerMinute || 60)),
+      minTime: Math.ceil(60000 / (config.requestsPerMinute || 30)),
       maxConcurrent: 2,
     });
 
@@ -147,9 +158,202 @@ export class GeminiTTSService implements ITTSService {
       'Generating speech with Gemini'
     );
 
-    return this.limiter.schedule(async () => {
-      return this.generateSpeechWithRetry(text, voice);
-    });
+    // Split long text into chunks to avoid timeout
+    const chunks = this.splitIntoChunks(text);
+
+    if (chunks.length === 1) {
+      // Single chunk - use existing logic
+      return this.limiter.schedule(async () => {
+        return this.generateSpeechWithRetry(text, voice);
+      });
+    }
+
+    // Multiple chunks - generate each and concatenate
+    logger.info(
+      { totalLength: text.length, chunkCount: chunks.length, chunkSizes: chunks.map(c => c.length) },
+      'Splitting text into chunks for Gemini TTS'
+    );
+
+    const pcmBuffers: Buffer[] = [];
+    let totalCharacters = 0;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]!;
+      logger.debug(
+        { chunkIndex: i + 1, totalChunks: chunks.length, chunkLength: chunk.length },
+        'Processing chunk'
+      );
+
+      const pcmBuffer = await this.limiter.schedule(async () => {
+        return this.generatePcmForChunk(chunk, voice);
+      });
+
+      pcmBuffers.push(pcmBuffer);
+      totalCharacters += chunk.length;
+    }
+
+    // Concatenate all PCM buffers
+    const combinedPcm = Buffer.concat(pcmBuffers);
+
+    // Convert final PCM to MP3
+    const audioBuffer = await this.convertPcmToMp3(combinedPcm);
+
+    // Calculate duration from combined PCM
+    const durationMs = (combinedPcm.length / 48000) * 1000;
+
+    logger.info(
+      {
+        voiceId: voice.voiceId,
+        totalLength: text.length,
+        chunkCount: chunks.length,
+        combinedPcmSize: combinedPcm.length,
+        mp3Size: audioBuffer.length,
+        durationMs: Math.round(durationMs),
+      },
+      'Chunked speech generation complete'
+    );
+
+    return {
+      audioBuffer,
+      durationMs,
+      charactersUsed: totalCharacters,
+    };
+  }
+
+  /**
+   * Split text into chunks at sentence boundaries
+   * Keeps chunks under MAX_CHUNK_SIZE for reliable Gemini processing
+   */
+  private splitIntoChunks(text: string): string[] {
+    if (text.length <= MAX_CHUNK_SIZE) {
+      return [text];
+    }
+
+    const chunks: string[] = [];
+    let remaining = text;
+
+    while (remaining.length > 0) {
+      if (remaining.length <= MAX_CHUNK_SIZE) {
+        chunks.push(remaining.trim());
+        break;
+      }
+
+      // Find a good split point (sentence boundary)
+      let splitIndex = MAX_CHUNK_SIZE;
+
+      // Look for sentence endings within the chunk
+      const searchArea = remaining.substring(0, MAX_CHUNK_SIZE);
+      const sentenceEndings = ['. ', '! ', '? ', '.\n', '!\n', '?\n', '."', '!"', '?"'];
+
+      let lastSentenceEnd = -1;
+      for (const ending of sentenceEndings) {
+        const idx = searchArea.lastIndexOf(ending);
+        if (idx > lastSentenceEnd) {
+          lastSentenceEnd = idx + ending.length;
+        }
+      }
+
+      if (lastSentenceEnd > MAX_CHUNK_SIZE * 0.4) {
+        // Found a good sentence break point (at least 40% into chunk)
+        splitIndex = lastSentenceEnd;
+      } else {
+        // No good sentence break, try comma or word boundary
+        const lastComma = searchArea.lastIndexOf(', ');
+        if (lastComma > MAX_CHUNK_SIZE * 0.5) {
+          splitIndex = lastComma + 2;
+        } else {
+          const lastSpace = searchArea.lastIndexOf(' ');
+          if (lastSpace > MAX_CHUNK_SIZE * 0.5) {
+            splitIndex = lastSpace + 1;
+          }
+          // Otherwise just split at max
+        }
+      }
+
+      chunks.push(remaining.substring(0, splitIndex).trim());
+      remaining = remaining.substring(splitIndex).trim();
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Generate PCM audio for a single chunk (used for chunked processing)
+   * Returns raw PCM buffer without MP3 conversion
+   */
+  private async generatePcmForChunk(
+    text: string,
+    voice: VoiceConfig,
+    attempt: number = 1
+  ): Promise<Buffer> {
+    try {
+      const startTime = Date.now();
+
+      const response = await this.client.post(
+        `/models/${this.modelId}:generateContent`,
+        {
+          contents: [
+            {
+              parts: [{ text }],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: voice.voiceId,
+                },
+              },
+            },
+          },
+        },
+        {
+          params: {
+            key: this.apiKey,
+          },
+        }
+      );
+
+      const audioData = response.data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+
+      if (!audioData?.data) {
+        throw new Error('No audio data in Gemini response');
+      }
+
+      const pcmBuffer = Buffer.from(audioData.data, 'base64');
+      const processingTime = Date.now() - startTime;
+
+      logger.debug(
+        {
+          voiceId: voice.voiceId,
+          textLength: text.length,
+          pcmSize: pcmBuffer.length,
+          processingTime,
+        },
+        'Chunk PCM generated'
+      );
+
+      return pcmBuffer;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      if (attempt < this.maxRetries && this.isRetryableError(axiosError)) {
+        const isRateLimit = axiosError.response?.status === 429;
+        const baseDelay = isRateLimit ? 5000 : 1000;
+        const delay = Math.pow(2, attempt - 1) * baseDelay + Math.random() * 500;
+
+        logger.warn(
+          { attempt, delay: Math.round(delay), isRateLimit, error: axiosError.message },
+          'Chunk generation failed, retrying'
+        );
+
+        await this.sleep(delay);
+        return this.generatePcmForChunk(text, voice, attempt + 1);
+      }
+
+      throw new Error(`Gemini TTS chunk failed: ${axiosError.message}`);
+    }
   }
 
   private async generateSpeechWithRetry(
@@ -194,35 +398,46 @@ export class GeminiTTSService implements ITTSService {
         throw new Error('No audio data in Gemini response');
       }
 
-      // Decode base64 audio
-      const audioBuffer = Buffer.from(audioData.data, 'base64');
-      const durationMs = Date.now() - startTime;
+      // Decode base64 audio (raw PCM: 16-bit signed LE, 24kHz, mono)
+      const pcmBuffer = Buffer.from(audioData.data, 'base64');
 
-      // Estimate audio duration (rough: ~150 words/min, ~5 chars/word)
-      const estimatedDuration = (text.length / 5 / 150) * 60 * 1000;
+      // Convert PCM to MP3
+      const audioBuffer = await this.convertPcmToMp3(pcmBuffer);
+
+      const processingTime = Date.now() - startTime;
+
+      // Calculate actual duration from PCM data
+      // PCM: 24kHz, mono, 16-bit = 48000 bytes per second
+      const durationMs = (pcmBuffer.length / 48000) * 1000;
 
       logger.info(
         {
           voiceId: voice.voiceId,
           textLength: text.length,
-          bufferSize: audioBuffer.length,
-          processingTime: durationMs,
+          pcmSize: pcmBuffer.length,
+          mp3Size: audioBuffer.length,
+          durationMs: Math.round(durationMs),
+          processingTime,
         },
         'Speech generated successfully via Gemini'
       );
 
       return {
         audioBuffer,
-        durationMs: estimatedDuration,
+        durationMs,
         charactersUsed: text.length,
       };
     } catch (error) {
       const axiosError = error as AxiosError;
 
       if (attempt < this.maxRetries && this.isRetryableError(axiosError)) {
-        const delay = Math.pow(2, attempt) * 1000;
+        // Use moderate delays for retries, slightly longer for rate limits
+        const isRateLimit = axiosError.response?.status === 429;
+        const baseDelay = isRateLimit ? 5000 : 1000; // 5s for rate limits, 1s otherwise
+        const delay = Math.pow(2, attempt - 1) * baseDelay + Math.random() * 500;
+
         logger.warn(
-          { attempt, delay, error: axiosError.message },
+          { attempt, delay: Math.round(delay), isRateLimit, error: axiosError.message },
           'Gemini TTS request failed, retrying'
         );
 
@@ -243,6 +458,49 @@ export class GeminiTTSService implements ITTSService {
         `Gemini TTS failed: ${axiosError.message}`
       );
     }
+  }
+
+  /**
+   * Convert raw PCM audio (Gemini format) to MP3
+   * Gemini returns: 16-bit signed little-endian PCM, 24kHz, mono
+   */
+  private async convertPcmToMp3(pcmBuffer: Buffer): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const inputStream = new PassThrough();
+      const outputChunks: Buffer[] = [];
+
+      ffmpeg(inputStream)
+        .inputOptions([
+          '-f', 's16le',      // 16-bit signed little-endian PCM
+          '-ar', '24000',     // 24kHz sample rate (Gemini's output rate)
+          '-ac', '1',         // Mono
+        ])
+        .audioCodec('libmp3lame')
+        .outputOptions(['-b:a', '192k'])
+        .format('mp3')
+        .on('error', (err) => {
+          logger.error({ error: err.message }, 'PCM to MP3 conversion failed');
+          reject(new Error(`PCM to MP3 conversion failed: ${err.message}`));
+        })
+        .pipe()
+        .on('data', (chunk: Buffer) => {
+          outputChunks.push(chunk);
+        })
+        .on('end', () => {
+          const mp3Buffer = Buffer.concat(outputChunks);
+          logger.debug(
+            { pcmSize: pcmBuffer.length, mp3Size: mp3Buffer.length },
+            'PCM to MP3 conversion complete'
+          );
+          resolve(mp3Buffer);
+        })
+        .on('error', (err: Error) => {
+          reject(new Error(`MP3 output stream error: ${err.message}`));
+        });
+
+      // Write PCM data to input stream
+      inputStream.end(pcmBuffer);
+    });
   }
 
   private isRetryableError(error: AxiosError): boolean {

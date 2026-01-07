@@ -5,10 +5,13 @@ import {
     PodcastExportConfig,
     ElevenLabsVoiceSettings,
     ElevenLabsModel,
-    DEFAULT_VOICE_ASSIGNMENTS
+    DEFAULT_VOICE_ASSIGNMENTS,
+    TTSProviderType,
+    GEMINI_VOICE_ASSIGNMENTS,
 } from '../../types/podcast-export.js';
 import { DebateTranscript } from '../transcript/transcript-recorder.js';
 import type { DebateTone } from '../../types/duelogic.js';
+import { getProviderRefinementGuidance } from './audio-tag-converter.js';
 
 const MAX_SEGMENT_CHARS = 4500; // Leave buffer under 5000 limit
 const WORDS_PER_MINUTE = 150;   // Average speaking rate
@@ -23,11 +26,11 @@ const WORDS_PER_MINUTE = 150;   // Average speaking rate
 type PhraseIntensity = 'polite' | 'moderate' | 'aggressive';
 
 /**
- * Interruption phrases categorized by intensity
+ * Interruption phrases categorized by intensity - ElevenLabs V3 version
  * Uses only officially documented ElevenLabs V3 audio tags:
  * [pause], [loudly], [sigh], [stammers], [whispers], [deadpan], [flatly]
  */
-const INTERRUPTION_PHRASES: Record<PhraseIntensity, string[]> = {
+const INTERRUPTION_PHRASES_ELEVENLABS: Record<PhraseIntensity, string[]> = {
     polite: [
         '[pause] If I may — ',
         '[pause] May I interject — ',
@@ -59,10 +62,45 @@ const INTERRUPTION_PHRASES: Record<PhraseIntensity, string[]> = {
 };
 
 /**
- * Response phrases for acknowledging interruptions, categorized by intensity
+ * Interruption phrases categorized by intensity - Gemini version
+ * Uses natural text without V3 tags
+ */
+const INTERRUPTION_PHRASES_GEMINI: Record<PhraseIntensity, string[]> = {
+    polite: [
+        '... If I may — ',
+        '... May I interject — ',
+        'Just a moment — ',
+        'I\'d like to add — ',
+        'If I could just say — ',
+        '... Before we continue — ',
+        'One moment, please — ',
+    ],
+    moderate: [
+        'Hold on — ',
+        'Wait — ',
+        'Actually — ',
+        'But — ',
+        'I have to stop you there — ',
+        'Let me jump in — ',
+        '... Hang on — ',
+        'Sorry, but — ',
+    ],
+    aggressive: [
+        'No, no, no — ',
+        'That\'s simply not true — ',
+        'Absolutely not — ',
+        '*sigh* This is exactly the problem — ',
+        'I can\'t let that stand — ',
+        'Hold on a second — ',
+        'That completely misses the point — ',
+    ],
+};
+
+/**
+ * Response phrases for acknowledging interruptions - ElevenLabs V3 version
  * Uses only officially documented ElevenLabs V3 audio tags
  */
-const RESPONSE_PHRASES: Record<PhraseIntensity, string[]> = {
+const RESPONSE_PHRASES_ELEVENLABS: Record<PhraseIntensity, string[]> = {
     polite: [
         'Fair point, but ',
         'I understand, but ',
@@ -89,6 +127,40 @@ const RESPONSE_PHRASES: Record<PhraseIntensity, string[]> = {
         '[deadpan] I\'ve addressed this three times already — ',
         '[sigh] No, that\'s not what I said — ',
         '[sigh] Once again — ',
+    ],
+};
+
+/**
+ * Response phrases for acknowledging interruptions - Gemini version
+ * Uses natural text without V3 tags
+ */
+const RESPONSE_PHRASES_GEMINI: Record<PhraseIntensity, string[]> = {
+    polite: [
+        'Fair point, but ',
+        'I understand, but ',
+        'That\'s a reasonable concern, however ',
+        '... I hear you, and ',
+        'Granted, but ',
+        'I appreciate that, but ',
+        'Point taken, however ',
+    ],
+    moderate: [
+        '*sigh* Okay, but ',
+        'Sure, but here\'s the thing — ',
+        'I see what you mean, but ',
+        'That\'s true, however ',
+        'Right, but consider this — ',
+        '... Yes, and — ',
+        'I hear you, but ',
+    ],
+    aggressive: [
+        '*sigh* That completely misses my point — ',
+        '*sigh* We keep going in circles here — ',
+        'Look, the evidence is clear — ',
+        'This is exactly what I\'m talking about — ',
+        'I\'ve addressed this three times already — ',
+        '*sigh* No, that\'s not what I said — ',
+        '*sigh* Once again — ',
     ],
 };
 
@@ -140,12 +212,14 @@ export class PodcastScriptRefiner {
     private config: PodcastExportConfig;
     private elevenLabsModel: ElevenLabsModel;
     private tone: DebateTone;
+    private ttsProvider: TTSProviderType;
 
     constructor(llmClient: OpenRouterLLMClient, config: PodcastExportConfig) {
         this.llmClient = llmClient;
         this.config = config;
         this.elevenLabsModel = config.elevenLabsModel || 'eleven_v3';
         this.tone = config.tone || 'spirited';  // Default to spirited
+        this.ttsProvider = config.ttsProvider || 'elevenlabs';  // Default to ElevenLabs
     }
 
     /**
@@ -367,7 +441,7 @@ export class PodcastScriptRefiner {
 
     /**
      * Build the refinement prompt for polishing debate content
-     * Optimized for ElevenLabs V3 expressive TTS with tone awareness
+     * Provider-aware: ElevenLabs uses V3 tags, Gemini uses natural text
      */
     private buildRefinementPrompt(
         content: string,
@@ -375,18 +449,15 @@ export class PodcastScriptRefiner {
         proposition: string
     ): RefinementPrompt {
         const toneGuidance = this.getToneGuidance();
+        const providerGuidance = getProviderRefinementGuidance(this.ttsProvider);
+        const providerName = this.ttsProvider === 'elevenlabs' ? 'ElevenLabs V3' : 'Gemini';
 
         return {
-            systemPrompt: `You are a podcast script editor optimizing debate content for ElevenLabs V3 text-to-speech.
+            systemPrompt: `You are a podcast script editor optimizing debate content for ${providerName} text-to-speech.
 
 Transform the debate transcript into expressive, natural spoken dialogue.
 
-## V3 Audio Tags Available (use naturally where appropriate):
-EMOTIONAL: [excited], [curious], [sarcastic], [mischievously], [cheerfully]
-REACTIONS: [sigh], [sighing], [laughs], [gasps], [clears throat], [gulps], [breathes]
-DELIVERY: [whispers], [loudly], [shouts], [deadpan], [playfully], [flatly], [timidly]
-PACING: [pause], [stammers], [rushed], [slows down], [drawn out]
-Note: Use [pause] for all pauses. Use ellipsis ... for longer pauses or trailing off.
+${providerGuidance}
 
 ## Debate Tone: ${this.tone.toUpperCase()}
 ${toneGuidance}
@@ -394,7 +465,6 @@ ${toneGuidance}
 ## Guidelines:
 - Remove ALL markdown formatting (**, *, #, bullets, numbered lists)
 - Convert structured arguments into flowing conversational prose
-- Add V3 audio tags naturally where they enhance delivery
 - Expand abbreviations naturally (AI → "A.I.", US → "the United States")
 - Use contractions where natural (it's, we're, that's)
 - Break long sentences into natural phrases with appropriate pauses
@@ -417,9 +487,36 @@ Refined spoken version:`,
 
     /**
      * Get tone-specific guidance for the refinement prompt
+     * Provider-aware: ElevenLabs uses V3 tags, Gemini uses natural text
      */
     private getToneGuidance(): string {
-        const guidance: Record<DebateTone, string> = {
+        if (this.ttsProvider === 'gemini') {
+            // Gemini guidance - no V3 tags, use natural text
+            const geminiGuidance: Record<DebateTone, string> = {
+                respectful: `Maintain professional, measured delivery. Use ellipsis (...) for thoughtful pauses.
+Write with genuine curiosity when engaging with the other side.
+Prefer diplomatic language: "I would suggest..." over "That's wrong..."
+Keep a collegial, academic atmosphere.`,
+
+                spirited: `Deliver with energy and conviction. Vary sentence length for natural pacing.
+Write *sigh* for moments of concession or frustration.
+Write *laughs* for irony or disbelief.
+Be direct: "Here's the problem with that..." with emphasis.
+Balance passion with respect.`,
+
+                heated: `Maximum intensity and passion. Use expressive punctuation and natural pauses.
+Write *sigh* or *sighs* for frustration.
+Use strong, assertive language.
+Emphasize disagreements: "That is EXACTLY backwards."
+Write *laughs dryly* for dry, cutting remarks.
+Include natural reactions like *gasps* for authentic moments.
+Don't hold back - this is a passionate debate.`,
+            };
+            return geminiGuidance[this.tone];
+        }
+
+        // ElevenLabs guidance with V3 tags
+        const elevenLabsGuidance: Record<DebateTone, string> = {
             respectful: `Maintain professional, measured delivery. Use [pause] for thoughtful beats.
 Use [curious] when genuinely engaging with the other side.
 Avoid aggressive tags like [loudly] or [shouts].
@@ -441,7 +538,7 @@ Include [gasps] and [stammers] for authentic reactions.
 Don't hold back - this is a passionate debate.`,
         };
 
-        return guidance[this.tone];
+        return elevenLabsGuidance[this.tone];
     }
 
     /**
@@ -762,20 +859,24 @@ Output ONLY the outro text.`,
     /**
      * Clean interruption markers and convert to natural speech
      * Transforms lively debate markers into natural spoken phrases
-     * Uses tone-aware phrases with V3 audio tags for expressiveness
+     * Provider-aware: uses V3 audio tags for ElevenLabs, natural text for Gemini
      */
     private cleanInterruptionMarkers(content: string): string {
-        // Get phrases based on debate tone intensity
+        // Get phrases based on debate tone intensity and TTS provider
         const intensity = TONE_TO_INTENSITY[this.tone];
-        const interruptionPhrases = INTERRUPTION_PHRASES[intensity];
-        const responsePhrases = RESPONSE_PHRASES[intensity];
+        const interruptionPhrases = this.ttsProvider === 'gemini'
+            ? INTERRUPTION_PHRASES_GEMINI[intensity]
+            : INTERRUPTION_PHRASES_ELEVENLABS[intensity];
+        const responsePhrases = this.ttsProvider === 'gemini'
+            ? RESPONSE_PHRASES_GEMINI[intensity]
+            : RESPONSE_PHRASES_ELEVENLABS[intensity];
 
         const getRandomPhrase = (phrases: string[]): string => {
             return phrases[Math.floor(Math.random() * phrases.length)] ?? phrases[0]!;
         };
 
         return content
-            // Convert [INTERRUPTION: ...] markers to natural phrases with V3 audio tags
+            // Convert [INTERRUPTION: ...] markers to natural phrases
             // The text inside the marker is a structural placeholder - discard it entirely
             // and replace with varied natural phrases appropriate for the debate tone
             .replace(/\[INTERRUPTION:\s*[^\]]*?\.{3}\]/gi, () =>
@@ -784,7 +885,7 @@ Output ONLY the outro text.`,
             .replace(/\[INTERRUPTION:\s*[^\]]*\]/gi, () =>
                 getRandomPhrase(interruptionPhrases)
             )
-            // Convert [RESPONDING TO INTERRUPTION] to natural transition with V3 tags
+            // Convert [RESPONDING TO INTERRUPTION] to natural transition
             .replace(/\[RESPONDING TO INTERRUPTION\]\s*/gi, () =>
                 getRandomPhrase(responsePhrases)
             )
@@ -796,15 +897,19 @@ Output ONLY the outro text.`,
     /**
      * Merge consecutive same-speaker turns for natural podcast flow
      * Prevents awkward back-to-back segments from the same voice
+     * Provider-aware: uses [pause] for ElevenLabs, ellipsis for Gemini
      */
     private mergeConsecutiveTurns(phases: PhaseData[]): PhaseData[] {
+        // Use provider-appropriate pause marker
+        const pauseMarker = this.ttsProvider === 'gemini' ? ' ... ' : ' [pause] ';
+
         return phases.map(phase => ({
             ...phase,
             turns: phase.turns.reduce((merged, turn) => {
                 const last = merged[merged.length - 1];
                 if (last && last.speaker === turn.speaker) {
-                    // Merge: add pause between content (V3 documented tag)
-                    last.content += ' [pause] ' + turn.content;
+                    // Merge: add pause between content
+                    last.content += pauseMarker + turn.content;
                 } else {
                     merged.push({ ...turn });
                 }
@@ -814,21 +919,30 @@ Output ONLY the outro text.`,
     }
 
     /**
-     * Convert pause syntax based on ElevenLabs model
-     * V3 uses only [pause] - normalize all pause variants to that
-     * Other models need SSML break tags
+     * Convert pause syntax based on TTS provider and model
+     * ElevenLabs V3 uses [pause], Gemini uses ellipsis
      */
     private convertPauseSyntax(text: string): string {
+        // Gemini: Convert all pauses to ellipsis (natural pause in speech)
+        if (this.ttsProvider === 'gemini') {
+            return text
+                .replace(/\[long pause\]/gi, '... ...')
+                .replace(/\[pause\]/gi, '...')
+                .replace(/\[short pause\]/gi, '...')
+                .replace(/\[hesitates\]/gi, '...')
+                .replace(/<break[^>]*>/gi, '...');
+        }
+
+        // ElevenLabs V3: Normalize all pause variants to documented [pause] tag
         if (this.elevenLabsModel === 'eleven_v3') {
-            // V3: Normalize all pause variants to documented [pause] tag
-            // Also convert any SSML-style tags that might have slipped through
             return text
                 .replace(/\[long pause\]/gi, '[pause] ... ')   // Long pause = pause + ellipsis
                 .replace(/\[short pause\]/gi, '[pause]')       // Short pause = pause
                 .replace(/<break[^>]*>/gi, '[pause]')          // Remove any SSML breaks
                 .replace(/\[hesitates\]/gi, '[stammers]');     // Use documented tag
         }
-        // Other models need SSML break tags
+
+        // Other ElevenLabs models need SSML break tags
         return text
             .replace(/\[long pause\]/gi, '<break time="3s"/>')
             .replace(/\[pause\]/gi, '<break time="2s"/>')
@@ -836,5 +950,12 @@ Output ONLY the outro text.`,
             .replace(/\[sigh\]/gi, '<break time="0.5s"/>')
             .replace(/\[laughs?\]/gi, '<break time="0.3s"/>')
             .replace(/\[exhales?\]/gi, '<break time="0.3s"/>');
+    }
+
+    /**
+     * Get the TTS provider being used
+     */
+    getTtsProvider(): TTSProviderType {
+        return this.ttsProvider;
     }
 }

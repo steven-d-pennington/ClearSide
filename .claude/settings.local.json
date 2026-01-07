@@ -45,7 +45,8 @@
       "Bash(frontend/src/components/DebateStage/DebateStage.tsx )",
       "Bash(frontend/src/components/ui/MarkdownRenderer.tsx)",
       "Bash(npm run dev:*)",
-      "Bash(node_modules/.bin/tsc:*)"
+      "Bash(node_modules/.bin/tsc:*)",
+      "Bash(npx tsx test-gemini-tts.ts)"
     ]
   }
 }

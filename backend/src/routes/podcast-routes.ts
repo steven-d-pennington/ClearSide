@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import path from 'path';
 import { PodcastScriptRefiner } from '../services/podcast/script-refiner.js';
 import { createPodcastPipeline, PipelineProgress } from '../services/podcast/podcast-pipeline.js';
+import { getAvailablePodcastProviders, PodcastTTSAdapter } from '../services/podcast/podcast-tts-adapter.js';
 import * as podcastRepo from '../db/repositories/podcast-export-repository.js';
 import { PodcastTTSClient } from '../services/podcast/podcast-tts-client.js';
 import { VoiceValidator } from '../services/podcast/voice-validator.js';
@@ -17,8 +18,11 @@ import {
     RefinedPodcastScript,
     PodcastSegment,
     DEFAULT_VOICE_ASSIGNMENTS,
+    GEMINI_VOICE_ASSIGNMENTS,
+    GEMINI_AVAILABLE_VOICES,
     ElevenLabsModel,
-    AudioOutputFormat
+    AudioOutputFormat,
+    TTSProviderType,
 } from '../types/podcast-export.js';
 import { REASONING_PRESETS } from '../types/openrouter.js';
 import { DebateTranscript } from '../services/transcript/transcript-recorder.js';
@@ -110,6 +114,43 @@ async function buildTranscriptFromUtterances(debateId: string): Promise<DebateTr
 }
 
 /**
+ * GET /api/exports/podcast/providers
+ * Get available TTS providers for podcast generation
+ */
+router.get('/providers', async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const available = getAvailablePodcastProviders();
+
+        const providers = [
+            {
+                id: 'elevenlabs',
+                name: 'ElevenLabs',
+                description: 'Premium AI voices with V3 audio tags for expressive delivery',
+                available: available.includes('elevenlabs'),
+                costPer1000Chars: 15,  // ~$0.15 per 1K chars
+                quality: 'premium',
+            },
+            {
+                id: 'gemini',
+                name: 'Google Gemini TTS',
+                description: 'Cost-effective multi-speaker TTS with natural voice selection',
+                available: available.includes('gemini'),
+                costPer1000Chars: 1.5,  // ~$0.015 per 1K chars
+                quality: 'premium',
+            },
+        ];
+
+        res.json({
+            providers,
+            defaultProvider: available[0] || 'elevenlabs',
+        });
+    } catch (error: any) {
+        logger.error({ error }, 'Get providers error');
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
  * POST /api/exports/podcast/refine
  * Generate a refined podcast script from a debate (preview before TTS)
  */
@@ -132,12 +173,25 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
+        // Determine TTS provider (defaults to elevenlabs for backward compatibility)
+        const ttsProvider = (config.ttsProvider || 'elevenlabs') as TTSProviderType;
+
+        // Validate provider is available
+        const availableProviders = getAvailablePodcastProviders();
+        if (!availableProviders.includes(ttsProvider)) {
+            res.status(400).json({
+                error: `TTS provider '${ttsProvider}' is not available. Available: ${availableProviders.join(', ') || 'none'}`,
+            });
+            return;
+        }
+
         // Extract tone from duelogic config if available
         const duelogicConfig = debate.duelogicConfig as { tone?: 'respectful' | 'spirited' | 'heated' } | null;
         const debateTone = config.tone || duelogicConfig?.tone || 'spirited';
 
         // Build full config with defaults
         const fullConfig: PodcastExportConfig = {
+            ttsProvider,
             refinementModel: config.refinementModel || 'google/gemini-3-flash-preview',
             includeIntro: config.includeIntro ?? true,
             includeOutro: config.includeOutro ?? true,
@@ -174,7 +228,7 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        // Refine the script
+        // Refine the script (provider-aware)
         const apiKey = process.env.OPENROUTER_API_KEY;
         if (!apiKey) {
             throw new Error('OPENROUTER_API_KEY is not configured');
@@ -188,14 +242,16 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
         await podcastRepo.saveRefinedScript(job.id, refinedScript);
         await podcastRepo.updateStatus(job.id, 'pending'); // Ready for TTS
 
-        // Calculate cost estimate
-        const estimatedCostCents = PodcastTTSClient.estimateCostCents(
-            refinedScript.totalCharacters
+        // Calculate cost estimate (provider-specific)
+        const estimatedCostCents = PodcastTTSAdapter.estimateCostCents(
+            refinedScript.totalCharacters,
+            ttsProvider
         );
 
         res.json({
             jobId: job.id,
             script: refinedScript,
+            ttsProvider,
             estimatedCostCents,
             estimatedDurationMinutes: Math.round(refinedScript.durationEstimateSeconds / 60),
         });
@@ -640,8 +696,11 @@ router.post('/:jobId/generate', async (req: Request, res: Response): Promise<voi
             return;
         }
 
-        // Start generation in background
-        const pipeline = createPodcastPipeline();
+        // Get provider from job config (defaults to elevenlabs for backward compatibility)
+        const ttsProvider = (job.config.ttsProvider || 'elevenlabs') as TTSProviderType;
+
+        // Start generation in background with the appropriate TTS provider
+        const pipeline = createPodcastPipeline({ ttsProvider });
 
         // Non-blocking - return immediately with job ID
         pipeline.generate(jobId!).catch(err => {
@@ -651,7 +710,8 @@ router.post('/:jobId/generate', async (req: Request, res: Response): Promise<voi
         res.json({
             jobId,
             status: 'generating',
-            message: 'Podcast generation started',
+            message: `Podcast generation started (using ${ttsProvider})`,
+            ttsProvider,
             estimatedSegments: job.totalSegments,
         });
 
@@ -875,10 +935,13 @@ router.get('/:jobId/stream', async (req: Request, res: Response): Promise<void> 
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    // Send initial connection message
-    res.write(`data: ${JSON.stringify({ phase: 'connected', message: 'Connected to progress stream' })}\n\n`);
+    // Get provider from job config
+    const ttsProvider = (job.config.ttsProvider || 'elevenlabs') as TTSProviderType;
 
-    const pipeline = createPodcastPipeline();
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({ phase: 'connected', message: `Connected to progress stream (using ${ttsProvider})` })}\n\n`);
+
+    const pipeline = createPodcastPipeline({ ttsProvider });
 
     // Send progress updates
     const progressHandler = (progress: PipelineProgress) => {

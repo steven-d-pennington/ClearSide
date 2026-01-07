@@ -76,6 +76,13 @@
   color: var(--color-text-secondary);
 }
 
+.optionCost {
+  font-size: var(--font-size-xs);
+  color: var(--color-success);
+  font-weight: 500;
+  margin-top: var(--space-1);
+}
+
 .checkIcon {
   position: absolute;
   top: var(--space-2);

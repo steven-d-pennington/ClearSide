@@ -17,6 +17,7 @@ import fs from 'fs/promises';
 import NodeID3 from 'node-id3';
 import pino from 'pino';
 import { PodcastTTSClient } from './podcast-tts-client.js';
+import { PodcastTTSAdapter, getAvailablePodcastProviders } from './podcast-tts-adapter.js';
 import { AudioProcessor } from '../audio/audio-processor.js';
 import * as podcastRepo from '../../db/repositories/podcast-export-repository.js';
 import {
@@ -24,6 +25,7 @@ import {
   PodcastExportConfig,
   RefinedPodcastScript,
   PodcastSegment,
+  TTSProviderType,
 } from '../../types/podcast-export.js';
 
 /**
@@ -70,7 +72,10 @@ export interface PipelineResult {
 export interface PipelineConfig {
   exportsDir: string;
   tempDir: string;
-  elevenLabsApiKey: string;
+  /** TTS provider to use (defaults to 'elevenlabs') */
+  ttsProvider?: TTSProviderType;
+  /** ElevenLabs API key (required if using ElevenLabs provider) */
+  elevenLabsApiKey?: string;
 }
 
 /**
@@ -84,19 +89,36 @@ const DEFAULT_TEMP_DIR = './temp/podcasts';
  *
  * Coordinates the entire podcast generation process from refined script
  * to final MP3 with metadata.
+ *
+ * Supports both ElevenLabs and Gemini TTS providers:
+ * - ElevenLabs: Premium quality with V3 audio tags
+ * - Gemini: Cost-effective with natural text
  */
 export class PodcastGenerationPipeline extends EventEmitter {
-  private ttsClient: PodcastTTSClient;
+  private ttsClient: PodcastTTSClient | null = null;
+  private ttsAdapter: PodcastTTSAdapter | null = null;
+  private ttsProvider: TTSProviderType;
   private audioProcessor: AudioProcessor;
   private exportsDir: string;
   private tempDir: string;
 
   constructor(config: PipelineConfig) {
     super();
-    this.ttsClient = new PodcastTTSClient(config.elevenLabsApiKey);
+    this.ttsProvider = config.ttsProvider || 'elevenlabs';
     this.audioProcessor = new AudioProcessor({ tempDir: config.tempDir });
     this.exportsDir = config.exportsDir || DEFAULT_EXPORTS_DIR;
     this.tempDir = config.tempDir || DEFAULT_TEMP_DIR;
+
+    // Initialize the appropriate TTS client/adapter
+    if (this.ttsProvider === 'elevenlabs' && config.elevenLabsApiKey) {
+      // Use legacy client for ElevenLabs with full control
+      this.ttsClient = new PodcastTTSClient(config.elevenLabsApiKey);
+    } else {
+      // Use new adapter for any provider
+      this.ttsAdapter = new PodcastTTSAdapter(this.ttsProvider);
+    }
+
+    logger.info({ ttsProvider: this.ttsProvider }, 'Pipeline initialized');
   }
 
   /**
@@ -183,7 +205,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
       await this.addID3Tags(normalizedFile, finalFile, script, job);
 
       // Get final stats (from DB for accuracy after resume)
-      const stats = this.ttsClient.getUsageStats();
+      const stats = this.getUsageStats();
       const dbCost = await podcastRepo.getSegmentsTotalCost(jobId);
       const totalCost = dbCost > 0 ? dbCost : stats.estimatedCostCents;
       const audioUrl = `/exports/podcasts/${finalFilename}`;
@@ -227,7 +249,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
       logger.error({ jobId, error: error.message }, 'Pipeline error');
 
       // Record partial cost and mark as error
-      const stats = this.ttsClient.getUsageStats();
+      const stats = this.getUsageStats();
       if (stats.estimatedCostCents > 0) {
         await podcastRepo.updatePartialCost(jobId, stats.estimatedCostCents);
       }
@@ -254,6 +276,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
   /**
    * Generate TTS audio for all segments, skipping any that already exist (for resume)
    * Includes segment-level status tracking and retry logic with exponential backoff
+   * Supports both ElevenLabs (legacy client) and Gemini (new adapter)
    */
   private async generateAllAudio(
     jobId: string,
@@ -272,8 +295,8 @@ export class PodcastGenerationPipeline extends EventEmitter {
       logger.info({ jobId, skippedCount, total }, 'Resuming generation - skipping existing segments');
     }
 
-    // Reset TTS client stats for accurate cost tracking of NEW segments only
-    this.ttsClient.resetUsageStats();
+    // Reset usage stats for accurate cost tracking of NEW segments only
+    this.resetUsageStats();
 
     for (let i = 0; i < segments.length; i++) {
       const segment = segments[i];
@@ -308,22 +331,18 @@ export class PodcastGenerationPipeline extends EventEmitter {
         currentSegment: i + 1,
         totalSegments: total,
         percentComplete,
-        message: `Generating audio for segment ${i + 1} of ${total} (${segment.speaker})...`,
+        message: `Generating audio for segment ${i + 1} of ${total} (${segment.speaker}) via ${this.ttsProvider}...`,
       });
 
-      logger.debug({ jobId, segment: i + 1, total, speaker: segment.speaker }, 'Generating segment');
+      logger.debug({ jobId, segment: i + 1, total, speaker: segment.speaker, provider: this.ttsProvider }, 'Generating segment');
 
       // Mark segment as generating
       await podcastRepo.updateSegmentStatus(jobId, i, 'generating');
 
       try {
-        // Generate audio via ElevenLabs with retry logic
+        // Generate audio using appropriate client/adapter with retry logic
         const response = await this.withRetry(
-          () => this.ttsClient.generateSegmentAudio(segment, {
-            modelId: config.elevenLabsModel || 'eleven_multilingual_v2',
-            outputFormat: config.outputFormat || 'mp3_44100_128',
-            pronunciationDictionaryId: config.pronunciationDictionaryId,
-          }),
+          () => this.generateSegmentAudio(segment, config),
           `segment ${i + 1}`
         );
 
@@ -332,7 +351,9 @@ export class PodcastGenerationPipeline extends EventEmitter {
         audioFiles.push(audioFile);
 
         // Mark segment as complete with cost info
-        const segmentCost = Math.round(segment.text.length * 0.03); // Approx cost per char
+        // Cost varies by provider: ElevenLabs ~$0.03/char, Gemini ~$0.0015/char
+        const costPerChar = this.ttsProvider === 'gemini' ? 0.0015 : 0.03;
+        const segmentCost = Math.round(segment.text.length * costPerChar);
         await podcastRepo.updateSegmentStatus(jobId, i, 'complete', {
           characterCount: segment.text.length,
           costCents: segmentCost,
@@ -349,6 +370,51 @@ export class PodcastGenerationPipeline extends EventEmitter {
     }
 
     return audioFiles;
+  }
+
+  /**
+   * Generate audio for a single segment using the appropriate TTS service
+   */
+  private async generateSegmentAudio(
+    segment: PodcastSegment,
+    config: PodcastExportConfig
+  ): Promise<{ audio: Buffer; characterCount: number; durationMs?: number }> {
+    if (this.ttsClient) {
+      // Use legacy ElevenLabs client
+      return this.ttsClient.generateSegmentAudio(segment, {
+        modelId: config.elevenLabsModel || 'eleven_multilingual_v2',
+        outputFormat: config.outputFormat || 'mp3_44100_128',
+        pronunciationDictionaryId: config.pronunciationDictionaryId,
+      });
+    } else if (this.ttsAdapter) {
+      // Use new adapter (supports ElevenLabs, Gemini, etc.)
+      return this.ttsAdapter.generateSegmentAudio(segment);
+    } else {
+      throw new Error('No TTS client or adapter configured');
+    }
+  }
+
+  /**
+   * Get usage statistics from whichever TTS service is being used
+   */
+  private getUsageStats(): { totalCharacters: number; totalRequests: number; estimatedCostCents: number } {
+    if (this.ttsClient) {
+      return this.ttsClient.getUsageStats();
+    } else if (this.ttsAdapter) {
+      return this.ttsAdapter.getUsageStats();
+    }
+    return { totalCharacters: 0, totalRequests: 0, estimatedCostCents: 0 };
+  }
+
+  /**
+   * Reset usage statistics
+   */
+  private resetUsageStats(): void {
+    if (this.ttsClient) {
+      this.ttsClient.resetUsageStats();
+    } else if (this.ttsAdapter) {
+      this.ttsAdapter.resetUsageStats();
+    }
   }
 
   /**
@@ -525,15 +591,30 @@ export class PodcastGenerationPipeline extends EventEmitter {
 
 /**
  * Create a configured pipeline instance
+ *
+ * @param config Optional configuration overrides
+ * @param config.ttsProvider TTS provider to use ('elevenlabs' or 'gemini')
+ * @param config.elevenLabsApiKey ElevenLabs API key (required for ElevenLabs provider)
+ * @param config.exportsDir Directory for final exports
+ * @param config.tempDir Directory for temp files
  */
 export function createPodcastPipeline(config?: Partial<PipelineConfig>): PodcastGenerationPipeline {
+  const ttsProvider = config?.ttsProvider || 'elevenlabs';
   const elevenLabsApiKey = config?.elevenLabsApiKey || process.env.ELEVENLABS_API_KEY;
 
-  if (!elevenLabsApiKey) {
-    throw new Error('ELEVENLABS_API_KEY is required for podcast generation');
+  // Validate provider availability
+  const availableProviders = getAvailablePodcastProviders();
+  if (!availableProviders.includes(ttsProvider)) {
+    const availableList = availableProviders.join(', ') || 'none';
+    throw new Error(
+      `TTS provider '${ttsProvider}' is not available. ` +
+      `Available providers: ${availableList}. ` +
+      `Configure the required API key for your desired provider.`
+    );
   }
 
   return new PodcastGenerationPipeline({
+    ttsProvider,
     elevenLabsApiKey,
     exportsDir: config?.exportsDir || process.env.EXPORTS_DIR || DEFAULT_EXPORTS_DIR,
     tempDir: config?.tempDir || process.env.TEMP_DIR || DEFAULT_TEMP_DIR,

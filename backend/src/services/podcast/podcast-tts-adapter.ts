@@ -1,0 +1,266 @@
+/**
+ * Podcast TTS Adapter
+ *
+ * Wraps the generic ITTSService for podcast-specific needs.
+ * Handles provider selection, tag conversion, and speaker role mapping.
+ */
+
+import pino from 'pino';
+import Bottleneck from 'bottleneck';
+import type {
+  PodcastSegment,
+  TTSProviderType,
+  ElevenLabsVoiceSettings,
+} from '../../types/podcast-export.js';
+import type { ITTSService, VoiceType, TTSResult } from '../audio/types.js';
+import { getTTSService, isProviderAvailable } from '../audio/tts-provider-factory.js';
+import { AudioTagConverter } from './audio-tag-converter.js';
+
+const logger = pino({
+  name: 'podcast-tts-adapter',
+  level: process.env.LOG_LEVEL || 'info',
+});
+
+/**
+ * Usage statistics for cost tracking
+ */
+export interface PodcastTTSUsageStats {
+  totalCharacters: number;
+  totalRequests: number;
+  estimatedCostCents: number;
+  provider: TTSProviderType;
+}
+
+/**
+ * TTS response for a single segment
+ */
+export interface PodcastTTSResponse {
+  audio: Buffer;
+  characterCount: number;
+  durationMs?: number;
+}
+
+/**
+ * Cost estimates per 1000 characters by provider
+ * These are approximate and subject to change
+ */
+const COST_PER_1000_CHARS_CENTS: Record<TTSProviderType, number> = {
+  elevenlabs: 15,  // $0.15 per 1K chars (Creator tier)
+  gemini: 1.5,     // ~$0.015 per 1K chars (much cheaper)
+};
+
+/**
+ * Podcast TTS Adapter
+ *
+ * Provides a unified interface for generating podcast audio
+ * with support for multiple TTS providers.
+ */
+export class PodcastTTSAdapter {
+  private readonly provider: TTSProviderType;
+  private readonly service: ITTSService;
+  private readonly tagConverter: AudioTagConverter;
+  private readonly limiter: Bottleneck;
+  private usageStats: PodcastTTSUsageStats;
+
+  constructor(provider: TTSProviderType = 'elevenlabs') {
+    this.provider = provider;
+    this.tagConverter = new AudioTagConverter(provider);
+
+    // Validate provider is available
+    // Map podcast provider type to audio service provider type
+    const serviceProvider = provider as 'elevenlabs' | 'gemini';
+    if (!isProviderAvailable(serviceProvider)) {
+      throw new Error(
+        `TTS provider '${provider}' is not available. ` +
+        `Please configure the required API key.`
+      );
+    }
+
+    this.service = getTTSService(serviceProvider);
+
+    // Rate limiter - adjust based on provider
+    const rpmLimit = provider === 'gemini' ? 30 : 100;  // Gemini has lower limits
+    this.limiter = new Bottleneck({
+      minTime: Math.ceil(60000 / rpmLimit),
+      maxConcurrent: provider === 'gemini' ? 2 : 1,
+    });
+
+    this.usageStats = {
+      totalCharacters: 0,
+      totalRequests: 0,
+      estimatedCostCents: 0,
+      provider,
+    };
+
+    logger.info({ provider }, 'Podcast TTS adapter initialized');
+  }
+
+  /**
+   * Generate audio for a single podcast segment
+   */
+  async generateSegmentAudio(segment: PodcastSegment): Promise<PodcastTTSResponse> {
+    return this.limiter.schedule(async () => {
+      // Convert tags for the target provider
+      const convertedText = this.tagConverter.convert(segment.text);
+
+      // Map speaker role to voice type
+      const voiceType = this.mapSpeakerToVoiceType(segment.speaker);
+
+      logger.debug({
+        speaker: segment.speaker,
+        voiceType,
+        provider: this.provider,
+        originalLength: segment.text.length,
+        convertedLength: convertedText.length,
+      }, 'Generating segment audio');
+
+      // Generate speech using the underlying service
+      const result = await this.service.generateSpeech(convertedText, voiceType);
+
+      // Track usage
+      this.trackUsage(convertedText.length);
+
+      return {
+        audio: result.audioBuffer,
+        characterCount: result.charactersUsed,
+        durationMs: result.durationMs,
+      };
+    });
+  }
+
+  /**
+   * Generate audio for all segments in a script
+   */
+  async generateFullPodcast(
+    segments: PodcastSegment[],
+    onProgress?: (current: number, total: number) => void
+  ): Promise<{ audioBuffers: Buffer[]; stats: PodcastTTSUsageStats }> {
+    const audioBuffers: Buffer[] = [];
+
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      if (!segment) continue;
+
+      const response = await this.generateSegmentAudio(segment);
+      audioBuffers.push(response.audio);
+
+      if (onProgress) {
+        onProgress(i + 1, segments.length);
+      }
+    }
+
+    return {
+      audioBuffers,
+      stats: this.getUsageStats(),
+    };
+  }
+
+  /**
+   * Map podcast speaker role to VoiceType for ITTSService
+   */
+  private mapSpeakerToVoiceType(speaker: string): VoiceType {
+    const mapping: Record<string, VoiceType> = {
+      // Direct mappings
+      pro: 'pro',
+      con: 'con',
+      moderator: 'moderator',
+      narrator: 'narrator',
+
+      // Podcast-specific roles
+      pro_advocate: 'pro',
+      con_advocate: 'con',
+
+      // Duelogic chairs - map to alternating voices
+      arbiter: 'moderator',
+      chair_1: 'pro',
+      chair_2: 'con',
+      chair_3: 'pro',      // Alternate
+      chair_4: 'con',      // Alternate
+      chair_5: 'pro',      // Alternate
+      chair_6: 'con',      // Alternate
+
+      // Informal participants
+      participant_1: 'pro',
+      participant_2: 'con',
+      participant_3: 'pro',
+      participant_4: 'con',
+    };
+
+    return mapping[speaker] || 'narrator';
+  }
+
+  /**
+   * Track usage for cost estimation
+   */
+  private trackUsage(characterCount: number): void {
+    this.usageStats.totalCharacters += characterCount;
+    this.usageStats.totalRequests += 1;
+    this.usageStats.estimatedCostCents += Math.ceil(
+      (characterCount / 1000) * COST_PER_1000_CHARS_CENTS[this.provider]
+    );
+  }
+
+  /**
+   * Get current usage statistics
+   */
+  getUsageStats(): PodcastTTSUsageStats {
+    return { ...this.usageStats };
+  }
+
+  /**
+   * Reset usage statistics
+   */
+  resetUsageStats(): void {
+    this.usageStats = {
+      totalCharacters: 0,
+      totalRequests: 0,
+      estimatedCostCents: 0,
+      provider: this.provider,
+    };
+  }
+
+  /**
+   * Estimate cost for a given character count
+   */
+  static estimateCostCents(characterCount: number, provider: TTSProviderType): number {
+    return Math.ceil((characterCount / 1000) * COST_PER_1000_CHARS_CENTS[provider]);
+  }
+
+  /**
+   * Get the current provider
+   */
+  getProvider(): TTSProviderType {
+    return this.provider;
+  }
+
+  /**
+   * Check if provider is available
+   */
+  static isProviderAvailable(provider: TTSProviderType): boolean {
+    return isProviderAvailable(provider as 'elevenlabs' | 'gemini');
+  }
+}
+
+/**
+ * Create a podcast TTS adapter for the specified provider
+ */
+export function createPodcastTTSAdapter(provider: TTSProviderType = 'elevenlabs'): PodcastTTSAdapter {
+  return new PodcastTTSAdapter(provider);
+}
+
+/**
+ * Get available podcast TTS providers
+ */
+export function getAvailablePodcastProviders(): TTSProviderType[] {
+  const available: TTSProviderType[] = [];
+
+  if (process.env.ELEVENLABS_API_KEY) {
+    available.push('elevenlabs');
+  }
+
+  if (process.env.GOOGLE_AI_API_KEY) {
+    available.push('gemini');
+  }
+
+  return available;
+}

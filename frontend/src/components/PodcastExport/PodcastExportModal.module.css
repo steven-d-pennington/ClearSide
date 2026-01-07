@@ -58,6 +58,69 @@
   gap: var(--space-4);
 }
 
+/* Provider Selector (at top of config) */
+.providerSelector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-2);
+}
+
+.providerLabel {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.providerOptions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.providerOption {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.providerOption:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.providerOption.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-alpha-10);
+}
+
+.providerName {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.providerDescription {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.providerCost {
+  font-size: var(--font-size-xs);
+  color: var(--color-success);
+  font-weight: 500;
+  margin-top: var(--space-1);
+}
+
 /* Existing Job Banner */
 .existingJobBanner {
   background: var(--color-bg-secondary);
