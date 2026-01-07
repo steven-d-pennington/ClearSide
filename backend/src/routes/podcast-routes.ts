@@ -18,8 +18,6 @@ import {
     RefinedPodcastScript,
     PodcastSegment,
     DEFAULT_VOICE_ASSIGNMENTS,
-    GEMINI_VOICE_ASSIGNMENTS,
-    GEMINI_AVAILABLE_VOICES,
     ElevenLabsModel,
     AudioOutputFormat,
     TTSProviderType,

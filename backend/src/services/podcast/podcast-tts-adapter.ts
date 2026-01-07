@@ -10,9 +10,8 @@ import Bottleneck from 'bottleneck';
 import type {
   PodcastSegment,
   TTSProviderType,
-  ElevenLabsVoiceSettings,
 } from '../../types/podcast-export.js';
-import type { ITTSService, VoiceType, TTSResult } from '../audio/types.js';
+import type { ITTSService, VoiceType } from '../audio/types.js';
 import { getTTSService, isProviderAvailable } from '../audio/tts-provider-factory.js';
 import { AudioTagConverter } from './audio-tag-converter.js';
 

@@ -103,7 +103,7 @@ router.post('/research/jobs/run', async (req: Request, res: Response) => {
     let config = configId ? await researchRepo.findConfigById(configId) : null;
     if (!config) {
       const configs = await researchRepo.findEnabledConfigs();
-      config = configs[0];
+      config = configs[0] ?? null;
     }
 
     if (!config) {
@@ -163,11 +163,12 @@ router.post('/research/configs', async (req: Request, res: Response) => {
 router.put('/research/configs/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
     await researchRepo.updateConfig(id, req.body);
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     logger.error({ error }, 'Failed to update research config');
-    res.status(500).json({ error: 'Failed to update research config' });
+    return res.status(500).json({ error: 'Failed to update research config' });
   }
 });
 
@@ -178,11 +179,12 @@ router.put('/research/configs/:id', async (req: Request, res: Response) => {
 router.delete('/research/configs/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
     await researchRepo.deleteConfig(id);
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     logger.error({ error }, 'Failed to delete research config');
-    res.status(500).json({ error: 'Failed to delete research config' });
+    return res.status(500).json({ error: 'Failed to delete research config' });
   }
 });
 
@@ -226,6 +228,7 @@ router.get('/proposals', async (req: Request, res: Response) => {
 router.get('/proposals/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
     const proposal = await proposalRepo.findById(id);
 
     if (!proposal) {
@@ -246,6 +249,7 @@ router.get('/proposals/:id', async (req: Request, res: Response) => {
 router.put('/proposals/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
     const parseResult = UpdateProposalSchema.safeParse(req.body);
 
     if (!parseResult.success) {
@@ -267,16 +271,17 @@ router.put('/proposals/:id', async (req: Request, res: Response) => {
 router.post('/proposals/:id/approve', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
     const { episodeNumber } = req.body;
 
     const nextNumber = episodeNumber || await proposalRepo.getNextEpisodeNumber();
     await proposalRepo.approve(id, 'admin', nextNumber);
 
     logger.info({ proposalId: id, episodeNumber: nextNumber }, 'Proposal approved');
-    res.json({ success: true, episodeNumber: nextNumber });
+    return res.json({ success: true, episodeNumber: nextNumber });
   } catch (error) {
     logger.error({ error }, 'Failed to approve proposal');
-    res.status(500).json({ error: 'Failed to approve proposal' });
+    return res.status(500).json({ error: 'Failed to approve proposal' });
   }
 });
 
@@ -287,15 +292,16 @@ router.post('/proposals/:id/approve', async (req: Request, res: Response) => {
 router.post('/proposals/:id/reject', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
     const { notes } = req.body;
 
     await proposalRepo.reject(id, 'admin', notes);
 
     logger.info({ proposalId: id }, 'Proposal rejected');
-    res.json({ success: true });
+    return res.json({ success: true });
   } catch (error) {
     logger.error({ error }, 'Failed to reject proposal');
-    res.status(500).json({ error: 'Failed to reject proposal' });
+    return res.status(500).json({ error: 'Failed to reject proposal' });
   }
 });
 
@@ -306,6 +312,7 @@ router.post('/proposals/:id/reject', async (req: Request, res: Response) => {
 router.post('/proposals/:id/schedule', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
     const { scheduledFor } = req.body;
 
     if (!scheduledFor) {

@@ -7,7 +7,6 @@ import {
     ElevenLabsModel,
     DEFAULT_VOICE_ASSIGNMENTS,
     TTSProviderType,
-    GEMINI_VOICE_ASSIGNMENTS,
 } from '../../types/podcast-export.js';
 import { DebateTranscript } from '../transcript/transcript-recorder.js';
 import type { DebateTone } from '../../types/duelogic.js';

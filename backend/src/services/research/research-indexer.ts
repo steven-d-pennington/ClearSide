@@ -113,18 +113,20 @@ export class ResearchIndexer {
       if (source.excerpt && source.excerpt.length > 500) {
         const additionalChunks = this.splitIntoChunks(source.excerpt, 500);
         for (let i = 1; i < additionalChunks.length; i++) {
+          const chunkText = additionalChunks[i];
+          if (!chunkText) continue;
           chunks.push({
             id: uuidv4(),
             episodeId,
             researchResultId: research.id,
-            content: `From ${source.title}: ${additionalChunks[i]}`,
+            content: `From ${source.title}: ${chunkText}`,
             metadata: {
               sourceUrl: source.url,
               sourceTitle: source.title,
               sourceDomain: source.domain,
               publishedAt: source.publishedAt,
               category: research.category,
-              excerpt: additionalChunks[i],
+              excerpt: chunkText,
             },
           });
         }

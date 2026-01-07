@@ -5,8 +5,8 @@
 
 import pino from 'pino';
 import { VectorDBClient } from '../../types/vector-db.js';
-import { PineconeClient, createPineconeClient } from './pinecone-client.js';
-import { ChromaDBClient, createChromaClient } from './chroma-client.js';
+import { createPineconeClient } from './pinecone-client.js';
+import { createChromaClient } from './chroma-client.js';
 
 const logger = pino({
   name: 'vector-db-factory',

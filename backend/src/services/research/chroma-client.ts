@@ -121,11 +121,14 @@ export class ChromaDBClient implements VectorDBClient {
   async hasIndexedResearch(episodeId: string): Promise<boolean> {
     const collection = await this.getCollection();
 
-    const response = await collection.count({
+    // Use query with limit 1 instead of count (which doesn't support filters)
+    const response = await collection.query({
+      queryEmbeddings: [[0]], // Dummy embedding, we just need to check existence
+      nResults: 1,
       where: { episodeId: episodeId },
     });
 
-    return response > 0;
+    return (response.ids[0]?.length || 0) > 0;
   }
 
   async ping(): Promise<boolean> {

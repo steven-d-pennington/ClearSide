@@ -8,8 +8,7 @@ import pino from 'pino';
 import {
   VectorDBClient,
   VectorEntry,
-  SearchResult,
-  VectorMetadata
+  SearchResult
 } from '../../types/vector-db.js';
 
 const logger = pino({

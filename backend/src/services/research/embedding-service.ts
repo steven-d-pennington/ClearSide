@@ -37,7 +37,11 @@ export class EmbeddingService {
         dimensions: this.config.dimensions,
       });
 
-      return response.data[0].embedding;
+      const embedding = response.data[0]?.embedding;
+      if (!embedding) {
+        throw new Error('No embedding returned from OpenAI');
+      }
+      return embedding;
     } catch (error) {
       logger.error({ error }, 'Failed to generate embedding');
       throw error;
