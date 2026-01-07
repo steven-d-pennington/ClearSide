@@ -9,7 +9,11 @@ import { createLogger } from '../utils/logger.js';
 import { pool } from '../db/index.js';
 import { ResearchRepository } from '../db/repositories/research-repository.js';
 import { EpisodeProposalRepository } from '../db/repositories/episode-proposal-repository.js';
-import { ProposalStatus } from '../types/duelogic-research.js';
+import { ProposalStatus, ResearchConfig } from '../types/duelogic-research.js';
+import { researchSSEManager } from '../services/sse/research-sse-manager.js';
+import { DuelogicResearchService } from '../services/research/duelogic-research-service.js';
+import { EpisodeGenerator } from '../services/research/episode-generator.js';
+import { OpenRouterLLMClient } from '../services/llm/openrouter-adapter.js';
 
 const router = express.Router();
 const logger = createLogger({ module: 'DuelogicResearchRoutes' });
@@ -17,6 +21,263 @@ const logger = createLogger({ module: 'DuelogicResearchRoutes' });
 // Initialize repositories
 const researchRepo = new ResearchRepository(pool);
 const proposalRepo = new EpisodeProposalRepository(pool);
+
+// Track running jobs to prevent duplicates
+const runningJobs = new Set<string>();
+
+/**
+ * Execute research job asynchronously with SSE events
+ */
+async function executeResearchJob(jobId: string, config: ResearchConfig): Promise<void> {
+  const startTime = Date.now();
+  let topicsDiscovered = 0;
+  let episodesGenerated = 0;
+  let tokensUsed = 0;
+
+  try {
+    // Emit job started event
+    researchSSEManager.broadcastToJob(jobId, 'research_started', {
+      jobId,
+      configId: config.id,
+      configName: config.name,
+      categories: config.categories,
+      maxTopicsPerRun: config.maxTopicsPerRun,
+      timestampMs: Date.now(),
+    });
+
+    researchSSEManager.broadcastToJob(jobId, 'research_log', {
+      jobId,
+      level: 'info',
+      message: `Starting research with config "${config.name}"`,
+      details: { categories: config.categories },
+      timestampMs: Date.now(),
+    });
+
+    // Check for OpenRouter API key
+    if (!process.env.OPENROUTER_API_KEY) {
+      researchSSEManager.broadcastToJob(jobId, 'research_log', {
+        jobId,
+        level: 'warn',
+        message: 'OPENROUTER_API_KEY not configured - running in demo mode',
+        timestampMs: Date.now(),
+      });
+
+      // Demo mode: simulate research with fake data
+      await runDemoResearch(jobId, config);
+      return;
+    }
+
+    // Initialize services
+    const llmClient = new OpenRouterLLMClient(config.perplexityModel);
+
+    const researchService = new DuelogicResearchService(
+      llmClient,
+      researchRepo,
+      { model: config.perplexityModel },
+      { minControversyScore: config.minControversyScore }
+    );
+
+    const episodeGenerator = new EpisodeGenerator(llmClient, proposalRepo);
+
+    // Process each category
+    for (let i = 0; i < config.categories.length; i++) {
+      const category = config.categories[i];
+      const categoryStartTime = Date.now();
+
+      researchSSEManager.broadcastToJob(jobId, 'research_category_start', {
+        jobId,
+        category,
+        categoryIndex: i + 1,
+        totalCategories: config.categories.length,
+        timestampMs: Date.now(),
+      });
+
+      researchSSEManager.broadcastToJob(jobId, 'research_log', {
+        jobId,
+        level: 'info',
+        message: `Researching category: ${category}`,
+        timestampMs: Date.now(),
+      });
+
+      try {
+        // Discover topics for this category
+        const results = await researchService.discoverTopics(config, jobId);
+
+        for (const result of results) {
+          topicsDiscovered++;
+
+          researchSSEManager.broadcastToJob(jobId, 'research_topic_found', {
+            jobId,
+            topic: result.topic,
+            category: result.category,
+            summary: result.summary.slice(0, 200),
+            sourceCount: result.sources.length,
+            timestampMs: Date.now(),
+          });
+
+          researchSSEManager.broadcastToJob(jobId, 'research_topic_scored', {
+            jobId,
+            topic: result.topic,
+            controversyScore: result.controversyScore,
+            timeliness: result.timeliness,
+            depth: result.depth,
+            passedThreshold: true,
+            timestampMs: Date.now(),
+          });
+
+          // Generate episode proposal
+          researchSSEManager.broadcastToJob(jobId, 'episode_generating', {
+            jobId,
+            topic: result.topic,
+            category: result.category,
+            timestampMs: Date.now(),
+          });
+
+          const proposal = await episodeGenerator.generateProposal(result);
+          if (proposal) {
+            episodesGenerated++;
+
+            researchSSEManager.broadcastToJob(jobId, 'episode_generated', {
+              jobId,
+              proposalId: proposal.id,
+              title: proposal.title,
+              subtitle: proposal.subtitle,
+              category: result.category,
+              tokensUsed: 0,
+              timestampMs: Date.now(),
+            });
+          }
+        }
+
+        researchSSEManager.broadcastToJob(jobId, 'research_category_complete', {
+          jobId,
+          category,
+          topicsFound: results.length,
+          tokensUsed: 0,
+          durationMs: Date.now() - categoryStartTime,
+          timestampMs: Date.now(),
+        });
+
+      } catch (categoryError) {
+        researchSSEManager.broadcastToJob(jobId, 'research_log', {
+          jobId,
+          level: 'error',
+          message: `Error processing category ${category}: ${categoryError instanceof Error ? categoryError.message : 'Unknown error'}`,
+          timestampMs: Date.now(),
+        });
+      }
+
+      // Progress update
+      researchSSEManager.broadcastToJob(jobId, 'research_progress', {
+        jobId,
+        phase: 'discovery',
+        categoriesCompleted: i + 1,
+        totalCategories: config.categories.length,
+        topicsFound: topicsDiscovered,
+        episodesGenerated,
+        tokensUsed,
+        timestampMs: Date.now(),
+      });
+    }
+
+    // Complete the job
+    await researchRepo.completeJob(jobId, topicsDiscovered, episodesGenerated, tokensUsed);
+
+    researchSSEManager.broadcastToJob(jobId, 'research_complete', {
+      jobId,
+      topicsDiscovered,
+      episodesGenerated,
+      tokensUsed,
+      durationMs: Date.now() - startTime,
+      timestampMs: Date.now(),
+    });
+
+    logger.info({ jobId, topicsDiscovered, episodesGenerated }, 'Research job completed');
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    await researchRepo.failJob(jobId, errorMessage);
+
+    researchSSEManager.broadcastToJob(jobId, 'research_failed', {
+      jobId,
+      error: errorMessage,
+      timestampMs: Date.now(),
+    });
+
+    logger.error({ jobId, error }, 'Research job failed');
+  } finally {
+    runningJobs.delete(jobId);
+  }
+}
+
+/**
+ * Demo research mode when no API key is configured
+ */
+async function runDemoResearch(jobId: string, config: ResearchConfig): Promise<void> {
+  const startTime = Date.now();
+
+  // Simulate processing each category
+  for (let i = 0; i < config.categories.length; i++) {
+    const category = config.categories[i];
+
+    researchSSEManager.broadcastToJob(jobId, 'research_category_start', {
+      jobId,
+      category,
+      categoryIndex: i + 1,
+      totalCategories: config.categories.length,
+      timestampMs: Date.now(),
+    });
+
+    // Simulate delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    researchSSEManager.broadcastToJob(jobId, 'research_log', {
+      jobId,
+      level: 'info',
+      message: `[Demo] Would research topics in: ${category}`,
+      timestampMs: Date.now(),
+    });
+
+    researchSSEManager.broadcastToJob(jobId, 'research_category_complete', {
+      jobId,
+      category,
+      topicsFound: 0,
+      tokensUsed: 0,
+      durationMs: 1000,
+      timestampMs: Date.now(),
+    });
+
+    researchSSEManager.broadcastToJob(jobId, 'research_progress', {
+      jobId,
+      phase: 'discovery',
+      categoriesCompleted: i + 1,
+      totalCategories: config.categories.length,
+      topicsFound: 0,
+      episodesGenerated: 0,
+      tokensUsed: 0,
+      timestampMs: Date.now(),
+    });
+  }
+
+  await researchRepo.completeJob(jobId, 0, 0, 0);
+
+  researchSSEManager.broadcastToJob(jobId, 'research_complete', {
+    jobId,
+    topicsDiscovered: 0,
+    episodesGenerated: 0,
+    tokensUsed: 0,
+    durationMs: Date.now() - startTime,
+    timestampMs: Date.now(),
+  });
+
+  researchSSEManager.broadcastToJob(jobId, 'research_log', {
+    jobId,
+    level: 'info',
+    message: 'Demo research completed. Configure OPENROUTER_API_KEY for real research.',
+    timestampMs: Date.now(),
+  });
+}
 
 // ============================================================================
 // Validation Schemas
@@ -113,8 +374,17 @@ router.post('/research/jobs/run', async (req: Request, res: Response) => {
     const job = await researchRepo.createJob(config.id);
     await researchRepo.startJob(job.id);
 
-    // In a real implementation, this would trigger the actual research job
-    // For now, we just create the job record
+    // Prevent duplicate runs
+    if (runningJobs.has(job.id)) {
+      return res.status(409).json({ error: 'Job is already running' });
+    }
+    runningJobs.add(job.id);
+
+    // Start research job asynchronously (don't await)
+    executeResearchJob(job.id, config).catch(err => {
+      logger.error({ jobId: job.id, error: err }, 'Research job execution failed');
+    });
+
     logger.info({ jobId: job.id, configId: config.id }, 'Research job started');
 
     return res.status(201).json(job);
@@ -122,6 +392,59 @@ router.post('/research/jobs/run', async (req: Request, res: Response) => {
     logger.error({ error }, 'Failed to start research job');
     return res.status(500).json({ error: 'Failed to start research job' });
   }
+});
+
+/**
+ * GET /duelogic/research/jobs/:id/stream
+ * SSE endpoint for streaming research job events
+ */
+router.get('/research/jobs/:id/stream', (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!id) {
+    res.status(400).json({ error: 'Job ID required' });
+    return;
+  }
+
+  // Check if job exists (async but we handle it inline)
+  researchRepo.findJobById(id).then(job => {
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+
+    // Register SSE client
+    const clientId = researchSSEManager.registerClient(id, res);
+
+    // Handle client disconnect
+    req.on('close', () => {
+      researchSSEManager.unregisterClient(clientId);
+    });
+
+    // If job is already completed, send final status immediately
+    if (job.status === 'completed') {
+      researchSSEManager.broadcastToJob(id, 'research_complete', {
+        jobId: id,
+        topicsDiscovered: job.topicsDiscovered,
+        episodesGenerated: job.episodesGenerated,
+        tokensUsed: job.tokensUsed,
+        durationMs: job.completedAt && job.startedAt
+          ? new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime()
+          : 0,
+        timestampMs: Date.now(),
+      });
+    } else if (job.status === 'failed') {
+      researchSSEManager.broadcastToJob(id, 'research_failed', {
+        jobId: id,
+        error: job.error || 'Unknown error',
+        timestampMs: Date.now(),
+      });
+    }
+    // Keep connection open - SSE manager handles heartbeats
+  }).catch(err => {
+    console.error('Failed to find job:', err);
+    res.status(500).json({ error: 'Failed to find job' });
+  });
 });
 
 // ============================================================================
