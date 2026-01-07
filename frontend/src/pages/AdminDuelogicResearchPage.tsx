@@ -12,40 +12,68 @@ import type {
   DashboardStats,
   ResearchJob,
   EpisodeProposal,
+  ResearchConfig,
+  ResearchCategory,
 } from '../types/duelogic-research';
+import { CATEGORY_LABELS } from '../types/duelogic-research';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+const ALL_CATEGORIES: ResearchCategory[] = [
+  'technology_ethics',
+  'ai_automation',
+  'climate_environment',
+  'bioethics_medicine',
+  'economics_inequality',
+  'politics_governance',
+  'social_justice',
+  'international_relations',
+  'privacy_surveillance',
+  'education_culture',
+];
 
 export function AdminDuelogicResearchPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentJobs, setRecentJobs] = useState<ResearchJob[]>([]);
   const [pendingProposals, setPendingProposals] = useState<EpisodeProposal[]>([]);
+  const [configs, setConfigs] = useState<ResearchConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [runningJob, setRunningJob] = useState(false);
+  const [showNewConfig, setShowNewConfig] = useState(false);
+  const [newConfig, setNewConfig] = useState({
+    name: '',
+    categories: ['technology_ethics', 'ai_automation'] as ResearchCategory[],
+    maxTopicsPerRun: 10,
+    minControversyScore: 0.6,
+  });
+  const [creatingConfig, setCreatingConfig] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const [statsRes, jobsRes, proposalsRes] = await Promise.all([
+      const [statsRes, jobsRes, proposalsRes, configsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/duelogic/dashboard/stats`),
         fetch(`${API_BASE_URL}/api/duelogic/research/jobs?limit=5`),
         fetch(`${API_BASE_URL}/api/duelogic/proposals?status=pending`),
+        fetch(`${API_BASE_URL}/api/duelogic/research/configs`),
       ]);
 
-      if (!statsRes.ok || !jobsRes.ok || !proposalsRes.ok) {
+      if (!statsRes.ok || !jobsRes.ok || !proposalsRes.ok || !configsRes.ok) {
         throw new Error('Failed to fetch dashboard data');
       }
 
-      const [statsData, jobsData, proposalsData] = await Promise.all([
+      const [statsData, jobsData, proposalsData, configsData] = await Promise.all([
         statsRes.json(),
         jobsRes.json(),
         proposalsRes.json(),
+        configsRes.json(),
       ]);
 
       setStats(statsData);
       setRecentJobs(jobsData);
       setPendingProposals(proposalsData.slice(0, 5));
+      setConfigs(configsData);
       setError(null);
     } catch (err) {
       console.error('Error fetching dashboard:', err);
@@ -59,16 +87,17 @@ export function AdminDuelogicResearchPage() {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  const handleRunJob = async () => {
+  const handleRunJob = async (configId?: string) => {
     setRunningJob(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/duelogic/research/jobs/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configId ? { configId } : {}),
       });
 
       if (response.ok) {
-        setActionMessage({ type: 'success', text: 'Research job started' });
+        setActionMessage({ type: 'success', text: 'Research job started successfully!' });
         fetchDashboard();
       } else {
         const data = await response.json();
@@ -80,6 +109,84 @@ export function AdminDuelogicResearchPage() {
       setRunningJob(false);
       setTimeout(() => setActionMessage(null), 5000);
     }
+  };
+
+  const handleCreateConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newConfig.name.trim()) {
+      setActionMessage({ type: 'error', text: 'Please enter a configuration name' });
+      return;
+    }
+    if (newConfig.categories.length === 0) {
+      setActionMessage({ type: 'error', text: 'Please select at least one category' });
+      return;
+    }
+
+    setCreatingConfig(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/duelogic/research/configs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newConfig.name,
+          schedule: '0 8 * * *', // Default: daily at 8am
+          enabled: true,
+          categories: newConfig.categories,
+          perplexityModel: 'perplexity/sonar-pro',
+          maxTopicsPerRun: newConfig.maxTopicsPerRun,
+          minControversyScore: newConfig.minControversyScore,
+        }),
+      });
+
+      if (response.ok) {
+        setActionMessage({ type: 'success', text: 'Research configuration created!' });
+        setShowNewConfig(false);
+        setNewConfig({
+          name: '',
+          categories: ['technology_ethics', 'ai_automation'],
+          maxTopicsPerRun: 10,
+          minControversyScore: 0.6,
+        });
+        fetchDashboard();
+      } else {
+        const data = await response.json();
+        setActionMessage({ type: 'error', text: data.error || 'Failed to create config' });
+      }
+    } catch (err) {
+      setActionMessage({ type: 'error', text: 'Failed to create configuration' });
+    } finally {
+      setCreatingConfig(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
+  const handleDeleteConfig = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this configuration?')) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/duelogic/research/configs/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setActionMessage({ type: 'success', text: 'Configuration deleted' });
+        fetchDashboard();
+      } else {
+        setActionMessage({ type: 'error', text: 'Failed to delete configuration' });
+      }
+    } catch (err) {
+      setActionMessage({ type: 'error', text: 'Failed to delete configuration' });
+    }
+    setTimeout(() => setActionMessage(null), 5000);
+  };
+
+  const toggleCategory = (cat: ResearchCategory) => {
+    setNewConfig(prev => ({
+      ...prev,
+      categories: prev.categories.includes(cat)
+        ? prev.categories.filter(c => c !== cat)
+        : [...prev.categories, cat],
+    }));
   };
 
   const handleQuickApprove = async (id: string) => {
@@ -194,18 +301,139 @@ export function AdminDuelogicResearchPage() {
         </div>
       </section>
 
+      {/* Research Configurations */}
+      <section className={styles.section}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>Research Configurations</h2>
+          <Button
+            onClick={() => setShowNewConfig(!showNewConfig)}
+            variant="secondary"
+            size="sm"
+          >
+            {showNewConfig ? 'Cancel' : '+ New Config'}
+          </Button>
+        </div>
+
+        {showNewConfig && (
+          <form onSubmit={handleCreateConfig} className={styles.newConfigForm}>
+            <div className={styles.formGroup}>
+              <label htmlFor="configName">Configuration Name</label>
+              <input
+                id="configName"
+                type="text"
+                value={newConfig.name}
+                onChange={e => setNewConfig(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g., Daily Tech & AI Research"
+                className={styles.input}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label>Categories to Research</label>
+              <div className={styles.categoryGrid}>
+                {ALL_CATEGORIES.map(cat => (
+                  <label key={cat} className={styles.categoryCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={newConfig.categories.includes(cat)}
+                      onChange={() => toggleCategory(cat)}
+                    />
+                    <span>{CATEGORY_LABELS[cat]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
+                <label htmlFor="maxTopics">Max Topics Per Run</label>
+                <input
+                  id="maxTopics"
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={newConfig.maxTopicsPerRun}
+                  onChange={e => setNewConfig(prev => ({ ...prev, maxTopicsPerRun: parseInt(e.target.value) || 10 }))}
+                  className={styles.input}
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="minControversy">Min Controversy Score</label>
+                <input
+                  id="minControversy"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={newConfig.minControversyScore}
+                  onChange={e => setNewConfig(prev => ({ ...prev, minControversyScore: parseFloat(e.target.value) || 0.6 }))}
+                  className={styles.input}
+                />
+              </div>
+            </div>
+
+            <Button type="submit" variant="primary" loading={creatingConfig}>
+              Create Configuration
+            </Button>
+          </form>
+        )}
+
+        {configs.length > 0 ? (
+          <div className={styles.configList}>
+            {configs.map(config => (
+              <div key={config.id} className={styles.configCard}>
+                <div className={styles.configInfo}>
+                  <h3 className={styles.configName}>{config.name}</h3>
+                  <p className={styles.configMeta}>
+                    {config.categories.length} categories · Max {config.maxTopicsPerRun} topics ·
+                    Min controversy: {config.minControversyScore}
+                  </p>
+                  <div className={styles.configCategories}>
+                    {config.categories.slice(0, 3).map(cat => (
+                      <span key={cat} className={styles.categoryTag}>
+                        {CATEGORY_LABELS[cat]}
+                      </span>
+                    ))}
+                    {config.categories.length > 3 && (
+                      <span className={styles.categoryTag}>+{config.categories.length - 3} more</span>
+                    )}
+                  </div>
+                </div>
+                <div className={styles.configActions}>
+                  <Button
+                    onClick={() => handleRunJob(config.id)}
+                    variant="primary"
+                    size="sm"
+                    loading={runningJob}
+                  >
+                    Run Now
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteConfig(config.id)}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : !showNewConfig ? (
+          <div className={styles.noConfigMessage}>
+            <p>No research configurations yet.</p>
+            <p>Create a configuration to start discovering debate topics automatically.</p>
+            <Button onClick={() => setShowNewConfig(true)} variant="primary">
+              Create Your First Configuration
+            </Button>
+          </div>
+        ) : null}
+      </section>
+
       {/* Recent Research Jobs */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Recent Research Jobs</h2>
-          <Button
-            onClick={handleRunJob}
-            loading={runningJob}
-            variant="primary"
-            size="sm"
-          >
-            Run Now
-          </Button>
         </div>
         {recentJobs.length > 0 ? (
           <table className={styles.table}>
@@ -237,7 +465,7 @@ export function AdminDuelogicResearchPage() {
             </tbody>
           </table>
         ) : (
-          <p className={styles.noData}>No research jobs yet</p>
+          <p className={styles.noData}>No research jobs yet. Create a configuration and run your first research job!</p>
         )}
       </section>
 
