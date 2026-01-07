@@ -874,7 +874,47 @@ OPENAI_API_KEY=your-api-key
 
 ---
 
+## Implementation Notes (2026-01-07)
+
+**Status: COMPLETED**
+
+### Files Created
+
+1. **Types:**
+   - `backend/src/types/vector-db.ts` - VectorDBClient interface, VectorEntry, SearchResult, RAGCitation types
+
+2. **Services:**
+   - `backend/src/services/research/embedding-service.ts` - OpenAI embedding generation
+   - `backend/src/services/research/pinecone-client.ts` - Pinecone vector DB adapter
+   - `backend/src/services/research/chroma-client.ts` - ChromaDB local adapter
+   - `backend/src/services/research/research-indexer.ts` - Indexes research into vector DB
+   - `backend/src/services/research/rag-retrieval-service.ts` - Retrieves citations for debates
+   - `backend/src/services/research/vector-db-factory.ts` - Factory for creating vector DB clients
+
+3. **Dependencies Added:**
+   - `@pinecone-database/pinecone` - Pinecone client
+   - `chromadb` - ChromaDB client
+
+### Key Implementation Details
+
+- Uses `text-embedding-3-small` model with 1536 dimensions
+- Supports both Pinecone (cloud) and ChromaDB (local) via environment config
+- Auto-detects provider from environment variables
+- Chunks research sources into semantic units for better retrieval
+- RAG retrieval filters by minimum relevance score (default 0.6)
+
+### Environment Variables Required
+
+```bash
+VECTOR_DB_PROVIDER=pinecone  # or 'chroma'
+PINECONE_API_KEY=your-key
+PINECONE_INDEX_NAME=duelogic-research
+OPENAI_API_KEY=your-key
+```
+
+---
+
 **Estimated Time:** 1-3 days
-**Assigned To:** _Unassigned_
+**Assigned To:** _Completed_
 **Created:** 2026-01-03
-**Updated:** 2026-01-03
+**Updated:** 2026-01-07

@@ -282,6 +282,12 @@ export function AdminDashboardPage() {
             </Button>
           </Link>
 
+          <Link to="/admin/duelogic/research" className={styles.actionLink}>
+            <Button variant="secondary" className={styles.actionButton}>
+              Duelogic Research
+            </Button>
+          </Link>
+
           <Button
             variant="ghost"
             onClick={handleCleanup}

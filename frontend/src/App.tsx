@@ -5,7 +5,7 @@
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { HomePage, HistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage, AdminEventsPage } from './pages';
+import { HomePage, HistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage, AdminEventsPage, AdminDuelogicResearchPage, AdminDuelogicProposalsPage, AdminDuelogicProposalDetailPage } from './pages';
 import './styles/tokens.css';
 import './App.css';
 
@@ -29,6 +29,9 @@ function App() {
             <Route path="/admin/system" element={<AdminSystemPage />} />
             <Route path="/admin/config" element={<AdminConfigPage />} />
             <Route path="/admin/events" element={<AdminEventsPage />} />
+            <Route path="/admin/duelogic/research" element={<AdminDuelogicResearchPage />} />
+            <Route path="/admin/duelogic/proposals" element={<AdminDuelogicProposalsPage />} />
+            <Route path="/admin/duelogic/proposals/:id" element={<AdminDuelogicProposalDetailPage />} />
           </Routes>
         </main>
       </div>

@@ -285,8 +285,6 @@ export class OpenRouterLLMClient extends LLMClient {
     let currentModelId = startModelId;
 
     for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
-      const startTime = Date.now();
-
       try {
         await rateLimiter.waitIfNeeded(currentModelId);
         rateLimiter.recordRequest(currentModelId);
