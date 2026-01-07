@@ -12,8 +12,6 @@ import type {
   DashboardStats,
   ResearchJob,
   EpisodeProposal,
-  ProposalStatus,
-  CATEGORY_LABELS,
 } from '../types/duelogic-research';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
