@@ -4,7 +4,7 @@
  * Dashboard for managing Duelogic research and episode proposals
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Alert } from '../components/ui';
 import styles from './AdminDuelogicResearchPage.module.css';
@@ -32,6 +32,15 @@ const ALL_CATEGORIES: ResearchCategory[] = [
   'education_culture',
 ];
 
+interface ResearchLogEntry {
+  id: string;
+  timestamp: string;
+  event: string;
+  level?: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  details?: Record<string, unknown>;
+}
+
 export function AdminDuelogicResearchPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentJobs, setRecentJobs] = useState<ResearchJob[]>([]);
@@ -48,7 +57,207 @@ export function AdminDuelogicResearchPage() {
     maxTopicsPerRun: 10,
     minControversyScore: 0.6,
   });
+
+  // Research job streaming state
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [jobLogs, setJobLogs] = useState<ResearchLogEntry[]>([]);
+  const [jobProgress, setJobProgress] = useState<{
+    categoriesCompleted: number;
+    totalCategories: number;
+    topicsFound: number;
+    episodesGenerated: number;
+  } | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const logContainerRef = useRef<HTMLDivElement>(null);
   const [creatingConfig, setCreatingConfig] = useState(false);
+
+  // Connect to SSE stream when a job starts
+  const connectToJobStream = useCallback((jobId: string) => {
+    // Close existing connection if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    setActiveJobId(jobId);
+    setJobLogs([]);
+    setJobProgress(null);
+
+    const eventSource = new EventSource(`${API_BASE_URL}/api/duelogic/research/jobs/${jobId}/stream`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const eventType = data.event as string;
+        const payload = data.data;
+        const timestamp = data.timestamp;
+
+        // Create log entry based on event type
+        let logEntry: ResearchLogEntry | null = null;
+
+        switch (eventType) {
+          case 'research_connected':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: 'Connected to research job stream',
+            };
+            break;
+
+          case 'research_started':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: `Starting research: ${payload.configName}`,
+              details: { categories: payload.categories },
+            };
+            break;
+
+          case 'research_log':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: payload.level,
+              message: payload.message,
+              details: payload.details,
+            };
+            break;
+
+          case 'research_category_start':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: `Researching category ${payload.categoryIndex}/${payload.totalCategories}: ${payload.category}`,
+            };
+            break;
+
+          case 'research_category_complete':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: `Completed ${payload.category}: found ${payload.topicsFound} topics`,
+            };
+            break;
+
+          case 'research_topic_found':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: `Found topic: ${payload.topic}`,
+              details: { sources: payload.sourceCount },
+            };
+            break;
+
+          case 'research_topic_scored':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: payload.passedThreshold ? 'info' : 'debug',
+              message: `Scored: controversy=${payload.controversyScore.toFixed(2)}, timeliness=${payload.timeliness.toFixed(2)}, depth=${payload.depth.toFixed(2)}`,
+            };
+            break;
+
+          case 'episode_generating':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: `Generating episode for: ${payload.topic}`,
+            };
+            break;
+
+          case 'episode_generated':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: `Episode created: "${payload.title}"`,
+            };
+            break;
+
+          case 'research_progress':
+            setJobProgress({
+              categoriesCompleted: payload.categoriesCompleted,
+              totalCategories: payload.totalCategories,
+              topicsFound: payload.topicsFound,
+              episodesGenerated: payload.episodesGenerated,
+            });
+            break;
+
+          case 'research_complete':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'info',
+              message: `Research complete! Topics: ${payload.topicsDiscovered}, Episodes: ${payload.episodesGenerated}`,
+            };
+            setRunningJob(false);
+            fetchDashboard();
+            // Close connection after completion
+            setTimeout(() => {
+              eventSource.close();
+            }, 1000);
+            break;
+
+          case 'research_failed':
+            logEntry = {
+              id: crypto.randomUUID(),
+              timestamp,
+              event: eventType,
+              level: 'error',
+              message: `Research failed: ${payload.error}`,
+            };
+            setRunningJob(false);
+            fetchDashboard();
+            break;
+        }
+
+        if (logEntry) {
+          setJobLogs(prev => [...prev, logEntry!]);
+          // Auto-scroll to bottom
+          if (logContainerRef.current) {
+            setTimeout(() => {
+              logContainerRef.current?.scrollTo({
+                top: logContainerRef.current.scrollHeight,
+                behavior: 'smooth',
+              });
+            }, 50);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to parse SSE event:', err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      console.error('SSE connection error');
+      eventSource.close();
+    };
+  }, [fetchDashboard]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -89,6 +298,8 @@ export function AdminDuelogicResearchPage() {
 
   const handleRunJob = async (configId?: string) => {
     setRunningJob(true);
+    setJobLogs([]);
+    setJobProgress(null);
     try {
       const response = await fetch(`${API_BASE_URL}/api/duelogic/research/jobs/run`, {
         method: 'POST',
@@ -97,18 +308,20 @@ export function AdminDuelogicResearchPage() {
       });
 
       if (response.ok) {
-        setActionMessage({ type: 'success', text: 'Research job started successfully!' });
-        fetchDashboard();
+        const job = await response.json();
+        setActionMessage({ type: 'success', text: 'Research job started - see logs below' });
+        // Connect to SSE stream for this job
+        connectToJobStream(job.id);
       } else {
         const data = await response.json();
         setActionMessage({ type: 'error', text: data.error || 'Failed to start job' });
+        setRunningJob(false);
       }
     } catch (err) {
       setActionMessage({ type: 'error', text: 'Failed to start research job' });
-    } finally {
       setRunningJob(false);
-      setTimeout(() => setActionMessage(null), 5000);
     }
+    setTimeout(() => setActionMessage(null), 5000);
   };
 
   const handleCreateConfig = async (e: React.FormEvent) => {
@@ -429,6 +642,59 @@ export function AdminDuelogicResearchPage() {
           </div>
         ) : null}
       </section>
+
+      {/* Active Job Log */}
+      {(activeJobId || jobLogs.length > 0) && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>
+              Research Job Log
+              {activeJobId && <span className={styles.jobIdBadge}>{activeJobId.slice(0, 8)}</span>}
+            </h2>
+            {jobProgress && (
+              <div className={styles.progressInfo}>
+                <span>Categories: {jobProgress.categoriesCompleted}/{jobProgress.totalCategories}</span>
+                <span>Topics: {jobProgress.topicsFound}</span>
+                <span>Episodes: {jobProgress.episodesGenerated}</span>
+              </div>
+            )}
+          </div>
+
+          <div ref={logContainerRef} className={styles.logContainer}>
+            {jobLogs.length === 0 ? (
+              <div className={styles.logEmpty}>Waiting for events...</div>
+            ) : (
+              jobLogs.map(log => (
+                <div
+                  key={log.id}
+                  className={`${styles.logEntry} ${styles[`logLevel${log.level?.charAt(0).toUpperCase()}${log.level?.slice(1)}`] || ''}`}
+                >
+                  <span className={styles.logTime}>
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </span>
+                  <span className={styles.logLevel}>{log.level?.toUpperCase() || 'INFO'}</span>
+                  <span className={styles.logMessage}>{log.message}</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {!runningJob && jobLogs.length > 0 && (
+            <Button
+              onClick={() => {
+                setJobLogs([]);
+                setActiveJobId(null);
+                setJobProgress(null);
+              }}
+              variant="secondary"
+              size="sm"
+              className={styles.clearLogsBtn}
+            >
+              Clear Log
+            </Button>
+          )}
+        </section>
+      )}
 
       {/* Recent Research Jobs */}
       <section className={styles.section}>

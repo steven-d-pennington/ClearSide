@@ -59,7 +59,21 @@ export type SSEEventType =
   | 'segment_start'          // Duelogic segment started
   | 'segment_complete'       // Duelogic segment completed
   | 'chair_interrupt'        // Chair interrupted another chair
-  | 'arbiter_interjection';  // Arbiter interjected for violation
+  | 'arbiter_interjection'   // Arbiter interjected for violation
+  // Research job events
+  | 'research_connected'       // Client connected to research job stream
+  | 'research_started'         // Research job started
+  | 'research_progress'        // Progress update
+  | 'research_category_start'  // Starting research on a category
+  | 'research_category_complete' // Completed research on a category
+  | 'research_topic_found'     // Found a potential topic
+  | 'research_topic_scored'    // Topic scored for quality
+  | 'research_topic_filtered'  // Topic filtered out (low quality)
+  | 'episode_generating'       // Generating episode proposal
+  | 'episode_generated'        // Episode proposal generated
+  | 'research_complete'        // Research job completed
+  | 'research_failed'          // Research job failed
+  | 'research_log';
 
 /**
  * SSE Client
@@ -423,4 +437,159 @@ export interface DiscussionCompleteEventData {
     }>;
     generatedAt: string;
   };
+}
+
+// ============================================================================
+// Research Job Event Types and Payloads
+// ============================================================================
+
+/** Research-specific SSE event types */
+export type ResearchSSEEventType =
+  | 'research_connected'       // Client connected to research job stream
+  | 'research_started'         // Research job started
+  | 'research_progress'        // Progress update
+  | 'research_category_start'  // Starting research on a category
+  | 'research_category_complete' // Completed research on a category
+  | 'research_topic_found'     // Found a potential topic
+  | 'research_topic_scored'    // Topic scored for quality
+  | 'research_topic_filtered'  // Topic filtered out (low quality)
+  | 'episode_generating'       // Generating episode proposal
+  | 'episode_generated'        // Episode proposal generated
+  | 'research_complete'        // Research job completed
+  | 'research_failed'          // Research job failed
+  | 'research_log';            // General log message
+
+/** Research connected event payload */
+export interface ResearchConnectedEventData {
+  jobId: string;
+  configId: string;
+  configName: string;
+  message: string;
+}
+
+/** Research started event payload */
+export interface ResearchStartedEventData {
+  jobId: string;
+  configId: string;
+  configName: string;
+  categories: string[];
+  maxTopicsPerRun: number;
+  timestampMs: number;
+}
+
+/** Research progress event payload */
+export interface ResearchProgressEventData {
+  jobId: string;
+  phase: 'discovery' | 'scoring' | 'generation';
+  categoriesCompleted: number;
+  totalCategories: number;
+  topicsFound: number;
+  episodesGenerated: number;
+  tokensUsed: number;
+  timestampMs: number;
+}
+
+/** Research category start event payload */
+export interface ResearchCategoryStartEventData {
+  jobId: string;
+  category: string;
+  categoryIndex: number;
+  totalCategories: number;
+  timestampMs: number;
+}
+
+/** Research category complete event payload */
+export interface ResearchCategoryCompleteEventData {
+  jobId: string;
+  category: string;
+  topicsFound: number;
+  tokensUsed: number;
+  durationMs: number;
+  timestampMs: number;
+}
+
+/** Research topic found event payload */
+export interface ResearchTopicFoundEventData {
+  jobId: string;
+  topic: string;
+  category: string;
+  summary: string;
+  sourceCount: number;
+  timestampMs: number;
+}
+
+/** Research topic scored event payload */
+export interface ResearchTopicScoredEventData {
+  jobId: string;
+  topic: string;
+  controversyScore: number;
+  timeliness: number;
+  depth: number;
+  passedThreshold: boolean;
+  timestampMs: number;
+}
+
+/** Research topic filtered event payload */
+export interface ResearchTopicFilteredEventData {
+  jobId: string;
+  topic: string;
+  reason: string;
+  scores: {
+    controversyScore: number;
+    timeliness: number;
+    depth: number;
+  };
+  thresholds: {
+    minControversy: number;
+    minTimeliness: number;
+    minDepth: number;
+  };
+  timestampMs: number;
+}
+
+/** Episode generating event payload */
+export interface EpisodeGeneratingEventData {
+  jobId: string;
+  topic: string;
+  category: string;
+  timestampMs: number;
+}
+
+/** Episode generated event payload */
+export interface EpisodeGeneratedEventData {
+  jobId: string;
+  proposalId: string;
+  title: string;
+  subtitle: string;
+  category: string;
+  tokensUsed: number;
+  timestampMs: number;
+}
+
+/** Research complete event payload */
+export interface ResearchCompleteEventData {
+  jobId: string;
+  topicsDiscovered: number;
+  episodesGenerated: number;
+  tokensUsed: number;
+  durationMs: number;
+  timestampMs: number;
+}
+
+/** Research failed event payload */
+export interface ResearchFailedEventData {
+  jobId: string;
+  error: string;
+  phase?: string;
+  category?: string;
+  timestampMs: number;
+}
+
+/** Research log event payload */
+export interface ResearchLogEventData {
+  jobId: string;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  details?: Record<string, unknown>;
+  timestampMs: number;
 }

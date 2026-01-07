@@ -432,3 +432,102 @@
     justify-content: flex-end;
   }
 }
+
+/* Job Log Viewer */
+.jobIdBadge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: normal;
+}
+
+.progressInfo {
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.progressInfo span {
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-md);
+}
+
+.logContainer {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  max-height: 400px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.logEmpty {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.logEntry {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  align-items: flex-start;
+}
+
+.logEntry:last-child {
+  border-bottom: none;
+}
+
+.logTime {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.logLevel {
+  flex-shrink: 0;
+  width: 50px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.logMessage {
+  flex: 1;
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+/* Log level colors */
+.logLevelInfo .logLevel {
+  color: var(--color-info);
+}
+
+.logLevelWarn .logLevel {
+  color: var(--color-warning);
+}
+
+.logLevelError {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.logLevelError .logLevel {
+  color: var(--color-error);
+}
+
+.logLevelDebug .logLevel {
+  color: var(--color-text-muted);
+}
+
+.clearLogsBtn {
+  margin-top: var(--space-2);
+}
