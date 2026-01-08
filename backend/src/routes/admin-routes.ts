@@ -14,6 +14,11 @@ import * as settingsRepository from '../db/repositories/settings-repository.js';
 import { orchestratorRegistry } from '../services/debate/index.js';
 import { createLogger } from '../utils/logger.js';
 import { getRateLimiter } from '../services/llm/rate-limiter.js';
+import {
+  listExternalServiceStatuses,
+  runExternalServiceTest,
+  type ExternalServiceId,
+} from '../services/admin/external-service-testing.js';
 import type { DebateStatus, SystemEventType, EventSeverity } from '../types/database.js';
 
 const router = express.Router();
@@ -473,6 +478,50 @@ router.get('/admin/system', async (_req: Request, res: Response) => {
     res.status(500).json({
       error: 'Failed to get system stats',
       message: errorMessage,
+    });
+  }
+});
+
+// =============================================================================
+// External Service Testing Endpoints
+// =============================================================================
+
+/**
+ * GET /admin/testing/services
+ * List external services and configuration status
+ */
+router.get('/admin/testing/services', (_req: Request, res: Response) => {
+  res.json({
+    services: listExternalServiceStatuses(),
+  });
+});
+
+/**
+ * POST /admin/testing/run
+ * Execute a connectivity test for an external service
+ */
+router.post('/admin/testing/run', async (req: Request, res: Response) => {
+  const { serviceId, config } = req.body as {
+    serviceId?: ExternalServiceId;
+    config?: Record<string, unknown>;
+  };
+
+  if (!serviceId) {
+    res.status(400).json({ error: 'serviceId is required' });
+    return;
+  }
+
+  try {
+    const result = await runExternalServiceTest(
+      serviceId,
+      (config || {}) as any
+    );
+    res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({
+      ok: false,
+      message,
     });
   }
 });
