@@ -23,15 +23,8 @@ type SortDirection = 'asc' | 'desc';
 
 const TITLE_PATTERNS = ['Compound Mystery', 'Provocative Question', 'Binary Choice', 'Hidden Truth', 'Countdown'];
 
-interface ResearchJobInfo {
-  id: string;
-  configName?: string;
-  completedAt?: string;
-}
-
 export function AdminDuelogicProposalsPage() {
   const [proposals, setProposals] = useState<EpisodeProposal[]>([]);
-  const [researchJobs, setResearchJobs] = useState<Map<string, ResearchJobInfo>>(new Map());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,29 +48,12 @@ export function AdminDuelogicProposalsPage() {
   const fetchProposals = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [proposalsRes, jobsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/duelogic/proposals`),
-        fetch(`${API_BASE_URL}/api/duelogic/research/jobs?limit=50`),
-      ]);
+      const proposalsRes = await fetch(`${API_BASE_URL}/api/duelogic/proposals`);
 
       if (!proposalsRes.ok) throw new Error('Failed to fetch proposals');
 
       const proposalsData = await proposalsRes.json();
       setProposals(proposalsData);
-
-      // Build research job lookup
-      if (jobsRes.ok) {
-        const jobsData = await jobsRes.json();
-        const jobMap = new Map<string, ResearchJobInfo>();
-        for (const job of jobsData) {
-          jobMap.set(job.id, {
-            id: job.id,
-            configName: job.configName,
-            completedAt: job.completedAt,
-          });
-        }
-        setResearchJobs(jobMap);
-      }
 
       setError(null);
     } catch (err) {

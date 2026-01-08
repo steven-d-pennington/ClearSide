@@ -697,9 +697,15 @@ router.post('/:jobId/segment', async (req: Request, res: Response): Promise<void
         }
 
         // Get voice assignment for the speaker
-        const voiceAssignment = job.config.voiceAssignments?.[speaker]
-            || DEFAULT_VOICE_ASSIGNMENTS[speaker]
-            || DEFAULT_VOICE_ASSIGNMENTS['narrator'];
+        const voiceAssignment =
+            job.config.voiceAssignments?.[speaker]
+            ?? DEFAULT_VOICE_ASSIGNMENTS[speaker]
+            ?? DEFAULT_VOICE_ASSIGNMENTS.narrator;
+
+        if (!voiceAssignment) {
+            res.status(400).json({ error: `No voice assignment found for speaker '${speaker}'` });
+            return;
+        }
 
         // Create new blank segment
         const newSegment: PodcastSegment = {
