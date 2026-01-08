@@ -270,6 +270,12 @@ export function AdminDashboardPage() {
             </Button>
           </Link>
 
+          <Link to="/admin/testing" className={styles.actionLink}>
+            <Button variant="ghost" className={styles.actionButton}>
+              Integration Testing
+            </Button>
+          </Link>
+
           <Link to="/admin/config" className={styles.actionLink}>
             <Button variant="ghost" className={styles.actionButton}>
               Configuration
