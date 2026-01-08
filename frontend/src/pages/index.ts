@@ -7,6 +7,7 @@ export { AdminExportsPage } from './AdminExportsPage';
 export { AdminSystemPage } from './AdminSystemPage';
 export { AdminConfigPage } from './AdminConfigPage';
 export { AdminEventsPage } from './AdminEventsPage';
+export { AdminTestingPage } from './AdminTestingPage';
 export { AdminDuelogicResearchPage } from './AdminDuelogicResearchPage';
 export { AdminDuelogicProposalsPage } from './AdminDuelogicProposalsPage';
 export { AdminDuelogicProposalDetailPage } from './AdminDuelogicProposalDetailPage';

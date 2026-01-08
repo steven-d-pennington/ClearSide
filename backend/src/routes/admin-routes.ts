@@ -4,6 +4,10 @@
  */
 
 import express, { type Request, type Response } from 'express';
+import axios from 'axios';
+import { exec as execCallback } from 'child_process';
+import { promisify } from 'util';
+import { Pinecone } from '@pinecone-database/pinecone';
 import { sseManager } from '../services/sse/index.js';
 import * as debateRepository from '../db/repositories/debate-repository.js';
 import * as exportJobRepository from '../db/repositories/export-job-repository.js';
@@ -12,12 +16,17 @@ import * as presetRepository from '../db/repositories/preset-repository.js';
 import * as personaRepository from '../db/repositories/persona-repository.js';
 import * as settingsRepository from '../db/repositories/settings-repository.js';
 import { orchestratorRegistry } from '../services/debate/index.js';
+import {
+  createServiceAccountAccessToken,
+  parseServiceAccountJson,
+} from '../services/audio/google-cloud-long-audio-service.js';
 import { createLogger } from '../utils/logger.js';
 import { getRateLimiter } from '../services/llm/rate-limiter.js';
 import type { DebateStatus, SystemEventType, EventSeverity } from '../types/database.js';
 
 const router = express.Router();
 const logger = createLogger({ module: 'AdminRoutes' });
+const exec = promisify(execCallback);
 
 // Track server start time for uptime calculation
 const serverStartTime = Date.now();
@@ -902,6 +911,435 @@ router.put('/admin/settings/models', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to update model defaults',
+      message: errorMessage,
+    });
+  }
+});
+
+// =============================================================================
+// External Service Testing
+// =============================================================================
+
+type ExternalServiceId =
+  | 'elevenlabs'
+  | 'gemini-tts'
+  | 'google-cloud-tts'
+  | 'google-cloud-long'
+  | 'azure-tts'
+  | 'edge-tts'
+  | 'openrouter'
+  | 'openai'
+  | 'pinecone'
+  | 'listen-notes';
+
+interface ExternalServiceInfo {
+  id: ExternalServiceId;
+  name: string;
+  category: 'tts' | 'llm' | 'research' | 'vector';
+  description: string;
+  configured: boolean;
+  keyPreview?: string | null;
+  metadata?: Record<string, string | null>;
+  warning?: string | null;
+}
+
+interface ExternalServiceTestRequest {
+  apiKey?: string;
+  serviceAccountJson?: string;
+  bucket?: string;
+  location?: string;
+  projectId?: string;
+  region?: string;
+  indexName?: string;
+  namespace?: string;
+}
+
+interface ExternalServiceTestResult {
+  name: string;
+  success: boolean;
+  message: string;
+}
+
+function maskKey(value?: string | null): string | null {
+  if (!value) return null;
+  if (value.length <= 12) {
+    return `${value.slice(0, 2)}…${value.slice(-2)}`;
+  }
+  return `${value.slice(0, 8)}…${value.slice(-4)}`;
+}
+
+function safeParseServiceAccount(input?: string): { credentials: ReturnType<typeof parseServiceAccountJson> | null; error?: string } {
+  if (!input) return { credentials: null };
+  try {
+    return { credentials: parseServiceAccountJson(input) };
+  } catch (error) {
+    return {
+      credentials: null,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+router.get('/admin/testing/services', (_req: Request, res: Response) => {
+  const serviceAccountInput = process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON;
+  const { credentials, error } = safeParseServiceAccount(serviceAccountInput);
+
+  const services: ExternalServiceInfo[] = [
+    {
+      id: 'elevenlabs',
+      name: 'ElevenLabs TTS',
+      category: 'tts',
+      description: 'Premium multi-voice TTS (API key auth).',
+      configured: !!process.env.ELEVENLABS_API_KEY,
+      keyPreview: maskKey(process.env.ELEVENLABS_API_KEY),
+    },
+    {
+      id: 'gemini-tts',
+      name: 'Google Gemini TTS',
+      category: 'tts',
+      description: 'Gemini 2.5 TTS via AI Studio API key.',
+      configured: !!process.env.GOOGLE_AI_API_KEY,
+      keyPreview: maskKey(process.env.GOOGLE_AI_API_KEY),
+    },
+    {
+      id: 'google-cloud-tts',
+      name: 'Google Cloud TTS',
+      category: 'tts',
+      description: 'Google Cloud Text-to-Speech API (API key).',
+      configured: !!process.env.GOOGLE_CLOUD_API_KEY,
+      keyPreview: maskKey(process.env.GOOGLE_CLOUD_API_KEY),
+    },
+    {
+      id: 'google-cloud-long',
+      name: 'Google Cloud Long Audio',
+      category: 'tts',
+      description: 'Long audio synthesis (service account + GCS bucket).',
+      configured: !!process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON && !!process.env.GOOGLE_CLOUD_TTS_BUCKET,
+      keyPreview: maskKey(credentials?.private_key_id || credentials?.client_email),
+      metadata: {
+        bucket: process.env.GOOGLE_CLOUD_TTS_BUCKET || null,
+        projectId: process.env.GOOGLE_CLOUD_PROJECT_ID || credentials?.project_id || null,
+        location: process.env.GOOGLE_CLOUD_TTS_LOCATION || 'us-central1',
+        clientEmail: credentials?.client_email ? maskKey(credentials.client_email) : null,
+      },
+      warning: error || null,
+    },
+    {
+      id: 'azure-tts',
+      name: 'Azure TTS',
+      category: 'tts',
+      description: 'Azure Speech Services TTS.',
+      configured: !!process.env.AZURE_SPEECH_KEY,
+      keyPreview: maskKey(process.env.AZURE_SPEECH_KEY),
+      metadata: {
+        region: process.env.AZURE_SPEECH_REGION || 'eastus',
+      },
+    },
+    {
+      id: 'edge-tts',
+      name: 'Edge TTS (Free)',
+      category: 'tts',
+      description: 'Edge neural voices (Python edge-tts required).',
+      configured: true,
+      keyPreview: null,
+    },
+    {
+      id: 'openrouter',
+      name: 'OpenRouter',
+      category: 'llm',
+      description: 'LLM routing for debates and embeddings.',
+      configured: !!process.env.OPENROUTER_API_KEY,
+      keyPreview: maskKey(process.env.OPENROUTER_API_KEY),
+    },
+    {
+      id: 'openai',
+      name: 'OpenAI',
+      category: 'llm',
+      description: 'OpenAI embeddings/models.',
+      configured: !!process.env.OPENAI_API_KEY,
+      keyPreview: maskKey(process.env.OPENAI_API_KEY),
+    },
+    {
+      id: 'pinecone',
+      name: 'Pinecone',
+      category: 'vector',
+      description: 'Vector database for research retrieval.',
+      configured: !!process.env.PINECONE_API_KEY && !!process.env.PINECONE_INDEX_NAME,
+      keyPreview: maskKey(process.env.PINECONE_API_KEY),
+      metadata: {
+        indexName: process.env.PINECONE_INDEX_NAME || null,
+        namespace: process.env.PINECONE_NAMESPACE || 'duelogic-research',
+      },
+    },
+    {
+      id: 'listen-notes',
+      name: 'Listen Notes',
+      category: 'research',
+      description: 'Podcast discovery for Duelogic research.',
+      configured: !!process.env.LISTEN_NOTES_API_KEY,
+      keyPreview: maskKey(process.env.LISTEN_NOTES_API_KEY),
+    },
+  ];
+
+  res.json({ services });
+});
+
+router.post('/admin/testing/services/:serviceId/test', async (req: Request, res: Response) => {
+  const serviceId = req.params.serviceId as ExternalServiceId;
+  const payload = req.body as ExternalServiceTestRequest;
+  const startTime = Date.now();
+
+  const finish = (
+    success: boolean,
+    message: string,
+    details?: Record<string, unknown>,
+    checks?: ExternalServiceTestResult[]
+  ) => {
+    res.json({
+      success,
+      message,
+      durationMs: Date.now() - startTime,
+      details,
+      checks,
+    });
+  };
+
+  try {
+    switch (serviceId) {
+      case 'elevenlabs': {
+        const apiKey = payload.apiKey || process.env.ELEVENLABS_API_KEY;
+        if (!apiKey) {
+          res.status(400).json({ success: false, message: 'ElevenLabs API key is required.' });
+          return;
+        }
+
+        const response = await axios.get('https://api.elevenlabs.io/v1/voices', {
+          headers: { 'xi-api-key': apiKey },
+          timeout: 15000,
+        });
+
+        finish(true, 'ElevenLabs API reachable.', {
+          voiceCount: response.data?.voices?.length || 0,
+        });
+        return;
+      }
+      case 'gemini-tts': {
+        const apiKey = payload.apiKey || process.env.GOOGLE_AI_API_KEY;
+        if (!apiKey) {
+          res.status(400).json({ success: false, message: 'Gemini API key is required.' });
+          return;
+        }
+
+        const response = await axios.get('https://generativelanguage.googleapis.com/v1beta/models', {
+          params: { key: apiKey, pageSize: 5 },
+          timeout: 15000,
+        });
+
+        finish(true, 'Gemini API reachable.', {
+          modelCount: response.data?.models?.length || 0,
+        });
+        return;
+      }
+      case 'google-cloud-tts': {
+        const apiKey = payload.apiKey || process.env.GOOGLE_CLOUD_API_KEY;
+        if (!apiKey) {
+          res.status(400).json({ success: false, message: 'Google Cloud TTS API key is required.' });
+          return;
+        }
+
+        const response = await axios.get('https://texttospeech.googleapis.com/v1/voices', {
+          params: { key: apiKey, languageCode: 'en-US' },
+          timeout: 15000,
+        });
+
+        finish(true, 'Google Cloud TTS API reachable.', {
+          voiceCount: response.data?.voices?.length || 0,
+        });
+        return;
+      }
+      case 'google-cloud-long': {
+        const serviceAccountJson = payload.serviceAccountJson || process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON;
+        const bucket = payload.bucket || process.env.GOOGLE_CLOUD_TTS_BUCKET;
+        if (!serviceAccountJson || !bucket) {
+          res.status(400).json({
+            success: false,
+            message: 'Service account JSON and GCS bucket are required.',
+          });
+          return;
+        }
+
+        const credentials = parseServiceAccountJson(serviceAccountJson);
+        const location = payload.location || process.env.GOOGLE_CLOUD_TTS_LOCATION || 'us-central1';
+        const projectId = payload.projectId || process.env.GOOGLE_CLOUD_PROJECT_ID || credentials.project_id;
+
+        const { accessToken } = await createServiceAccountAccessToken(credentials);
+        const checks: ExternalServiceTestResult[] = [];
+
+        const ttsUrl = `https://${location}-texttospeech.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/operations`;
+        try {
+          await axios.get(ttsUrl, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            params: { pageSize: 1 },
+            timeout: 15000,
+          });
+          checks.push({ name: 'Long Audio API', success: true, message: 'Operations endpoint reachable.' });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          checks.push({ name: 'Long Audio API', success: false, message });
+        }
+
+        const bucketUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}`;
+        try {
+          await axios.get(bucketUrl, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            timeout: 15000,
+          });
+          checks.push({ name: 'GCS Bucket', success: true, message: 'Bucket metadata accessible.' });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          checks.push({ name: 'GCS Bucket', success: false, message });
+        }
+
+        const success = checks.every(check => check.success);
+        finish(
+          success,
+          success ? 'Google Cloud Long Audio checks passed.' : 'Google Cloud Long Audio checks failed.',
+          {
+            projectId,
+            bucket,
+            location,
+          },
+          checks
+        );
+        return;
+      }
+      case 'azure-tts': {
+        const apiKey = payload.apiKey || process.env.AZURE_SPEECH_KEY;
+        const region = payload.region || process.env.AZURE_SPEECH_REGION || 'eastus';
+        if (!apiKey) {
+          res.status(400).json({ success: false, message: 'Azure Speech API key is required.' });
+          return;
+        }
+
+        const response = await axios.get(
+          `https://${region}.tts.speech.microsoft.com/cognitiveservices/voices/list`,
+          {
+            headers: {
+              'Ocp-Apim-Subscription-Key': apiKey,
+            },
+            timeout: 15000,
+          }
+        );
+
+        finish(true, 'Azure TTS API reachable.', {
+          voiceCount: response.data?.length || 0,
+          region,
+        });
+        return;
+      }
+      case 'edge-tts': {
+        try {
+          await exec('python3 -c "import edge_tts"');
+          finish(true, 'edge-tts Python package available.', { command: 'python3 -c "import edge_tts"' });
+          return;
+        } catch {
+          try {
+            await exec('python -c "import edge_tts"');
+            finish(true, 'edge-tts Python package available (python).', { command: 'python -c "import edge_tts"' });
+            return;
+          } catch {
+            finish(false, 'edge-tts Python package not available.', {
+              suggestion: 'Install with: pip install edge-tts',
+            });
+            return;
+          }
+        }
+      }
+      case 'openrouter': {
+        const apiKey = payload.apiKey || process.env.OPENROUTER_API_KEY;
+        if (!apiKey) {
+          res.status(400).json({ success: false, message: 'OpenRouter API key is required.' });
+          return;
+        }
+
+        const response = await axios.get('https://openrouter.ai/api/v1/auth/key', {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          timeout: 15000,
+        });
+
+        finish(true, 'OpenRouter API reachable.', {
+          label: response.data?.label || null,
+          rateLimit: response.data?.rate_limit || null,
+        });
+        return;
+      }
+      case 'openai': {
+        const apiKey = payload.apiKey || process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+          res.status(400).json({ success: false, message: 'OpenAI API key is required.' });
+          return;
+        }
+
+        const response = await axios.get('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          timeout: 15000,
+        });
+
+        finish(true, 'OpenAI API reachable.', {
+          modelCount: response.data?.data?.length || 0,
+        });
+        return;
+      }
+      case 'pinecone': {
+        const apiKey = payload.apiKey || process.env.PINECONE_API_KEY;
+        const indexName = payload.indexName || process.env.PINECONE_INDEX_NAME;
+        const namespace = payload.namespace || process.env.PINECONE_NAMESPACE || 'duelogic-research';
+
+        if (!apiKey || !indexName) {
+          res.status(400).json({
+            success: false,
+            message: 'Pinecone API key and index name are required.',
+          });
+          return;
+        }
+
+        const client = new Pinecone({ apiKey });
+        const index = client.index(indexName);
+        await index.describeIndexStats();
+
+        finish(true, 'Pinecone reachable.', {
+          indexName,
+          namespace,
+        });
+        return;
+      }
+      case 'listen-notes': {
+        const apiKey = payload.apiKey || process.env.LISTEN_NOTES_API_KEY;
+        if (!apiKey) {
+          res.status(400).json({ success: false, message: 'Listen Notes API key is required.' });
+          return;
+        }
+
+        const response = await axios.get('https://listen-api.listennotes.com/api/v2/trending_searches', {
+          headers: { 'X-ListenAPI-Key': apiKey },
+          timeout: 15000,
+        });
+
+        finish(true, 'Listen Notes API reachable.', {
+          termCount: response.data?.terms?.length || 0,
+        });
+        return;
+      }
+      default: {
+        res.status(400).json({ success: false, message: `Unknown service: ${serviceId}` });
+        return;
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ serviceId, errorMessage }, 'External service test failed');
+    res.status(500).json({
+      success: false,
       message: errorMessage,
     });
   }
