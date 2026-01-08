@@ -19,6 +19,7 @@ import pino from 'pino';
 import crypto from 'crypto';
 import ffmpeg from 'fluent-ffmpeg';
 import { PassThrough } from 'stream';
+import fs from 'fs';
 import type {
   VoiceConfig,
   VoiceType,
@@ -127,6 +128,74 @@ export interface GoogleCloudLongAudioConfig {
   cleanupGcs?: boolean;
 }
 
+export function parseServiceAccountJson(input: string): ServiceAccountCredentials {
+  const trimmed = input.trim();
+
+  if (trimmed.startsWith('{')) {
+    return JSON.parse(trimmed) as ServiceAccountCredentials;
+  }
+
+  if (fs.existsSync(trimmed)) {
+    const fileContents = fs.readFileSync(trimmed, 'utf8');
+    return JSON.parse(fileContents) as ServiceAccountCredentials;
+  }
+
+  throw new Error('Service account must be JSON string or file path.');
+}
+
+export async function createServiceAccountAccessToken(
+  credentials: ServiceAccountCredentials
+): Promise<{ accessToken: string; expiresIn: number }> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = {
+    alg: 'RS256',
+    typ: 'JWT',
+  };
+  const payload = {
+    iss: credentials.client_email,
+    scope: 'https://www.googleapis.com/auth/cloud-platform',
+    aud: credentials.token_uri,
+    iat: now,
+    exp: now + 3600, // 1 hour
+  };
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signatureInput = `${encodedHeader}.${encodedPayload}`;
+
+  const sign = crypto.createSign('RSA-SHA256');
+  sign.update(signatureInput);
+  const signature = sign.sign(credentials.private_key);
+  const encodedSignature = base64UrlEncode(signature);
+
+  const jwt = `${signatureInput}.${encodedSignature}`;
+
+  const response = await axios.post(
+    credentials.token_uri,
+    new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    }
+  );
+
+  return {
+    accessToken: response.data.access_token,
+    expiresIn: response.data.expires_in,
+  };
+}
+
+function base64UrlEncode(input: string | Buffer): string {
+  const base64 = Buffer.isBuffer(input)
+    ? input.toString('base64')
+    : Buffer.from(input).toString('base64');
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 /**
  * Google Cloud Long Audio Synthesis Service
  *
@@ -151,7 +220,7 @@ export class GoogleCloudLongAudioService implements ITTSService {
 
   constructor(config: GoogleCloudLongAudioConfig) {
     // Parse service account credentials
-    this.credentials = this.parseServiceAccount(config.serviceAccountJson);
+    this.credentials = parseServiceAccountJson(config.serviceAccountJson);
     this.projectId = config.projectId || this.credentials.project_id;
     this.bucket = config.bucket;
     this.location = config.location || 'us-central1';
@@ -183,22 +252,6 @@ export class GoogleCloudLongAudioService implements ITTSService {
   /**
    * Parse service account JSON from string or file reference
    */
-  private parseServiceAccount(input: string): ServiceAccountCredentials {
-    try {
-      // Try parsing as JSON directly
-      return JSON.parse(input);
-    } catch {
-      // If it starts with {, it's invalid JSON
-      if (input.trim().startsWith('{')) {
-        throw new Error('Invalid service account JSON');
-      }
-      // Otherwise treat as file path (would need fs.readFileSync)
-      throw new Error(
-        'Service account must be JSON string. File paths not yet supported.'
-      );
-    }
-  }
-
   isAvailable(): boolean {
     return !!(this.credentials?.private_key && this.bucket);
   }
@@ -425,63 +478,13 @@ export class GoogleCloudLongAudioService implements ITTSService {
 
     logger.debug('Generating new OAuth2 access token');
 
-    // Create JWT for service account
-    const now = Math.floor(Date.now() / 1000);
-    const header = {
-      alg: 'RS256',
-      typ: 'JWT',
-    };
-    const payload = {
-      iss: this.credentials.client_email,
-      scope: 'https://www.googleapis.com/auth/cloud-platform',
-      aud: this.credentials.token_uri,
-      iat: now,
-      exp: now + 3600, // 1 hour
-    };
-
-    // Encode header and payload
-    const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
-    const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
-    const signatureInput = `${encodedHeader}.${encodedPayload}`;
-
-    // Sign with private key
-    const sign = crypto.createSign('RSA-SHA256');
-    sign.update(signatureInput);
-    const signature = sign.sign(this.credentials.private_key);
-    const encodedSignature = this.base64UrlEncode(signature);
-
-    const jwt = `${signatureInput}.${encodedSignature}`;
-
-    // Exchange JWT for access token
-    const response = await axios.post(
-      this.credentials.token_uri,
-      new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion: jwt,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    );
-
-    this.accessToken = response.data.access_token;
-    this.tokenExpiry = Date.now() + response.data.expires_in * 1000;
+    const tokenResponse = await createServiceAccountAccessToken(this.credentials);
+    this.accessToken = tokenResponse.accessToken;
+    this.tokenExpiry = Date.now() + tokenResponse.expiresIn * 1000;
 
     logger.debug('OAuth2 access token generated');
 
     return this.accessToken!;
-  }
-
-  /**
-   * Base64 URL encode (for JWT)
-   */
-  private base64UrlEncode(input: string | Buffer): string {
-    const base64 = Buffer.isBuffer(input)
-      ? input.toString('base64')
-      : Buffer.from(input).toString('base64');
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
   /**
