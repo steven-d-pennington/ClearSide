@@ -69,6 +69,8 @@ export interface EpisodeProposal {
   category?: ResearchCategory;
   qualityScore?: number;
   viralMetrics?: ViralMetrics;
+  configName?: string | null;
+  launchedDebateId?: string | null;
 }
 
 export interface ResearchConfig {

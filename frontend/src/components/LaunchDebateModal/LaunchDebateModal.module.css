@@ -268,6 +268,19 @@
   line-height: 1.4;
 }
 
+/* Select row - side by side dropdowns */
+.selectRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .selectRow {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Model select */
 .modelSelectWrapper {
   display: flex;
@@ -327,6 +340,57 @@
   font-weight: 600;
   color: var(--text-secondary);
   font-style: normal;
+}
+
+/* Options section */
+.optionsSection {
+  padding: 1rem 1.5rem;
+}
+
+.toggleOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.875rem 1rem;
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.toggleOption:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.toggleCheckbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent-cyan);
+  cursor: pointer;
+}
+
+.toggleContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.toggleLabel {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.toggleDescription {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 /* Footer */

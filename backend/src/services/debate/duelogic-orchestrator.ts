@@ -32,7 +32,9 @@ import {
 import {
   ChairAgent,
   createChairAgents,
+  EmptyResponseError,
 } from '../agents/chair-agent.js';
+import { RAGRetrievalService } from '../research/rag-retrieval-service.js';
 import {
   ResponseEvaluator,
   createResponseEvaluator,
@@ -101,6 +103,19 @@ interface DebateStats {
 }
 
 /**
+ * Information about a chair that failed to respond
+ */
+export interface FailedChairInfo {
+  position: string;
+  modelId: string;
+  modelDisplayName?: string;
+  providerName?: string;
+  segment: DuelogicSegment;
+  reason: string;
+  timestamp: string;
+}
+
+/**
  * Orchestrator status
  */
 export interface DuelogicOrchestratorStatus {
@@ -110,6 +125,7 @@ export interface DuelogicOrchestratorStatus {
   utteranceCount: number;
   exchangeNumber: number;
   elapsedMs: number;
+  failedChair?: FailedChairInfo;
 }
 
 // ============================================================================
@@ -147,6 +163,13 @@ export class DuelogicOrchestrator {
   private isRunning: boolean = false;
   private isPaused: boolean = false;
   private startTime: number = 0;
+
+  // Failure tracking
+  private failedChair: FailedChairInfo | null = null;
+
+  // RAG support
+  private ragService?: RAGRetrievalService;
+  private episodeId?: string;
 
   constructor(options: DuelogicOrchestratorOptions) {
     this.debateId = options.debateId;
@@ -199,6 +222,39 @@ export class DuelogicOrchestrator {
     );
   }
 
+  /**
+   * Enable RAG (Retrieval-Augmented Generation) for this debate
+   * Enables citation injection for all chair agents based on indexed research
+   *
+   * @param ragService - The RAG retrieval service
+   * @param episodeId - The episode ID to query for citations
+   */
+  enableRAG(ragService: RAGRetrievalService, episodeId: string): void {
+    this.ragService = ragService;
+    this.episodeId = episodeId;
+
+    // Enable RAG for all chair agents
+    for (const agent of this.chairAgents.values()) {
+      agent.enableRAG(ragService, episodeId);
+    }
+
+    logger.info(
+      {
+        debateId: this.debateId,
+        episodeId,
+        chairCount: this.chairAgents.size,
+      },
+      'RAG enabled for debate orchestrator and all chair agents'
+    );
+  }
+
+  /**
+   * Check if RAG is enabled for this debate
+   */
+  isRAGEnabled(): boolean {
+    return !!(this.ragService && this.episodeId);
+  }
+
   // ==========================================================================
   // Public Methods
   // ==========================================================================
@@ -241,17 +297,30 @@ export class DuelogicOrchestrator {
         },
       });
 
-      // Execute 4 segments
+      // Execute 4 segments - each can throw EmptyResponseError
       await this.executeIntroduction();
+
+      if (!this.isRunning) return; // Check if halted
       await this.executeOpenings();
+
+      if (!this.isRunning) return; // Check if halted
       await this.executeExchange();
+
+      if (!this.isRunning) return; // Check if halted
       await this.executeSynthesis();
 
-      // Broadcast completion
-      await this.broadcastComplete();
+      // Broadcast completion only if we completed successfully
+      if (this.isRunning && !this.failedChair) {
+        await this.broadcastComplete();
+      }
 
     } catch (error) {
-      this.handleError(error as Error);
+      // Handle chair failure specifically
+      if (error instanceof EmptyResponseError) {
+        await this.handleChairFailure(error);
+      } else {
+        this.handleError(error as Error);
+      }
     } finally {
       this.isRunning = false;
     }
@@ -321,6 +390,7 @@ export class DuelogicOrchestrator {
       utteranceCount: this.transcript.length,
       exchangeNumber: this.exchangeNumber,
       elapsedMs: this.getElapsedMs(),
+      failedChair: this.failedChair || undefined,
     };
   }
 
@@ -890,9 +960,80 @@ export class DuelogicOrchestrator {
   }
 
   /**
+   * Handle chair failure (empty response after retries)
+   */
+  private async handleChairFailure(error: EmptyResponseError): Promise<void> {
+    // Find the chair config for detailed info
+    const chair = this.config.chairs.find(c => c.position === error.chairPosition);
+
+    this.failedChair = {
+      position: error.chairPosition,
+      modelId: error.modelId,
+      modelDisplayName: chair?.modelDisplayName,
+      providerName: chair?.providerName,
+      segment: this.currentSegment,
+      reason: error.message,
+      timestamp: new Date().toISOString(),
+    };
+
+    logger.error(
+      {
+        debateId: this.debateId,
+        failedChair: this.failedChair,
+      },
+      'Chair failed to respond - halting debate'
+    );
+
+    // Stop the debate
+    this.isRunning = false;
+
+    // Update debate status to failed and store failure info in proposition_context
+    try {
+      // First update status to error (valid status per schema)
+      await debateRepo.updateStatus(this.debateId, { status: 'error' });
+
+      // Then update proposition_context with failure info
+      // Using raw query since we need to update JSONB
+      const { pool } = await import('../../db/index.js');
+      await pool.query(
+        `UPDATE debates
+         SET proposition_context = proposition_context || $1::jsonb
+         WHERE id = $2`,
+        [
+          JSON.stringify({
+            failedChair: this.failedChair,
+            failureType: 'chair_failure',
+          }),
+          this.debateId,
+        ]
+      );
+    } catch (updateError) {
+      logger.error({ updateError, debateId: this.debateId }, 'Failed to update debate status');
+    }
+
+    // Broadcast failure event with chair details
+    this.broadcastEvent('debate_failed', {
+      debateId: this.debateId,
+      reason: 'chair_not_responding',
+      failedChair: this.failedChair,
+      timestamp: Date.now(),
+      utteranceCount: this.transcript.length,
+      segment: this.currentSegment,
+    });
+  }
+
+  /**
    * Handle error
    */
   private handleError(error: Error): void {
+    // Check if this is an EmptyResponseError
+    if (error instanceof EmptyResponseError) {
+      // This will be handled by handleChairFailure in the calling method
+      // Just log and re-throw
+      logger.error({ error, debateId: this.debateId }, 'Chair empty response error');
+      throw error;
+    }
+
     logger.error({ error, debateId: this.debateId }, 'Duelogic orchestrator error');
 
     this.broadcastEvent('error', {

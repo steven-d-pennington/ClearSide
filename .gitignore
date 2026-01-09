@@ -417,4 +417,6 @@ FodyWeavers.xsd
 *.msm
 *.msp
 .env.docker
-debate_exportsdocs/clearside-tts-key.json
+debate_exports
+docs/clearside-tts-key.json
+backend/temp*

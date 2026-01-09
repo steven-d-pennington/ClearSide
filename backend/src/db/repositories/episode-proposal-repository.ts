@@ -218,6 +218,46 @@ export class EpisodeProposalRepository {
         return stats;
     }
 
+    async findAllWithConfigName(): Promise<(EpisodeProposal & { configName: string | null })[]> {
+        const result = await this.pool.query(`
+      SELECT ep.*, rc.name as config_name
+      FROM episode_proposals ep
+      LEFT JOIN research_results rr ON ep.research_result_id = rr.id
+      LEFT JOIN research_jobs rj ON rr.job_id = rj.id
+      LEFT JOIN research_configs rc ON rj.config_id = rc.id
+      ORDER BY ep.generated_at DESC
+    `);
+
+        return result.rows.map(row => ({
+            ...this.mapRow(row),
+            configName: row.config_name,
+        }));
+    }
+
+    async findByStatusWithConfigName(status: ProposalStatus): Promise<(EpisodeProposal & { configName: string | null })[]> {
+        const result = await this.pool.query(`
+      SELECT ep.*, rc.name as config_name
+      FROM episode_proposals ep
+      LEFT JOIN research_results rr ON ep.research_result_id = rr.id
+      LEFT JOIN research_jobs rj ON rr.job_id = rj.id
+      LEFT JOIN research_configs rc ON rj.config_id = rc.id
+      WHERE ep.status = $1
+      ORDER BY ep.generated_at DESC
+    `, [status]);
+
+        return result.rows.map(row => ({
+            ...this.mapRow(row),
+            configName: row.config_name,
+        }));
+    }
+
+    async bulkDelete(ids: string[]): Promise<void> {
+        await this.pool.query(`
+      DELETE FROM episode_proposals
+      WHERE id = ANY($1)
+    `, [ids]);
+    }
+
     private mapRow(row: any): EpisodeProposal {
         return {
             id: row.id,

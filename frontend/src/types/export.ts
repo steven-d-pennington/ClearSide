@@ -11,7 +11,7 @@
 /**
  * Available TTS providers for audio export
  */
-export type TTSProvider = 'elevenlabs' | 'gemini' | 'google-cloud' | 'azure' | 'edge';
+export type TTSProvider = 'elevenlabs' | 'gemini' | 'google-cloud' | 'google-cloud-long' | 'azure' | 'edge';
 
 /**
  * Quality level for TTS providers

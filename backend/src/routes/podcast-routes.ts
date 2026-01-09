@@ -192,9 +192,25 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        // Extract tone from duelogic config if available
-        const duelogicConfig = debate.duelogicConfig as { tone?: 'respectful' | 'spirited' | 'heated' } | null;
+        // Extract tone and chair frameworks from duelogic config if available
+        const duelogicConfig = debate.duelogicConfig as {
+            tone?: 'respectful' | 'spirited' | 'heated';
+            chairs?: Array<{ position: string; framework: string }>;
+        } | null;
         const debateTone = config.tone || duelogicConfig?.tone || 'spirited';
+
+        // Build chair framework mapping (e.g., { chair_1: 'Precautionary Chair', chair_2: 'Pragmatic Chair' })
+        const chairFrameworks: Record<string, string> = {};
+        if (duelogicConfig?.chairs) {
+            for (const chair of duelogicConfig.chairs) {
+                // Format framework name for display (e.g., 'precautionary' -> 'Precautionary Chair')
+                const frameworkName = chair.framework
+                    .split('_')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ') + ' Chair';
+                chairFrameworks[chair.position] = frameworkName;
+            }
+        }
 
         // Build full config with defaults
         const fullConfig: PodcastExportConfig = {
@@ -215,6 +231,8 @@ router.post('/refine', async (req: Request, res: Response): Promise<void> => {
             // Tone-aware refinement settings
             tone: debateTone,
             debateMode: config.debateMode || debate.debateMode || 'turn_based',
+            // Chair framework mapping for Duelogic debates
+            chairFrameworks: Object.keys(chairFrameworks).length > 0 ? chairFrameworks : undefined,
         };
 
         // Create job record

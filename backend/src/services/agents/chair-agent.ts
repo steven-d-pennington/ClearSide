@@ -29,11 +29,39 @@ import {
   hasApparentSelfCritique,
 } from './prompts/chair-prompts.js';
 import { createOpenRouterClient, OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
+import { RAGRetrievalService } from '../research/rag-retrieval-service.js';
 
 const logger = pino({
   name: 'chair-agent',
   level: process.env.LOG_LEVEL || 'info',
 });
+
+/**
+ * Error thrown when a chair agent receives an empty response from the LLM
+ */
+export class EmptyResponseError extends Error {
+  public readonly chairPosition: string;
+  public readonly modelId: string;
+  public readonly segment: string;
+
+  constructor(chairPosition: string, modelId: string, segment: string) {
+    super(`Empty response from model ${modelId} for ${chairPosition} during ${segment}`);
+    this.name = 'EmptyResponseError';
+    this.chairPosition = chairPosition;
+    this.modelId = modelId;
+    this.segment = segment;
+  }
+}
+
+/**
+ * Minimum content length to consider a response valid
+ */
+const MIN_CONTENT_LENGTH = 10;
+
+/**
+ * Maximum retries for empty responses
+ */
+const MAX_EMPTY_RETRIES = 2;
 
 /**
  * Options for ChairAgent constructor
@@ -74,6 +102,10 @@ export class ChairAgent {
   private conversationHistory: ConversationEntry[];
   private frameworkInfo: typeof PHILOSOPHICAL_CHAIR_INFO[PhilosophicalChair];
   private keyTensions?: string[];
+
+  // RAG support
+  private ragService?: RAGRetrievalService;
+  private episodeId?: string;
 
   constructor(options: ChairAgentOptions) {
     // Create model-specific OpenRouter client or use provided
@@ -156,6 +188,66 @@ export class ChairAgent {
    */
   getFrameworkInfo() {
     return this.frameworkInfo;
+  }
+
+  /**
+   * Enable RAG (Retrieval-Augmented Generation) for this chair agent
+   * When enabled, relevant research citations will be injected into prompts
+   */
+  enableRAG(ragService: RAGRetrievalService, episodeId: string): void {
+    this.ragService = ragService;
+    this.episodeId = episodeId;
+    logger.info(
+      {
+        debateId: this.debateId,
+        position: this.position,
+        episodeId,
+      },
+      'RAG enabled for chair agent'
+    );
+  }
+
+  /**
+   * Check if RAG is enabled for this agent
+   */
+  isRAGEnabled(): boolean {
+    return !!(this.ragService && this.episodeId);
+  }
+
+  /**
+   * Get RAG citation context for a given query
+   * Returns formatted citation prompt to inject into the conversation
+   */
+  private async getRAGContext(query: string): Promise<string> {
+    if (!this.ragService || !this.episodeId) {
+      return '';
+    }
+
+    try {
+      const citationContext = await this.ragService.buildCitationContext(
+        this.episodeId,
+        query
+      );
+
+      if (citationContext) {
+        logger.debug(
+          {
+            debateId: this.debateId,
+            position: this.position,
+            hasContext: true,
+          },
+          'Retrieved RAG context for turn'
+        );
+      }
+
+      return citationContext;
+    } catch (error) {
+      logger.warn(
+        { error, debateId: this.debateId, position: this.position },
+        'Failed to retrieve RAG context, continuing without citations'
+      );
+      return '';
+    }
   }
 
   /**
@@ -479,7 +571,7 @@ export class ChairAgent {
   // =========================================================================
 
   /**
-   * Generate with optional streaming
+   * Generate with optional streaming and empty response validation
    */
   private async generate(
     prompt: string,
@@ -487,15 +579,76 @@ export class ChairAgent {
     temperature: number,
     maxTokens: number
   ): Promise<string> {
-    const messages = [...this.conversationHistory, { role: 'user' as const, content: prompt }];
-
-    // Use streaming if SSE manager is available and client supports it
-    if (this.sseManager && this.llmClient instanceof OpenRouterLLMClient) {
-      return await this.generateWithStreaming(messages, segment, temperature, maxTokens);
+    // Get RAG context if available
+    let enhancedPrompt = prompt;
+    if (this.isRAGEnabled()) {
+      const ragContext = await this.getRAGContext(prompt);
+      if (ragContext) {
+        enhancedPrompt = `${ragContext}\n\n---\n\n${prompt}`;
+        logger.debug(
+          { debateId: this.debateId, position: this.position, segment },
+          'Injected RAG citations into prompt'
+        );
+      }
     }
 
-    // Fall back to non-streaming
-    return await this.llmClient.chat(messages, { temperature, maxTokens });
+    const messages = [...this.conversationHistory, { role: 'user' as const, content: enhancedPrompt }];
+
+    let lastContent = '';
+
+    for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+      try {
+        let content: string;
+
+        // Use streaming if SSE manager is available and client supports it
+        if (this.sseManager && this.llmClient instanceof OpenRouterLLMClient) {
+          content = await this.generateWithStreaming(messages, segment, temperature, maxTokens);
+        } else {
+          content = await this.llmClient.chat(messages, { temperature, maxTokens });
+        }
+
+        // Validate response is not empty
+        const trimmedContent = content.trim();
+        if (trimmedContent.length >= MIN_CONTENT_LENGTH) {
+          return content;
+        }
+
+        // Content is empty or too short
+        lastContent = content;
+
+        if (attempt < MAX_EMPTY_RETRIES) {
+          logger.warn(
+            {
+              debateId: this.debateId,
+              position: this.position,
+              segment,
+              attempt: attempt + 1,
+              contentLength: trimmedContent.length,
+            },
+            'Empty or short response from LLM, retrying'
+          );
+          // Brief delay before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        // Re-throw non-empty-response errors
+        throw error;
+      }
+    }
+
+    // All retries exhausted, throw EmptyResponseError
+    logger.error(
+      {
+        debateId: this.debateId,
+        position: this.position,
+        modelId: this.chair.modelId,
+        segment,
+        lastContentLength: lastContent.trim().length,
+      },
+      'Failed to get valid response after retries'
+    );
+
+    throw new EmptyResponseError(this.position, this.chair.modelId, segment);
   }
 
   /**

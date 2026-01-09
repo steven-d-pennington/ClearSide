@@ -17,13 +17,25 @@ interface ChairModelSelection {
   modelId: string;
   modelDisplayName: string;
   providerName: string;
+  framework: string;
+}
+
+export interface LaunchDebateOptions {
+  chairModels: ChairModelSelection[];
+  allowInterruptions: boolean;
+}
+
+interface FrameworkInfo {
+  id: string;
+  name: string;
+  description: string;
 }
 
 interface LaunchDebateModalProps {
   proposal: EpisodeProposal;
   isOpen: boolean;
   onClose: () => void;
-  onLaunch: (chairModels: ChairModelSelection[]) => Promise<void>;
+  onLaunch: (options: LaunchDebateOptions) => Promise<void>;
   isLaunching: boolean;
 }
 
@@ -33,6 +45,9 @@ const DEFAULT_MODELS = [
   { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
 ];
 
+// Default frameworks for chairs (can be overridden by proposal recommendations)
+const DEFAULT_FRAMEWORKS = ['precautionary', 'pragmatic'];
+
 export function LaunchDebateModal({
   proposal,
   isOpen,
@@ -41,9 +56,11 @@ export function LaunchDebateModal({
   isLaunching,
 }: LaunchDebateModalProps) {
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [frameworks, setFrameworks] = useState<FrameworkInfo[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chairSelections, setChairSelections] = useState<ChairModelSelection[]>([]);
+  const [allowInterruptions, setAllowInterruptions] = useState(false);
 
   const chairs = proposal.chairs || [];
 
@@ -52,28 +69,40 @@ export function LaunchDebateModal({
     if (isOpen && chairs.length > 0) {
       const initialSelections = chairs.map((_, index) => {
         const defaultModel = DEFAULT_MODELS[index % DEFAULT_MODELS.length];
+        const defaultFramework = DEFAULT_FRAMEWORKS[index % DEFAULT_FRAMEWORKS.length];
         return {
           modelId: defaultModel.id,
           modelDisplayName: defaultModel.name,
           providerName: defaultModel.provider,
+          framework: defaultFramework,
         };
       });
       setChairSelections(initialSelections);
     }
   }, [isOpen, chairs.length]);
 
-  // Fetch available models
+  // Fetch available models and frameworks
   useEffect(() => {
     if (!isOpen) return;
 
-    async function loadModels() {
+    async function loadModelsAndFrameworks() {
       setIsLoadingModels(true);
       setError(null);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/models`);
-        if (!response.ok) throw new Error('Failed to load models');
-        const data = await response.json();
-        setModels(data.models || []);
+        // Fetch models and frameworks in parallel
+        const [modelsRes, frameworksRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/models`),
+          fetch(`${API_BASE_URL}/api/duelogic/chairs`),
+        ]);
+
+        if (!modelsRes.ok) throw new Error('Failed to load models');
+        const modelsData = await modelsRes.json();
+        setModels(modelsData.models || []);
+
+        if (frameworksRes.ok) {
+          const frameworksData = await frameworksRes.json();
+          setFrameworks(frameworksData.chairs || []);
+        }
       } catch (err) {
         console.error('Failed to load models:', err);
         setError('Could not load available models');
@@ -81,7 +110,7 @@ export function LaunchDebateModal({
         setIsLoadingModels(false);
       }
     }
-    loadModels();
+    loadModelsAndFrameworks();
   }, [isOpen]);
 
   const handleModelChange = useCallback((chairIndex: number, modelId: string) => {
@@ -91,6 +120,7 @@ export function LaunchDebateModal({
     setChairSelections(prev => {
       const updated = [...prev];
       updated[chairIndex] = {
+        ...updated[chairIndex],
         modelId: model.id,
         modelDisplayName: model.name,
         providerName: model.provider,
@@ -99,8 +129,19 @@ export function LaunchDebateModal({
     });
   }, [models]);
 
+  const handleFrameworkChange = useCallback((chairIndex: number, frameworkId: string) => {
+    setChairSelections(prev => {
+      const updated = [...prev];
+      updated[chairIndex] = {
+        ...updated[chairIndex],
+        framework: frameworkId,
+      };
+      return updated;
+    });
+  }, []);
+
   const handleLaunch = async () => {
-    await onLaunch(chairSelections);
+    await onLaunch({ chairModels: chairSelections, allowInterruptions });
   };
 
   // Group models by provider
@@ -172,29 +213,70 @@ export function LaunchDebateModal({
                   <p className={styles.chairPosition}>
                     "{chair.position.length > 80 ? chair.position.slice(0, 80) + '...' : chair.position}"
                   </p>
-                  <div className={styles.modelSelectWrapper}>
-                    <label className={styles.modelLabel}>Model</label>
-                    <select
-                      className={styles.modelSelect}
-                      value={chairSelections[index]?.modelId || ''}
-                      onChange={e => handleModelChange(index, e.target.value)}
-                      disabled={isLaunching}
-                    >
-                      {sortedProviders.map(provider => (
-                        <optgroup key={provider} label={provider}>
-                          {modelsByProvider[provider].map(model => (
-                            <option key={model.id} value={model.id}>
-                              {model.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+                  <div className={styles.selectRow}>
+                    <div className={styles.modelSelectWrapper}>
+                      <label className={styles.modelLabel}>Model</label>
+                      <select
+                        className={styles.modelSelect}
+                        value={chairSelections[index]?.modelId || ''}
+                        onChange={e => handleModelChange(index, e.target.value)}
+                        disabled={isLaunching}
+                      >
+                        {sortedProviders.map(provider => (
+                          <optgroup key={provider} label={provider}>
+                            {modelsByProvider[provider].map(model => (
+                              <option key={model.id} value={model.id}>
+                                {model.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={styles.modelSelectWrapper}>
+                      <label className={styles.modelLabel}>Framework</label>
+                      <select
+                        className={styles.modelSelect}
+                        value={chairSelections[index]?.framework || ''}
+                        onChange={e => handleFrameworkChange(index, e.target.value)}
+                        disabled={isLaunching}
+                      >
+                        {frameworks.map(fw => (
+                          <option key={fw.id} value={fw.id}>
+                            {fw.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+
+        <div className={styles.divider} />
+
+        {/* Debate Options */}
+        <div className={styles.optionsSection}>
+          <h4 className={styles.sectionTitle}>Debate Options</h4>
+          <label className={styles.toggleOption}>
+            <input
+              type="checkbox"
+              checked={allowInterruptions}
+              onChange={e => setAllowInterruptions(e.target.checked)}
+              disabled={isLaunching}
+              className={styles.toggleCheckbox}
+            />
+            <div className={styles.toggleContent}>
+              <span className={styles.toggleLabel}>Allow Interruptions</span>
+              <span className={styles.toggleDescription}>
+                {allowInterruptions
+                  ? 'Chairs can interrupt each other for dynamic exchanges (may result in longer debates)'
+                  : 'Structured turn-taking without interruptions (recommended for shorter debates)'}
+              </span>
+            </div>
+          </label>
         </div>
 
         <div className={styles.divider} />

@@ -83,6 +83,9 @@ export interface PodcastExportConfig {
   // Debate context for tone-aware refinement
   tone?: DebateTone;              // 'respectful' | 'spirited' | 'heated'
   debateMode?: 'turn_based' | 'lively' | 'informal' | 'duelogic';
+
+  // Chair framework mapping for Duelogic debates (e.g., { chair_1: 'Precautionary Chair', chair_2: 'Pragmatic Chair' })
+  chairFrameworks?: Record<string, string>;
 }
 
 export interface PodcastExportJob {

@@ -215,6 +215,7 @@ export class PodcastScriptRefiner {
     private elevenLabsModel: ElevenLabsModel;
     private tone: DebateTone;
     private ttsProvider: TTSProviderType;
+    private chairFrameworks: Record<string, string>;
 
     constructor(llmClient: OpenRouterLLMClient, config: PodcastExportConfig) {
         this.llmClient = llmClient;
@@ -222,6 +223,7 @@ export class PodcastScriptRefiner {
         this.elevenLabsModel = config.elevenLabsModel || 'eleven_v3';
         this.tone = config.tone || 'spirited';  // Default to spirited
         this.ttsProvider = config.ttsProvider || 'elevenlabs';  // Default to ElevenLabs
+        this.chairFrameworks = config.chairFrameworks || {};
     }
 
     /**
@@ -409,9 +411,10 @@ export class PodcastScriptRefiner {
             const refinedText = await this.refineTurn(turn.content, turn.speaker, proposition);
 
             // Split into segments if too long
+            // Pass original speaker ID for voice lookup, display name is determined inside
             const turnSegments = this.splitIntoSegments(
                 refinedText,
-                this.mapSpeakerRole(turn.speaker)
+                turn.speaker  // Original speaker ID (e.g., 'chair_1')
             );
 
             segments.push(...turnSegments);
@@ -433,13 +436,17 @@ export class PodcastScriptRefiner {
 
         const prompt = this.buildRefinementPrompt(cleanedContent, speaker, proposition);
 
+        // Calculate max tokens based on input length
+        // Refined text with ellipses and expansions can be 1.5-2x longer
+        const estimatedOutputTokens = Math.max(4000, Math.ceil(content.length * 0.5));
+
         const response = await this.llmClient.complete({
             messages: [
                 { role: 'system', content: prompt.systemPrompt },
                 { role: 'user', content: prompt.userPrompt }
             ],
             temperature: 0.4, // Lower temp for more faithful transformation
-            maxTokens: 2000,
+            maxTokens: estimatedOutputTokens,
         });
 
         // Apply model-specific pause syntax conversion
@@ -554,11 +561,11 @@ Don't hold back - this is a passionate debate.`,
      */
     private buildIntroPrompt(transcript: DebateTranscript): RefinementPrompt {
         return {
-            systemPrompt: `You are a podcast intro writer for "Duelogic" - an AI debate podcast where models tackle humanity's toughest questions. Create welcoming, engaging introductions.
+            systemPrompt: `You are a podcast intro writer for "Deul-Logic" - an AI debate podcast where models tackle humanity's toughest questions. Create welcoming, engaging introductions.
 
 Guidelines:
 - Keep it under 100 words
-- Welcome listeners to "Duelogic" (the podcast name)
+- Welcome listeners to "Deul-Logic" (the podcast name)
 - Introduce the topic clearly
 - Mention that AI models will debate this topic with nobody walking away with easy answers
 - Set expectations for what they'll hear
@@ -567,7 +574,7 @@ Guidelines:
 
 Output ONLY the intro text.`,
 
-            userPrompt: `Create a Duelogic podcast intro for a debate on this topic:
+            userPrompt: `Create a Deul-Logic podcast intro for a debate on this topic:
 
 "${transcript.proposition.normalized_question}"
 
@@ -580,11 +587,11 @@ The debate has ${transcript.transcript.length} utterances and features AI advoca
      */
     private buildOutroPrompt(transcript: DebateTranscript): RefinementPrompt {
         return {
-            systemPrompt: `You are a podcast outro writer for "Duelogic" - an AI debate podcast. Create brief, thoughtful closings.
+            systemPrompt: `You are a podcast outro writer for "Deul-Logic" - an AI debate podcast. Create brief, thoughtful closings.
 
 Guidelines:
 - Keep it under 60 words
-- Thank listeners for joining this episode of Duelogic
+- Thank listeners for joining this episode of Deul-Logic
 - Encourage reflection on both perspectives
 - Remind them the goal is understanding, not persuasion - nobody walks away with easy answers
 - Sound warm and genuine
@@ -592,7 +599,7 @@ Guidelines:
 
 Output ONLY the outro text.`,
 
-            userPrompt: `Create a Duelogic podcast outro for a debate on:
+            userPrompt: `Create a Deul-Logic podcast outro for a debate on:
 
 "${transcript.proposition.normalized_question}"`,
         };
@@ -613,7 +620,7 @@ Output ONLY the outro text.`,
             'Moderator Synthesis': '[pause] Finally, our moderator offers a balanced synthesis of the debate.',
 
             // Duelogic segment types
-            'Introduction': '[dramatic tone] Welcome to Duelogic. [pause] Let me set the stage for today\'s philosophical exploration.',
+            'Introduction': '[dramatic tone] Welcome to Deul-Logic. [pause] Let me set the stage for today\'s philosophical exploration.',
             'Opening': '[pause] Each of our chairs will now present their opening perspective.',
             'Exchange': '[pause] We now move into open discussion.',
             'Synthesis': '[pause] [serious tone] Let us now bring together the threads of this debate.',
@@ -628,17 +635,23 @@ Output ONLY the outro text.`,
 
     /**
      * Split long text into segments under the character limit
+     * @param text - The text to split
+     * @param speakerId - Original speaker ID (e.g., 'chair_1') for voice lookup
      */
-    private splitIntoSegments(text: string, speaker: string): PodcastSegment[] {
+    private splitIntoSegments(text: string, speakerId: string): PodcastSegment[] {
         const segments: PodcastSegment[] = [];
+
+        // Get display name (e.g., 'Precautionary Chair') and voice role (e.g., 'pro_advocate')
+        const displayName = this.mapSpeakerRole(speakerId);
+        const voiceRole = this.mapSpeakerToVoiceRole(speakerId);
 
         if (text.length <= MAX_SEGMENT_CHARS) {
             segments.push({
                 index: 0,
-                speaker,
-                voiceId: this.getVoiceId(speaker),
+                speaker: displayName,
+                voiceId: this.getVoiceId(voiceRole),
                 text,
-                voiceSettings: this.getVoiceSettings(speaker),
+                voiceSettings: this.getVoiceSettings(voiceRole),
             });
             return segments;
         }
@@ -654,10 +667,10 @@ Output ONLY the outro text.`,
                 if (currentSegment) {
                     segments.push({
                         index: segments.length,
-                        speaker,
-                        voiceId: this.getVoiceId(speaker),
+                        speaker: displayName,
+                        voiceId: this.getVoiceId(voiceRole),
                         text: currentSegment.trim(),
-                        voiceSettings: this.getVoiceSettings(speaker),
+                        voiceSettings: this.getVoiceSettings(voiceRole),
                     });
                     currentSegment = '';
                 }
@@ -667,20 +680,20 @@ Output ONLY the outro text.`,
                 for (const chunk of sentenceChunks) {
                     segments.push({
                         index: segments.length,
-                        speaker,
-                        voiceId: this.getVoiceId(speaker),
+                        speaker: displayName,
+                        voiceId: this.getVoiceId(voiceRole),
                         text: chunk.trim(),
-                        voiceSettings: this.getVoiceSettings(speaker),
+                        voiceSettings: this.getVoiceSettings(voiceRole),
                     });
                 }
             } else if ((currentSegment + sentence).length > MAX_SEGMENT_CHARS) {
                 if (currentSegment) {
                     segments.push({
                         index: segments.length,
-                        speaker,
-                        voiceId: this.getVoiceId(speaker),
+                        speaker: displayName,
+                        voiceId: this.getVoiceId(voiceRole),
                         text: currentSegment.trim(),
-                        voiceSettings: this.getVoiceSettings(speaker),
+                        voiceSettings: this.getVoiceSettings(voiceRole),
                     });
                 }
                 currentSegment = sentence;
@@ -693,10 +706,10 @@ Output ONLY the outro text.`,
         if (currentSegment.trim()) {
             segments.push({
                 index: segments.length,
-                speaker,
-                voiceId: this.getVoiceId(speaker),
+                speaker: displayName,
+                voiceId: this.getVoiceId(voiceRole),
                 text: currentSegment.trim(),
-                voiceSettings: this.getVoiceSettings(speaker),
+                voiceSettings: this.getVoiceSettings(voiceRole),
             });
         }
 
@@ -769,11 +782,53 @@ Output ONLY the outro text.`,
     }
 
     /**
-     * Map debate speaker to voice assignment role
-     * Handles formal, informal, and Duelogic debate mode speakers
+     * Map debate speaker to display name for the podcast
+     * Uses framework names for Duelogic chairs when available (e.g., "Precautionary Chair")
+     * Falls back to generic names for other modes
      */
     private mapSpeakerRole(speaker: string): string {
-        const mapping: Record<string, string> = {
+        // For Duelogic chairs, use framework name if available
+        if (this.chairFrameworks[speaker]) {
+            return this.chairFrameworks[speaker];
+        }
+
+        // Generic display name mapping for non-Duelogic modes
+        const displayMapping: Record<string, string> = {
+            // Formal debate mode
+            'pro': 'Pro Advocate',
+            'pro_advocate': 'Pro Advocate',
+            'con': 'Con Advocate',
+            'con_advocate': 'Con Advocate',
+            'moderator': 'Moderator',
+
+            // Duelogic mode - fallback if no framework mapping
+            'arbiter': 'Moderator',
+            'chair_1': 'Chair A',
+            'chair_2': 'Chair B',
+            'chair_3': 'Chair C',
+            'chair_4': 'Chair D',
+            'chair_5': 'Chair E',
+            'chair_6': 'Chair F',
+
+            // Informal discussion participants
+            'participant_1': 'Participant 1',
+            'participant_2': 'Participant 2',
+            'participant_3': 'Participant 3',
+            'participant_4': 'Participant 4',
+
+            // Narrator for intro/outro
+            'narrator': 'Narrator',
+        };
+
+        return displayMapping[speaker] || 'Narrator';
+    }
+
+    /**
+     * Map speaker to voice assignment role for voice lookup
+     * This maps to the internal voice IDs regardless of display name
+     */
+    private mapSpeakerToVoiceRole(speaker: string): string {
+        const voiceMapping: Record<string, string> = {
             // Formal debate mode
             'pro': 'pro_advocate',
             'pro_advocate': 'pro_advocate',
@@ -791,16 +846,16 @@ Output ONLY the outro text.`,
             'chair_6': 'chair_6',        // Uses Daniel voice
 
             // Informal discussion participants
-            'participant_1': 'participant_1',  // Uses Adam voice
-            'participant_2': 'participant_2',  // Uses Sam voice
-            'participant_3': 'participant_3',  // Uses Josh voice
-            'participant_4': 'participant_4',  // Uses Arnold voice
+            'participant_1': 'participant_1',
+            'participant_2': 'participant_2',
+            'participant_3': 'participant_3',
+            'participant_4': 'participant_4',
 
             // Narrator for intro/outro
             'narrator': 'narrator',
         };
 
-        return mapping[speaker] || 'narrator';
+        return voiceMapping[speaker] || 'narrator';
     }
 
     /**
@@ -1031,7 +1086,7 @@ Output ONLY the outro text.`,
             turn_based: 'a structured debate podcast with formal phases',
             lively: 'a dynamic debate podcast with natural interruptions and reactions',
             informal: 'a casual discussion podcast exploring multiple perspectives',
-            duelogic: 'Duelogic - an intellectual debate show featuring multiple philosophical perspectives',
+            duelogic: 'Deul-Logic - an intellectual debate show featuring multiple philosophical perspectives',
         };
 
         const showFormat = modeDescriptions[debateMode] || modeDescriptions['turn_based'];

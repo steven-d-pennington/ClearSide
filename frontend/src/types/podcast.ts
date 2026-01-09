@@ -328,7 +328,7 @@ export const DEFAULT_VOICE_ASSIGNMENTS: Record<string, VoiceAssignment> = {
  * Default podcast export configuration
  */
 export const DEFAULT_PODCAST_CONFIG: PodcastExportConfig = {
-  // ttsProvider intentionally omitted - backend will use getDefaultProvider()
+  ttsProvider: 'google-cloud-long',  // Default to Google Cloud Long Audio (Journey voices)
   refinementModel: 'google/gemini-3-flash-preview',
   includeIntro: true,
   includeOutro: true,
@@ -406,6 +406,12 @@ export const TTS_PROVIDERS: Array<{
   description: string;
   costPer1000Chars: number;
 }> = [
+  {
+    id: 'google-cloud-long',
+    name: 'Google Cloud Long Audio',
+    description: 'Journey voices - natural, podcast-optimized (Recommended)',
+    costPer1000Chars: 1.6,  // ~$0.016 per 1K chars (Neural2/Journey pricing)
+  },
   {
     id: 'elevenlabs',
     name: 'ElevenLabs',

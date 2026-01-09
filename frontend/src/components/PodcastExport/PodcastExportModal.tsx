@@ -140,6 +140,67 @@ export function PodcastExportModal({
     onClose();
   };
 
+  // Export refined script as markdown
+  const handleExportMarkdown = () => {
+    if (!refinedScript) return;
+
+    const getSpeakerLabel = (speaker: string): string => {
+      const labels: Record<string, string> = {
+        moderator: 'Moderator',
+        pro_advocate: 'Pro Advocate',
+        con_advocate: 'Con Advocate',
+        narrator: 'Narrator',
+      };
+      return labels[speaker] || speaker;
+    };
+
+    const getVoiceName = (speaker: string): string => {
+      return config.voiceAssignments[speaker]?.voiceName || 'Unknown';
+    };
+
+    // Build markdown content
+    let markdown = `# ${refinedScript.title}\n\n`;
+    markdown += `**Duration:** ~${Math.round(refinedScript.durationEstimateSeconds / 60)} min | `;
+    markdown += `**Characters:** ${refinedScript.totalCharacters.toLocaleString()}\n\n`;
+    markdown += `---\n\n`;
+
+    // Intro
+    if (refinedScript.intro) {
+      markdown += `## Introduction\n\n`;
+      markdown += `**${getSpeakerLabel(refinedScript.intro.speaker)}** _(${getVoiceName(refinedScript.intro.speaker)})_\n\n`;
+      markdown += `${refinedScript.intro.text}\n\n`;
+    }
+
+    // Main segments
+    markdown += `## Debate\n\n`;
+    for (const segment of refinedScript.segments) {
+      markdown += `**${getSpeakerLabel(segment.speaker)}** _(${getVoiceName(segment.speaker)})_\n\n`;
+      markdown += `${segment.text}\n\n`;
+    }
+
+    // Outro
+    if (refinedScript.outro) {
+      markdown += `## Closing\n\n`;
+      markdown += `**${getSpeakerLabel(refinedScript.outro.speaker)}** _(${getVoiceName(refinedScript.outro.speaker)})_\n\n`;
+      markdown += `${refinedScript.outro.text}\n\n`;
+    }
+
+    // Footer
+    markdown += `---\n\n`;
+    markdown += `_Generated via ClearSide Podcast Export_\n`;
+
+    // Create and download file
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${debateTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-script.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Render configuration tabs
   const renderConfigTabs = () => (
     <div className={styles.tabs}>
@@ -422,6 +483,9 @@ export function PodcastExportModal({
           <div className={styles.actions}>
             <Button variant="secondary" onClick={() => setStep('configure')}>
               Back to Settings
+            </Button>
+            <Button variant="secondary" onClick={handleExportMarkdown}>
+              Download Script (.md)
             </Button>
             <Button variant="primary" onClick={handleStartGeneration}>
               Generate Podcast (${(estimatedCost / 100).toFixed(2)})

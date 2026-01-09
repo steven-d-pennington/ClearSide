@@ -1609,6 +1609,58 @@ duelogic_research:
 
 ---
 
+## 11. OpenAI TTS Provider
+
+**Priority:** P3
+**Complexity:** Medium
+**Status:** Planned
+
+Add OpenAI Text-to-Speech as a TTS provider for podcast generation. OpenAI TTS offers high-quality voices at competitive pricing ($15/1M chars for tts-1), uses the existing `OPENAI_API_KEY`, and follows established patterns.
+
+### Requirements
+- [ ] Create `openai-tts-service.ts` implementing `ITTSService` interface
+- [ ] Register provider in `tts-provider-factory.ts`
+- [ ] Add to podcast routes and TTS adapter
+- [ ] Update frontend types and provider selector
+- [ ] Support text chunking (4000 char limit)
+
+### Voice Mapping
+
+| Role | OpenAI Voice | Rationale |
+|------|--------------|-----------|
+| Pro Advocate | onyx | Deep, authoritative |
+| Con Advocate | fable | Expressive, articulate |
+| Moderator | alloy | Neutral, versatile |
+| Narrator | nova | Soft, pleasant |
+
+### API Details
+- **Endpoint**: `POST https://api.openai.com/v1/audio/speech`
+- **Models**: tts-1 ($15/1M chars), tts-1-hd ($30/1M chars)
+- **Voices**: alloy, echo, fable, onyx, nova, shimmer
+- **Output**: MP3 (default), opus, aac, flac, wav, pcm
+- **Max input**: 4096 characters per request
+
+### Implementation Notes
+- Uses existing `OPENAI_API_KEY` environment variable
+- Cost: ~$0.015/1K chars (same as Gemini, 10x cheaper than ElevenLabs)
+- Binary audio response (not base64)
+- Sentence-boundary chunking for long text
+
+### Files to Modify
+
+**Backend:**
+- `backend/src/services/audio/types.ts` - Add 'openai' to TTSProvider union
+- `backend/src/services/audio/openai-tts-service.ts` - NEW: Implement ITTSService
+- `backend/src/services/audio/tts-provider-factory.ts` - Register provider
+- `backend/src/types/podcast-export.ts` - Add 'openai' to TTSProviderType
+- `backend/src/services/podcast/podcast-tts-adapter.ts` - Add to cost map and availability
+- `backend/src/routes/podcast-routes.ts` - Add to /providers endpoint
+
+**Frontend:**
+- `frontend/src/types/podcast.ts` - Add 'openai' to TTSProviderType and TTS_PROVIDERS
+
+---
+
 ## Future Considerations
 
 ### Multi-User Support
@@ -1638,4 +1690,4 @@ duelogic_research:
 
 ---
 
-*Last Updated: 2026-01-03*
+*Last Updated: 2026-01-08*

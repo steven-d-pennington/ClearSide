@@ -16,7 +16,7 @@
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import pino from 'pino';
-import crypto from 'crypto';
+import { GoogleAuth } from 'google-auth-library';
 import ffmpeg from 'fluent-ffmpeg';
 import { PassThrough } from 'stream';
 import fs from 'fs';
@@ -72,11 +72,12 @@ interface LongAudioOperation {
 
 /**
  * Voice profiles for Google Cloud Long Audio
- * Using Neural2 voices for best quality
+ * Using Journey voices - optimized for long-form content like podcasts
+ * Journey voices provide more natural prosody and better suited for storytelling
  */
 export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
   pro: {
-    voiceId: 'en-US-Neural2-F', // Clear, professional female
+    voiceId: 'en-US-Journey-F', // Journey female - expressive, long-form optimized
     name: 'Pro Advocate',
     stability: 0.5,
     similarityBoost: 0.75,
@@ -84,7 +85,7 @@ export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
     useSpeakerBoost: true,
   },
   con: {
-    voiceId: 'en-US-Neural2-D', // Clear, professional male
+    voiceId: 'en-US-Journey-D', // Journey male - expressive, long-form optimized
     name: 'Con Advocate',
     stability: 0.5,
     similarityBoost: 0.75,
@@ -92,7 +93,7 @@ export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
     useSpeakerBoost: true,
   },
   moderator: {
-    voiceId: 'en-US-Neural2-C', // Neutral, authoritative female
+    voiceId: 'en-US-Journey-O', // Journey neutral - balanced, authoritative
     name: 'Moderator',
     stability: 0.7,
     similarityBoost: 0.8,
@@ -100,7 +101,7 @@ export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
     useSpeakerBoost: true,
   },
   narrator: {
-    voiceId: 'en-US-Neural2-A', // Warm male narrator
+    voiceId: 'en-US-Journey-D', // Journey male - warm narrator tone
     name: 'Narrator',
     stability: 0.8,
     similarityBoost: 0.75,
@@ -146,54 +147,21 @@ export function parseServiceAccountJson(input: string): ServiceAccountCredential
 export async function createServiceAccountAccessToken(
   credentials: ServiceAccountCredentials
 ): Promise<{ accessToken: string; expiresIn: number }> {
-  const now = Math.floor(Date.now() / 1000);
-  const header = {
-    alg: 'RS256',
-    typ: 'JWT',
-  };
-  const payload = {
-    iss: credentials.client_email,
-    scope: 'https://www.googleapis.com/auth/cloud-platform',
-    aud: credentials.token_uri,
-    iat: now,
-    exp: now + 3600, // 1 hour
-  };
+  const auth = new GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+  });
+  const client = await auth.getClient();
+  const accessTokenResponse = await client.getAccessToken();
 
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const signatureInput = `${encodedHeader}.${encodedPayload}`;
-
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(signatureInput);
-  const signature = sign.sign(credentials.private_key);
-  const encodedSignature = base64UrlEncode(signature);
-
-  const jwt = `${signatureInput}.${encodedSignature}`;
-
-  const response = await axios.post(
-    credentials.token_uri,
-    new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    }),
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    }
-  );
+  if (!accessTokenResponse?.token) {
+    throw new Error('Failed to generate access token');
+  }
 
   return {
-    accessToken: response.data.access_token,
-    expiresIn: response.data.expires_in,
+    accessToken: accessTokenResponse.token,
+    expiresIn: 3600, // Default 1 hour expiry
   };
-}
-
-function base64UrlEncode(input: string | Buffer): string {
-  const base64 = Buffer.isBuffer(input)
-    ? input.toString('base64')
-    : Buffer.from(input).toString('base64');
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
@@ -223,7 +191,7 @@ export class GoogleCloudLongAudioService implements ITTSService {
     this.credentials = parseServiceAccountJson(config.serviceAccountJson);
     this.projectId = config.projectId || this.credentials.project_id;
     this.bucket = config.bucket;
-    this.location = config.location || 'us-central1';
+    this.location = config.location || 'global';
     this.maxWaitMs = config.maxWaitMs || 600000; // 10 minutes
     this.pollIntervalMs = config.pollIntervalMs || 5000; // 5 seconds
     this.cleanupGcs = config.cleanupGcs !== false;
@@ -234,9 +202,9 @@ export class GoogleCloudLongAudioService implements ITTSService {
     };
 
     // Create axios client for TTS Long Audio API
-    // Long Audio API uses location-specific endpoint and v1beta1
+    // Use global endpoint with v1 API for better compatibility
     this.client = axios.create({
-      baseURL: `https://${this.location}-texttospeech.googleapis.com/v1beta1`,
+      baseURL: 'https://texttospeech.googleapis.com/v1',
       timeout: 60000,
       headers: {
         'Content-Type': 'application/json',
@@ -266,6 +234,17 @@ export class GoogleCloudLongAudioService implements ITTSService {
   async generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult> {
     const voice = this.voiceProfiles[voiceType];
     const startTime = Date.now();
+
+    // Guard against empty input - Journey voices reject empty text
+    if (!text || text.trim().length === 0) {
+      logger.warn({ voiceType }, 'Skipping empty text segment - returning silent audio');
+      // Return a minimal silent result
+      return {
+        audioBuffer: Buffer.alloc(0),
+        durationMs: 0,
+        charactersUsed: 0,
+      };
+    }
 
     logger.debug(
       { voiceType, voiceId: voice.voiceId, textLength: text.length },
@@ -299,10 +278,10 @@ export class GoogleCloudLongAudioService implements ITTSService {
         });
       }
 
-      // Calculate duration from WAV (LINEAR16: 24kHz, mono, 16-bit)
+      // Calculate duration from WAV (LINEAR16: 48kHz, mono, 16-bit)
       // WAV header is 44 bytes, data is 2 bytes per sample
       const wavDataSize = wavBuffer.length - 44;
-      const durationMs = (wavDataSize / 2 / 24000) * 1000;
+      const durationMs = (wavDataSize / 2 / 48000) * 1000;
 
       const processingTime = Date.now() - startTime;
 
@@ -357,7 +336,7 @@ export class GoogleCloudLongAudioService implements ITTSService {
       },
       audioConfig: {
         audioEncoding: 'LINEAR16',
-        sampleRateHertz: 24000,
+        sampleRateHertz: 48000, // Higher sample rate for better audio quality
       },
     };
 
@@ -450,16 +429,22 @@ export class GoogleCloudLongAudioService implements ITTSService {
           return;
         }
       } catch (error) {
-        const axiosError = error as AxiosError;
-        // Non-404 errors during polling should be retried
-        if (axiosError.response?.status !== 404) {
-          logger.warn(
-            { operationName, error: axiosError.message },
-            'Error polling operation, retrying'
-          );
-        } else {
+        // Re-throw synthesis errors immediately (don't retry)
+        if (error instanceof Error && error.message.startsWith('Synthesis failed:')) {
           throw error;
         }
+
+        const axiosError = error as AxiosError;
+        // 404 means operation not found - don't retry
+        if (axiosError.response?.status === 404) {
+          throw error;
+        }
+
+        // Other network errors can be retried
+        logger.warn(
+          { operationName, error: axiosError.message },
+          'Error polling operation, retrying'
+        );
       }
 
       // Wait before next poll

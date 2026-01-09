@@ -112,14 +112,17 @@ export class PineconeClient implements VectorDBClient {
   }
 
   async hasIndexedResearch(episodeId: string): Promise<boolean> {
-    // Use a dummy vector to check if any vectors exist for this episode
+    // Use a small non-zero vector to check if any vectors exist for this episode
+    // Note: Zero vectors don't work with cosine similarity (division by zero)
     const response = await this.index.namespace(this.namespace).query({
-      vector: new Array(1536).fill(0), // Dummy vector
+      vector: new Array(1536).fill(0.01), // Small non-zero dummy vector
       topK: 1,
       filter: { episodeId: { $eq: episodeId } },
     });
 
-    return (response.matches?.length || 0) > 0;
+    const hasResearch = (response.matches?.length || 0) > 0;
+    logger.info({ episodeId, hasResearch, matchCount: response.matches?.length || 0 }, 'Checked for indexed research');
+    return hasResearch;
   }
 
   async ping(): Promise<boolean> {

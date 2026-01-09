@@ -1,33 +1,48 @@
 # CLAUDE.md - AI Agent Guide for ClearSide Development
 
-> **Last Updated:** 2026-01-03
-> **Version:** 5.0.0
+> **Last Updated:** 2026-01-08
+> **Version:** 6.0.0
 
 ---
 
 ## Quick Start: What to Work On
 
-### Current Priority: Phase 5 - Duelogic Research & Automated Episode Generation
+### Current Priority: Phase 6 - Conversational Podcast Mode
 
-Start with **DUELOGIC-001** in `tasks/phase5/duelogic-research/DUELOGIC-001.md`
+Free-form podcast conversations where 2-6 AI personas discuss topics in a natural, talk show format with a host.
+
+Start with **CONV-001** in `tasks/phase6/conversational-podcast/CONV-001.md`
 
 | Task | Description | Status | File |
 |------|-------------|--------|------|
-| DUELOGIC-001 | Database Schema & Types for Research | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-001.md) |
-| DUELOGIC-002 | Perplexity Integration via OpenRouter | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-002.md) |
-| DUELOGIC-003 | Episode Generator Service | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-003.md) |
-| DUELOGIC-004 | Research Job Scheduler | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-004.md) |
-| DUELOGIC-005 | Vector Database Integration for RAG | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-005.md) |
-| DUELOGIC-006 | Admin Research Dashboard | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-006.md) |
-| DUELOGIC-007 | Debate Orchestrator RAG Integration | Ready | [View](tasks/phase5/duelogic-research/DUELOGIC-007.md) |
+| CONV-001 | Database Migration | Ready | [View](tasks/phase6/conversational-podcast/CONV-001.md) |
+| CONV-002 | TypeScript Types | Ready | [View](tasks/phase6/conversational-podcast/CONV-002.md) |
+| CONV-003 | Persona Repository | Ready | [View](tasks/phase6/conversational-podcast/CONV-003.md) |
+| CONV-004 | Session Repositories | Ready | [View](tasks/phase6/conversational-podcast/CONV-004.md) |
+| CONV-005 | PersonaAgent Class | Ready | [View](tasks/phase6/conversational-podcast/CONV-005.md) |
+| CONV-006 | ContextBoardService | Ready | [View](tasks/phase6/conversational-podcast/CONV-006.md) |
+| CONV-007 | PodcastHostAgent | Ready | [View](tasks/phase6/conversational-podcast/CONV-007.md) |
+| CONV-008 | ConversationalOrchestrator | Ready | [View](tasks/phase6/conversational-podcast/CONV-008.md) |
+
+**Critical Path:** CONV-001 → CONV-002 → CONV-005 → CONV-007 → CONV-008 → CONV-019
+
+**Full task list:** 22 tasks (CONV-001 through CONV-022) - See [docs/KANBAN.md](docs/KANBAN.md)
+
+### Key Concepts
+
+- **12 Personas**: Distinct characters with backstories, speaking styles, worldviews
+- **Talk Show Host**: Introduces guests, asks probing questions, steers discussion (NOT a debate moderator)
+- **Hybrid Flow**: Host steers, but participants can signal desire to speak
+- **Context Board**: Real-time whiteboard tracking topics, claims, agreements
+- **Native Export**: Podcast export preserves talk show format (not converted to debate)
 
 ### Alternative Options
 
 | Option | First Task | Description |
 |--------|------------|-------------|
+| Duelogic Research | DUELOGIC-001 | Automated research & episode generation |
 | PDF Export | EXPORT-002 | Quick win - text export to PDF |
 | Video Export | VIDEO-001 | Remotion video framework setup |
-| Multi-LLM | OPENROUTER-001 | Let users choose LLMs per agent |
 
 **Full task board:** [docs/KANBAN.md](docs/KANBAN.md)
 
@@ -127,15 +142,32 @@ ClearSide/
 │   ├── phase2/               # Media export tasks
 │   ├── phase4/               # Podcast export tasks (complete)
 │   │   └── podcast-export/
-│   └── phase5/               # Duelogic Research tasks (NEW)
-│       └── duelogic-research/
-│           ├── DUELOGIC-001.md  # Database Schema & Types
-│           ├── DUELOGIC-002.md  # Perplexity Integration
-│           ├── DUELOGIC-003.md  # Episode Generator
-│           ├── DUELOGIC-004.md  # Research Scheduler
-│           ├── DUELOGIC-005.md  # Vector DB / RAG
-│           ├── DUELOGIC-006.md  # Admin Dashboard
-│           └── DUELOGIC-007.md  # Orchestrator RAG
+│   ├── phase5/               # Duelogic Research tasks (complete)
+│   │   └── duelogic-research/
+│   └── phase6/               # Conversational Podcast (CURRENT)
+│       └── conversational-podcast/
+│           ├── CONV-001.md      # Database Migration
+│           ├── CONV-002.md      # TypeScript Types
+│           ├── CONV-003.md      # Persona Repository
+│           ├── CONV-004.md      # Session Repositories
+│           ├── CONV-005.md      # PersonaAgent Class
+│           ├── CONV-006.md      # ContextBoardService
+│           ├── CONV-007.md      # PodcastHostAgent
+│           ├── CONV-008.md      # ConversationalOrchestrator
+│           ├── CONV-009.md      # Persona and Session Routes
+│           ├── CONV-010.md      # Control and Streaming Routes
+│           ├── CONV-011.md      # SSE Manager Integration
+│           ├── CONV-012.md      # ConversationConfigModal
+│           ├── CONV-013.md      # ConversationViewer
+│           ├── CONV-014.md      # TranscriptPanel
+│           ├── CONV-015.md      # ContextBoardPanel
+│           ├── CONV-016.md      # ControlBar
+│           ├── CONV-017.md      # Entry from Proposals
+│           ├── CONV-018.md      # Entry from Main Screen
+│           ├── CONV-019.md      # Podcast Export (Native)
+│           ├── CONV-020.md      # RAG Integration
+│           ├── CONV-021.md      # Vector Indexing
+│           └── CONV-022.md      # Testing & Refinement
 ├── backend/                  # Node.js/TypeScript backend
 └── frontend/                 # React/Vite frontend
 ```
@@ -179,11 +211,12 @@ ClearSide/
 - Phase 1: Live Debate Engine (36/36 tasks)
 - Phase 2 Audio: ElevenLabs TTS, podcast generation
 - Phase 4: Podcast Export Pipeline (6/6 tasks)
+- Phase 5: Duelogic Research & RAG Integration (7/7 tasks)
 - Informal Discussion Mode
 - Human Participation Mode
 
 ### In Progress
-- Phase 5: Duelogic Research & Automated Episode Generation (0/7 tasks)
+- Phase 6: Conversational Podcast Mode (0/22 tasks)
 
 ### Planned
 - Phase 2 Video: Remotion video export

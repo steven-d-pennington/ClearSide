@@ -530,6 +530,26 @@
   margin-bottom: 0.875rem;
   padding-bottom: 0.875rem;
   border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.configBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--dashboard-cyan-bg);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--dashboard-cyan);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.configBadge svg {
+  opacity: 0.8;
 }
 
 .proposalActions {

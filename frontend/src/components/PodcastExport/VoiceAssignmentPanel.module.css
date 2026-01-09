@@ -222,6 +222,14 @@
   color: var(--color-text-secondary);
 }
 
+/* Voice hint for Google Cloud Long Audio */
+.voiceHint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin: var(--space-2) 0 0 0;
+  font-style: italic;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
   .roleHeader {

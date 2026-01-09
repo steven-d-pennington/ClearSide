@@ -270,6 +270,32 @@
   color: var(--color-text-primary);
 }
 
+.selectAllLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+}
+
+.selectAllLabel:hover {
+  background: var(--color-surface-tertiary);
+  color: var(--color-text-primary);
+}
+
+.selectAllCheckbox {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
 .clearFiltersBtn {
   padding: 0.5rem 1rem;
   border: 1px solid var(--dashboard-rose);
@@ -719,6 +745,24 @@
   font-size: 0.625rem;
   color: var(--color-text-muted);
   font-family: 'JetBrains Mono', monospace;
+}
+
+.configBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--dashboard-cyan-bg);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--dashboard-cyan);
+}
+
+.configBadge svg {
+  opacity: 0.8;
 }
 
 /* Card Actions */

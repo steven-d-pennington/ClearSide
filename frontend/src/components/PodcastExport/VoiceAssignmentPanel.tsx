@@ -28,6 +28,26 @@ const GEMINI_VOICES: Record<string, { voiceName: string; description: string }> 
   narrator: { voiceName: 'Puck', description: 'Clear narrator voice' },
 };
 
+/**
+ * Google Cloud Long Audio (Journey) voice options
+ * Journey voices are optimized for long-form content like podcasts
+ */
+const GOOGLE_CLOUD_LONG_VOICES: Array<{ id: string; name: string; description: string }> = [
+  { id: 'en-US-Journey-F', name: 'Journey F', description: 'Female - expressive, warm' },
+  { id: 'en-US-Journey-D', name: 'Journey D', description: 'Male - clear, engaging' },
+  { id: 'en-US-Journey-O', name: 'Journey O', description: 'Neutral - balanced, authoritative' },
+];
+
+/**
+ * Default voice assignments for Google Cloud Long Audio
+ */
+const GOOGLE_CLOUD_LONG_DEFAULTS: Record<string, { voiceId: string; voiceName: string; description: string }> = {
+  moderator: { voiceId: 'en-US-Journey-O', voiceName: 'Journey O', description: 'Neutral, authoritative' },
+  pro_advocate: { voiceId: 'en-US-Journey-F', voiceName: 'Journey F', description: 'Female, expressive' },
+  con_advocate: { voiceId: 'en-US-Journey-D', voiceName: 'Journey D', description: 'Male, engaging' },
+  narrator: { voiceId: 'en-US-Journey-D', voiceName: 'Journey D', description: 'Male, warm narrator' },
+};
+
 interface VoiceAssignmentPanelProps {
   assignments: Record<string, VoiceAssignment>;
   onChange: (assignments: Record<string, VoiceAssignment>) => void;
@@ -48,15 +68,16 @@ export function VoiceAssignmentPanel({
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
 
   const isGemini = provider === 'gemini';
+  const isGoogleCloudLong = provider === 'google-cloud-long';
 
   // Fetch available voices on mount (only for ElevenLabs)
   useEffect(() => {
-    if (!isGemini) {
+    if (!isGemini && !isGoogleCloudLong) {
       fetchVoices();
     } else {
       setIsLoadingVoices(false);
     }
-  }, [isGemini]);
+  }, [isGemini, isGoogleCloudLong]);
 
   const fetchVoices = async () => {
     setIsLoadingVoices(true);
@@ -139,6 +160,52 @@ export function VoiceAssignmentPanel({
                 </div>
               </div>
             </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Render Google Cloud Long Audio voices (selectable Journey voices)
+  const renderGoogleCloudLongVoices = () => (
+    <div className={styles.roleList}>
+      {SPEAKER_ROLES.map((role) => {
+        const defaultVoice = GOOGLE_CLOUD_LONG_DEFAULTS[role.id];
+        const currentVoiceId = assignments[role.id]?.voiceId || defaultVoice?.voiceId || '';
+        const currentVoice = GOOGLE_CLOUD_LONG_VOICES.find(v => v.id === currentVoiceId) ||
+          GOOGLE_CLOUD_LONG_VOICES.find(v => v.id === defaultVoice?.voiceId);
+
+        return (
+          <div key={role.id} className={styles.roleCard}>
+            <div className={styles.roleHeader}>
+              <div className={styles.roleInfo}>
+                <label className={styles.roleLabel}>{role.label}</label>
+                <p className={styles.roleDescription}>{role.description}</p>
+              </div>
+
+              <div className={styles.voiceControls}>
+                <select
+                  className={styles.voiceSelect}
+                  value={currentVoiceId}
+                  onChange={(e) => {
+                    const voice = GOOGLE_CLOUD_LONG_VOICES.find(v => v.id === e.target.value);
+                    updateAssignment(role.id, {
+                      voiceId: e.target.value,
+                      voiceName: voice?.name || e.target.value,
+                    });
+                  }}
+                >
+                  {GOOGLE_CLOUD_LONG_VOICES.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.name} - {voice.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className={styles.voiceHint}>
+              {currentVoice?.description || defaultVoice?.description}
+            </p>
           </div>
         );
       })}
@@ -316,13 +383,19 @@ export function VoiceAssignmentPanel({
     </div>
   );
 
+  const getDescription = () => {
+    if (isGemini) {
+      return 'Gemini uses optimized voices for each speaker role.';
+    }
+    if (isGoogleCloudLong) {
+      return 'Select from Journey voices optimized for long-form podcast content.';
+    }
+    return 'Assign distinct voices to each speaker role for a natural-sounding podcast.';
+  };
+
   return (
     <div className={styles.container}>
-      <p className={styles.description}>
-        {isGemini
-          ? 'Gemini uses optimized voices for each speaker role.'
-          : 'Assign distinct voices to each speaker role for a natural-sounding podcast.'}
-      </p>
+      <p className={styles.description}>{getDescription()}</p>
 
       {isLoadingVoices ? (
         <div className={styles.loading}>
@@ -331,6 +404,8 @@ export function VoiceAssignmentPanel({
         </div>
       ) : isGemini ? (
         renderGeminiVoices()
+      ) : isGoogleCloudLong ? (
+        renderGoogleCloudLongVoices()
       ) : (
         renderElevenLabsVoices()
       )}

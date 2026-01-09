@@ -21,7 +21,8 @@ import { createVectorDBClient } from '../services/research/vector-db-factory.js'
 import { createEmbeddingService } from '../services/research/embedding-service.js';
 import { ResearchIndexer } from '../services/research/research-indexer.js';
 import { createDuelogicOrchestrator } from '../services/debate/duelogic-orchestrator.js';
-import { mergeWithDuelogicDefaults, type PhilosophicalChair } from '../types/duelogic.js';
+import { createRAGRetrievalService } from '../services/research/rag-retrieval-service.js';
+import { mergeWithDuelogicDefaults, isPhilosophicalChair, type PhilosophicalChair } from '../types/duelogic.js';
 import { getTrendingTopicsService } from '../services/research/trending-topics-service.js';
 import { getListenNotesClient } from '../services/research/listen-notes-client.js';
 
@@ -345,6 +346,10 @@ const BulkActionSchema = z.object({
   ids: z.array(z.string().uuid()),
 });
 
+const BulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()),
+});
+
 // ============================================================================
 // Dashboard Stats
 // ============================================================================
@@ -561,6 +566,7 @@ router.delete('/research/configs/:id', async (req: Request, res: Response) => {
 /**
  * GET /duelogic/proposals
  * Get episode proposals with optional status filter
+ * Returns proposals with configName resolved from research chain
  */
 router.get('/proposals', async (req: Request, res: Response) => {
   try {
@@ -568,16 +574,10 @@ router.get('/proposals', async (req: Request, res: Response) => {
     let proposals;
 
     if (status) {
-      proposals = await proposalRepo.findByStatus(status);
+      proposals = await proposalRepo.findByStatusWithConfigName(status);
     } else {
-      // Get all proposals - we'll combine multiple queries
-      const [pending, approved, rejected, scheduled] = await Promise.all([
-        proposalRepo.findByStatus('pending'),
-        proposalRepo.findByStatus('approved'),
-        proposalRepo.findByStatus('rejected'),
-        proposalRepo.findByStatus('scheduled'),
-      ]);
-      proposals = [...pending, ...approved, ...rejected, ...scheduled];
+      // Get all proposals with config names
+      proposals = await proposalRepo.findAllWithConfigName();
     }
 
     res.json(proposals);
@@ -786,6 +786,7 @@ interface ChairModelConfig {
   modelId: string;
   modelDisplayName?: string;
   providerName?: string;
+  framework?: string;
 }
 
 /**
@@ -798,8 +799,11 @@ router.post('/proposals/:id/launch', async (req: Request, res: Response) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: 'ID required' });
 
-    // Extract optional chair model configurations from request
-    const { chairModels } = req.body as { chairModels?: ChairModelConfig[] };
+    // Extract optional chair model configurations and interruptions setting from request
+    const { chairModels, allowInterruptions } = req.body as {
+      chairModels?: ChairModelConfig[];
+      allowInterruptions?: boolean;
+    };
 
     // Get the proposal
     const proposal = await proposalRepo.findById(id);
@@ -823,9 +827,16 @@ router.post('/proposals/:id/launch', async (req: Request, res: Response) => {
     const proposalChairs = proposal.chairs || [];
     const duelogicChairs = proposalChairs.map((chair, index) => {
       const modelConfig = chairModels?.[index];
+
+      // Use framework from request if valid, otherwise fall back to default
+      let framework: PhilosophicalChair = DEFAULT_CHAIR_FRAMEWORKS[index % DEFAULT_CHAIR_FRAMEWORKS.length]!;
+      if (modelConfig?.framework && isPhilosophicalChair(modelConfig.framework)) {
+        framework = modelConfig.framework;
+      }
+
       return {
         position: `chair_${index + 1}` as const,
-        framework: DEFAULT_CHAIR_FRAMEWORKS[index % DEFAULT_CHAIR_FRAMEWORKS.length]!,
+        framework,
         modelId: modelConfig?.modelId ?? 'openai/gpt-4o',
         modelDisplayName: modelConfig?.modelDisplayName ?? chair.name,
         providerName: modelConfig?.providerName ?? 'OpenAI',
@@ -858,9 +869,19 @@ ${proposalChairs.map(c => `- ${c.name}: ${c.position}`).join('\n')}
 `.trim();
 
     // Build Duelogic config with the proposal's chairs
+    // Default interruptions to disabled for shorter, more controlled debates
+    const interruptionsEnabled = allowInterruptions === true;
+
     const duelogicConfig = mergeWithDuelogicDefaults({
       chairs: duelogicChairs.length >= 2 ? duelogicChairs : undefined,
       tone: 'respectful',
+      interruptions: {
+        enabled: interruptionsEnabled,
+        allowChairInterruptions: interruptionsEnabled,
+        allowArbiterInterruptions: interruptionsEnabled,
+        aggressiveness: 3,
+        cooldownSeconds: 60,
+      },
       podcastMode: {
         enabled: true,
         showName: 'Duelogic',
@@ -868,6 +889,11 @@ ${proposalChairs.map(c => `- ${c.name}: ${c.position}`).join('\n')}
         includeCallToAction: true,
       },
     });
+
+    logger.info({
+      proposalId: id,
+      allowInterruptions: interruptionsEnabled,
+    }, 'Debate config: interruptions setting');
 
     // Create the debate in database with duelogic mode
     await debateRepository.create({
@@ -908,6 +934,29 @@ ${proposalChairs.map(c => `- ${c.name}: ${c.position}`).join('\n')}
       keyTensions, // Pass key tensions to guide the debate
     });
 
+    // Enable RAG if vector DB and research is available for this proposal
+    let ragEnabled = false;
+    try {
+      const vectorDB = createVectorDBClient();
+      const embeddingService = createEmbeddingService();
+
+      if (vectorDB && embeddingService) {
+        // Check if research is indexed for this proposal
+        const hasResearch = await vectorDB.hasIndexedResearch(id);
+
+        if (hasResearch) {
+          const ragService = createRAGRetrievalService(vectorDB, embeddingService);
+          orchestrator.enableRAG(ragService, id);
+          ragEnabled = true;
+          logger.info({ debateId, proposalId: id }, 'RAG enabled for debate with indexed research');
+        } else {
+          logger.info({ debateId, proposalId: id }, 'No indexed research found, RAG not enabled');
+        }
+      }
+    } catch (ragError) {
+      logger.warn({ debateId, error: ragError }, 'Failed to enable RAG, continuing without citations');
+    }
+
     // Start debate in background (non-blocking)
     orchestrator.start().catch((error) => {
       logger.error({ debateId, error }, 'Duelogic debate failed');
@@ -918,11 +967,88 @@ ${proposalChairs.map(c => `- ${c.name}: ${c.position}`).join('\n')}
       debateId,
       proposalId: id,
       chairCount: duelogicChairs.length,
+      ragEnabled,
       message: `Duelogic debate created and starting: ${proposal.title}`,
     });
   } catch (error) {
     logger.error({ error }, 'Failed to launch debate from proposal');
     return res.status(500).json({ error: 'Failed to launch debate' });
+  }
+});
+
+/**
+ * POST /duelogic/proposals/:id/relaunch
+ * Reset a launched proposal so it can be launched again with different settings
+ * Cleans up previous debate data and resets proposal status
+ */
+router.post('/proposals/:id/relaunch', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    // Get the proposal
+    const proposal = await proposalRepo.findById(id);
+    if (!proposal) {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+
+    // Check proposal is in launched status
+    if (proposal.status !== 'launched') {
+      return res.status(400).json({
+        error: 'Proposal must be in launched status to re-launch',
+        currentStatus: proposal.status,
+      });
+    }
+
+    // Find any debates created from this proposal
+    const debates = await pool.query<{ id: string; status: string; proposition_context: Record<string, unknown> | null }>(
+      `SELECT id, status, proposition_context FROM debates
+       WHERE proposition_context->>'proposalId' = $1
+       ORDER BY created_at DESC`,
+      [id]
+    );
+
+    let failedChairInfo = null;
+    let previousDebateId = null;
+
+    if (debates.rows.length > 0) {
+      const lastDebate = debates.rows[0];
+      previousDebateId = lastDebate?.id;
+
+      // Parse failure info from proposition_context if available
+      const context = lastDebate?.proposition_context;
+      if (context && typeof context === 'object' && 'failedChair' in context) {
+        failedChairInfo = context.failedChair;
+      }
+
+      // Delete debates for this proposal (CASCADE will clean up related tables)
+      for (const debate of debates.rows) {
+        await pool.query('DELETE FROM debates WHERE id = $1', [debate.id]);
+        logger.info({ debateId: debate.id }, 'Deleted previous debate data');
+      }
+    }
+
+    // Reset proposal status to approved
+    await proposalRepo.updateStatus(id, 'approved');
+
+    logger.info({
+      proposalId: id,
+      deletedDebates: debates.rows.length,
+      previousDebateId,
+      hadFailure: !!failedChairInfo,
+    }, 'Proposal reset for re-launch');
+
+    return res.json({
+      success: true,
+      proposalId: id,
+      status: 'approved',
+      deletedDebateCount: debates.rows.length,
+      previousDebateId,
+      failedChairInfo, // Return info about which model failed
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to reset proposal for re-launch');
+    return res.status(500).json({ error: 'Failed to reset proposal' });
   }
 });
 
@@ -951,6 +1077,30 @@ router.post('/proposals/bulk-action', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error }, 'Failed to perform bulk action');
     return res.status(500).json({ error: 'Failed to perform bulk action' });
+  }
+});
+
+/**
+ * DELETE /duelogic/proposals/bulk-delete
+ * Bulk delete proposals
+ */
+router.delete('/proposals/bulk-delete', async (req: Request, res: Response) => {
+  try {
+    const parseResult = BulkDeleteSchema.safeParse(req.body);
+
+    if (!parseResult.success) {
+      return res.status(400).json({ errors: parseResult.error.errors });
+    }
+
+    const { ids } = parseResult.data;
+
+    await proposalRepo.bulkDelete(ids);
+
+    logger.info({ count: ids.length }, 'Bulk delete completed');
+    return res.json({ success: true, count: ids.length });
+  } catch (error) {
+    logger.error({ error }, 'Failed to perform bulk delete');
+    return res.status(500).json({ error: 'Failed to perform bulk delete' });
   }
 });
 

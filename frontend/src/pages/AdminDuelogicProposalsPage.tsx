@@ -231,6 +231,30 @@ export function AdminDuelogicProposalsPage() {
     setTimeout(() => setActionMessage(null), 5000);
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} proposals permanently? This cannot be undone.`)) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/duelogic/proposals/bulk-delete`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+
+      if (response.ok) {
+        setActionMessage({ type: 'success', text: `Deleted ${selectedIds.size} proposals` });
+        setSelectedIds(new Set());
+        fetchProposals();
+      } else {
+        setActionMessage({ type: 'error', text: 'Failed to delete proposals' });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Failed to delete proposals' });
+    }
+    setTimeout(() => setActionMessage(null), 5000);
+  };
+
   const handleQuickApprove = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -404,6 +428,15 @@ export function AdminDuelogicProposalsPage() {
       {/* Filters Section */}
       <section className={styles.filtersSection}>
         <div className={styles.searchRow}>
+          <label className={styles.selectAllLabel}>
+            <input
+              type="checkbox"
+              checked={selectedIds.size === filteredProposals.length && filteredProposals.length > 0}
+              onChange={selectAllFiltered}
+              className={styles.selectAllCheckbox}
+            />
+            <span>Select All ({filteredProposals.length})</span>
+          </label>
           <div className={styles.searchInput}>
             <svg className={styles.searchIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8" />
@@ -550,6 +583,9 @@ export function AdminDuelogicProposalsPage() {
           <Button onClick={handleBulkReject} variant="secondary" size="sm">
             Reject Selected
           </Button>
+          <Button onClick={handleBulkDelete} variant="danger" size="sm">
+            Delete Selected
+          </Button>
           <button className={styles.clearSelectionBtn} onClick={() => setSelectedIds(new Set())}>
             Clear Selection
           </button>
@@ -640,9 +676,13 @@ export function AdminDuelogicProposalsPage() {
                         </span>
                       )}
                     </div>
-                    {proposal.researchResultId && (
-                      <span className={styles.researchInfo}>
-                        Research: {proposal.researchResultId.slice(0, 8)}...
+                    {proposal.configName && (
+                      <span className={styles.configBadge}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                        </svg>
+                        {proposal.configName}
                       </span>
                     )}
                   </div>

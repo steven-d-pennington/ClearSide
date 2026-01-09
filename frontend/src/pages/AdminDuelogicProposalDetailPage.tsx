@@ -34,6 +34,7 @@ export function AdminDuelogicProposalDetailPage() {
   const [showLaunchModal, setShowLaunchModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isRelaunching, setIsRelaunching] = useState(false);
 
   const fetchProposal = useCallback(async () => {
     if (!id) return;
@@ -178,7 +179,12 @@ export function AdminDuelogicProposalDetailPage() {
     providerName: string;
   }
 
-  const handleLaunchDebate = async (chairModels: ChairModelSelection[]) => {
+  interface LaunchDebateOptions {
+    chairModels: ChairModelSelection[];
+    allowInterruptions: boolean;
+  }
+
+  const handleLaunchDebate = async (options: LaunchDebateOptions) => {
     if (!id) return;
 
     setIsLaunching(true);
@@ -186,7 +192,10 @@ export function AdminDuelogicProposalDetailPage() {
       const response = await fetch(`${API_BASE_URL}/api/duelogic/proposals/${id}/launch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chairModels }),
+        body: JSON.stringify({
+          chairModels: options.chairModels,
+          allowInterruptions: options.allowInterruptions,
+        }),
       });
 
       if (response.ok) {
@@ -206,6 +215,40 @@ export function AdminDuelogicProposalDetailPage() {
     } finally {
       setIsLaunching(false);
       setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
+  const handleRelaunch = async () => {
+    if (!id) return;
+
+    if (!confirm('This will delete the previous debate data and allow you to launch again with different models. Continue?')) {
+      return;
+    }
+
+    setIsRelaunching(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/duelogic/proposals/${id}/relaunch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        let message = 'Proposal reset for re-launch.';
+        if (data.failedChairInfo) {
+          message += ` Previous failure: ${data.failedChairInfo.modelDisplayName || data.failedChairInfo.modelId} (${data.failedChairInfo.position})`;
+        }
+        setActionMessage({ type: 'success', text: message });
+        fetchProposal();
+      } else {
+        const data = await response.json();
+        setActionMessage({ type: 'error', text: data.error || 'Failed to reset proposal' });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Failed to reset proposal' });
+    } finally {
+      setIsRelaunching(false);
+      setTimeout(() => setActionMessage(null), 7000);
     }
   };
 
@@ -408,13 +451,42 @@ export function AdminDuelogicProposalDetailPage() {
               </>
             )}
             {proposal.status === 'launched' && (
-              <span className={styles.launchedBadge}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                Debate Launched
-              </span>
+              <>
+                {proposal.launchedDebateId ? (
+                  <Link to={`/debate/${proposal.launchedDebateId}`} className={styles.launchedLink}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    View Debate
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </Link>
+                ) : (
+                  <span className={styles.launchedBadge}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    Debate Launched
+                  </span>
+                )}
+                <Button
+                  onClick={handleRelaunch}
+                  variant="secondary"
+                  loading={isRelaunching}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M23 4v6h-6" />
+                    <path d="M1 20v-6h6" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  </svg>
+                  Re-Launch
+                </Button>
+              </>
             )}
           </>
         )}

@@ -16,8 +16,8 @@ import * as presetRepository from '../db/repositories/preset-repository.js';
 import * as personaRepository from '../db/repositories/persona-repository.js';
 import * as settingsRepository from '../db/repositories/settings-repository.js';
 import { orchestratorRegistry } from '../services/debate/index.js';
+import { GoogleAuth } from 'google-auth-library';
 import {
-  createServiceAccountAccessToken,
   parseServiceAccountJson,
 } from '../services/audio/google-cloud-long-audio-service.js';
 import { createLogger } from '../utils/logger.js';
@@ -1169,13 +1169,27 @@ router.post('/admin/testing/services/:serviceId/test', async (req: Request, res:
         }
 
         const credentials = parseServiceAccountJson(serviceAccountJson);
-        const location = payload.location || process.env.GOOGLE_CLOUD_TTS_LOCATION || 'us-central1';
+        const location = payload.location || process.env.GOOGLE_CLOUD_TTS_LOCATION || 'global';
         const projectId = payload.projectId || process.env.GOOGLE_CLOUD_PROJECT_ID || credentials.project_id;
 
-        const { accessToken } = await createServiceAccountAccessToken(credentials);
+        // Use google-auth-library for reliable token generation
+        const auth = new GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+        });
+        const client = await auth.getClient();
+        const accessTokenResponse = await client.getAccessToken();
+        const accessToken = accessTokenResponse?.token;
+
+        if (!accessToken) {
+          finish(false, 'Failed to generate access token.');
+          return;
+        }
+
         const checks: ExternalServiceTestResult[] = [];
 
-        const ttsUrl = `https://${location}-texttospeech.googleapis.com/v1beta1/projects/${projectId}/locations/${location}/operations`;
+        // Use global endpoint with v1 API for better compatibility
+        const ttsUrl = `https://texttospeech.googleapis.com/v1/projects/${projectId}/locations/${location}/operations`;
         try {
           await axios.get(ttsUrl, {
             headers: { Authorization: `Bearer ${accessToken}` },

@@ -1,11 +1,24 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2026-01-03
-> Version: 6.0.0 - Phase 5 Duelogic Research Tasks Added
+> Last Updated: 2026-01-08
+> Version: 7.0.0 - Phase 6 Conversational Podcast Mode Added
 
-## 🔧 Recent Changes (2026-01-03)
+## 🔧 Recent Changes (2026-01-08)
 
-**NEW: Phase 5 - Duelogic Research & Automated Episode Generation:**
+**NEW: Phase 6 - Conversational Podcast Mode:**
+- Free-form podcast conversations with 2-6 AI personas
+- 12 persistent character personas with distinct backstories and speaking styles
+- Talk show-style host that introduces guests, asks questions, steers discussion
+- Hybrid flow control: Host steers, participants can signal desire to speak
+- Shared context board tracking topics, claims, agreements, disagreements
+- Manual, auto-stream, and natural pace flow modes
+- Native podcast export (not debate conversion)
+- 22 comprehensive task files in `tasks/phase6/conversational-podcast/`
+- See [Plan File](../.claude/plans/async-noodling-tiger.md) for full specification
+
+## 🔧 Previous Changes (2026-01-03)
+
+**Phase 5 - Duelogic Research & Automated Episode Generation:**
 - Automated topic discovery using Perplexity via OpenRouter
 - LLM-powered episode proposal generation following Duelogic format
 - Research job scheduling with cron-based automation
@@ -532,6 +545,85 @@ Automated research pipeline using Perplexity to discover trending topics, genera
 **Critical Path:** DUELOGIC-001 → DUELOGIC-002 → DUELOGIC-003 → DUELOGIC-004 → DUELOGIC-006
 
 **Parallel Track:** DUELOGIC-001 → DUELOGIC-005 → DUELOGIC-007
+
+---
+
+## 📋 PHASE 6: CONVERSATIONAL PODCAST MODE
+
+Free-form podcast conversations where 2-6 AI personas discuss topics in a natural, talk show format with a host.
+
+### 🎙️ Foundation
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| CONV-001 | Database Migration | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-001.md) |
+| CONV-002 | TypeScript Types | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-002.md) |
+| CONV-003 | Persona Repository | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-003.md) |
+| CONV-004 | Session Repositories | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-004.md) |
+
+### 🤖 Core Services
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| CONV-005 | PersonaAgent Class | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-005.md) |
+| CONV-006 | ContextBoardService | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-006.md) |
+| CONV-007 | PodcastHostAgent (Ultrathink) | P0 | L | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-007.md) |
+| CONV-008 | ConversationalOrchestrator | P0 | L | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-008.md) |
+
+### 🔌 API Layer
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| CONV-009 | Persona and Session Routes | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-009.md) |
+| CONV-010 | Control and Streaming Routes | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-010.md) |
+| CONV-011 | SSE Manager Integration | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-011.md) |
+
+### 🎨 Frontend
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| CONV-012 | ConversationConfigModal | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-012.md) |
+| CONV-013 | ConversationViewer Base | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-013.md) |
+| CONV-014 | TranscriptPanel + UtteranceCard | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-014.md) |
+| CONV-015 | ContextBoardPanel | P1 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-015.md) |
+| CONV-016 | ControlBar Component | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-016.md) |
+
+### 🔗 Integration
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| CONV-017 | Entry from Proposals Page | P1 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-017.md) |
+| CONV-018 | Entry from Main Screen | P1 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-018.md) |
+| CONV-019 | Podcast Export (Native Format) | P1 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-019.md) |
+
+### ✨ Polish
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| CONV-020 | RAG Integration | P2 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-020.md) |
+| CONV-021 | Vector Indexing of Utterances | P2 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-021.md) |
+| CONV-022 | Testing and Refinement | P1 | L | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-022.md) |
+
+**Dependencies:**
+- CONV-001 can start immediately (no blockers)
+- CONV-002 depends on CONV-001
+- CONV-003, CONV-004 depend on CONV-001, CONV-002
+- CONV-005, CONV-006 depend on CONV-002, CONV-003/004
+- CONV-007 depends on CONV-005, CONV-006
+- CONV-008 depends on CONV-005, CONV-006, CONV-007
+- CONV-009, CONV-010 depend on CONV-003, CONV-004
+- CONV-011 depends on CONV-010
+- CONV-012 depends on CONV-002, CONV-009
+- CONV-013 depends on CONV-011, CONV-012
+- CONV-014, CONV-015, CONV-016 depend on CONV-013
+- CONV-017, CONV-018 depend on CONV-012
+- CONV-019 depends on CONV-008
+- CONV-020, CONV-021 depend on CONV-008
+- CONV-022 depends on all previous tasks
+
+**Critical Path:** CONV-001 → CONV-002 → CONV-005 → CONV-007 → CONV-008 → CONV-019
+
+**Start Here:** CONV-001 (Database Migration)
 
 ---
 
