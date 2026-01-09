@@ -150,7 +150,7 @@ export class GeminiTTSService implements ITTSService {
     return this.voiceProfiles[voiceType];
   }
 
-  async generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult> {
+  async generateSpeech(text: string, voiceType: VoiceType, _customVoiceId?: string): Promise<TTSResult> {
     const voice = this.voiceProfiles[voiceType];
 
     logger.debug(

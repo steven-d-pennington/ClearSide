@@ -173,7 +173,7 @@ export class EdgeTTSService implements ITTSService {
     return this.voiceProfiles[voiceType];
   }
 
-  async generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult> {
+  async generateSpeech(text: string, voiceType: VoiceType, _customVoiceId?: string): Promise<TTSResult> {
     // Check Python availability
     const pythonOk = await this.checkPythonAvailable();
     if (!pythonOk) {

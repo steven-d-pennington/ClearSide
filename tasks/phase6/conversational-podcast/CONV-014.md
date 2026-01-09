@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-013 (Viewer Base)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -24,14 +24,14 @@ This task creates the TranscriptPanel and UtteranceCard components for displayin
 
 ### Acceptance Criteria
 
-- [ ] Create `TranscriptPanel` component
-- [ ] Create `UtteranceCard` for individual utterances
-- [ ] Display speaker name with avatar emoji
-- [ ] Show key points with highlighting
-- [ ] Display topic markers when present
-- [ ] Show streaming content for current speaker
-- [ ] Auto-scroll to latest utterance
-- [ ] Different styling for host vs participants
+- [x] Create `TranscriptPanel` component
+- [x] Create `UtteranceCard` for individual utterances
+- [x] Display speaker name with avatar emoji
+- [x] Show key points with highlighting
+- [x] Display topic markers when present
+- [x] Show streaming content for current speaker
+- [x] Auto-scroll to latest utterance
+- [x] Different styling for host vs participants
 
 ---
 
@@ -452,16 +452,16 @@ export { default as UtteranceCard } from './UtteranceCard';
 
 ### Definition of Done
 
-- [ ] TranscriptPanel renders utterance list
-- [ ] UtteranceCard shows speaker info correctly
-- [ ] Host utterances visually distinct
-- [ ] Key points highlighted
-- [ ] Topic markers displayed
-- [ ] Streaming content shows with animation
-- [ ] Auto-scroll to bottom works
-- [ ] Empty state shown when no utterances
-- [ ] Responsive design works
-- [ ] TypeScript compiles without errors
+- [x] TranscriptPanel renders utterance list
+- [x] UtteranceCard shows speaker info correctly
+- [x] Host utterances visually distinct
+- [x] Key points highlighted
+- [x] Topic markers displayed
+- [x] Streaming content shows with animation
+- [x] Auto-scroll to bottom works
+- [x] Empty state shown when no utterances
+- [x] Responsive design works
+- [x] TypeScript compiles without errors
 
 ---
 

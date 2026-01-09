@@ -6,7 +6,7 @@
 **Priority:** P1
 **Estimated Effort:** S (2-4 hours)
 **Dependencies:** CONV-012 (Config Modal)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -24,11 +24,11 @@ This task adds a "Start Conversation" entry point from the main application scre
 
 ### Acceptance Criteria
 
-- [ ] Add "Start Conversation" button/card to homepage
-- [ ] Button opens ConversationConfigModal
-- [ ] No pre-filled data (user enters topic manually)
-- [ ] Navigate to ConversationViewer on launch
-- [ ] Card design consistent with existing homepage style
+- [x] Add "Start Conversation" button/card to homepage
+- [x] Button opens ConversationConfigModal
+- [x] No pre-filled data (user enters topic manually)
+- [x] Navigate to ConversationViewer on launch
+- [x] Card design consistent with existing homepage style
 
 ---
 
@@ -223,13 +223,13 @@ Add to `HomePage.module.css`:
 
 ### Definition of Done
 
-- [ ] "Start Conversation" action card added
-- [ ] Card opens config modal
-- [ ] Modal opens with empty fields
-- [ ] Navigation to viewer works after launch
-- [ ] Card styling consistent with homepage
-- [ ] Featured variant highlights the new feature
-- [ ] TypeScript compiles without errors
+- [x] "Start Conversation" action card added
+- [x] Card opens config modal
+- [x] Modal opens with empty fields
+- [x] Navigation to viewer works after launch
+- [x] Card styling consistent with homepage
+- [x] Featured variant highlights the new feature
+- [x] TypeScript compiles without errors
 
 ---
 

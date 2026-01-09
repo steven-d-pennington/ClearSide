@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-002 (Types), CONV-004 (Repositories)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,13 +25,13 @@ This task creates the ContextBoardService that maintains a real-time "whiteboard
 
 ### Acceptance Criteria
 
-- [ ] Create `ContextBoardService` in `backend/src/services/conversation/context-board-service.ts`
-- [ ] Extract topics, claims, agreements, disagreements from utterances
-- [ ] Track key points per participant
-- [ ] Manage current conversational thread
-- [ ] Process speaker signals and maintain queue
-- [ ] Persist state to database via ContextBoardRepository
-- [ ] Use fast LLM (Haiku) for extraction
+- [x] Create `ContextBoardService` in `backend/src/services/conversation/context-board-service.ts`
+- [x] Extract topics, claims, agreements, disagreements from utterances
+- [x] Track key points per participant
+- [x] Manage current conversational thread
+- [x] Process speaker signals and maintain queue
+- [x] Persist state to database via ContextBoardRepository
+- [x] Use fast LLM (Haiku) for extraction
 
 ---
 

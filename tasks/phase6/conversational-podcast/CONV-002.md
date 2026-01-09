@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** S (2-4 hours)
 **Dependencies:** CONV-001 (Database Schema)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,18 +25,18 @@ This task creates TypeScript type definitions for the Conversational Podcast Mod
 
 ### Acceptance Criteria
 
-- [ ] Create `backend/src/types/conversation.ts` with all backend types
-- [ ] Create `frontend/src/types/conversation.ts` with frontend types
-- [ ] Define PodcastPersona interface with all persona fields
-- [ ] Define ConversationSession interface with status tracking
-- [ ] Define ConversationParticipant interface for persona+model mapping
-- [ ] Define ConversationUtterance interface with direct addressing
-- [ ] Define ContextBoardState interface for shared whiteboard
-- [ ] Define SpeakerSignal interface for hybrid flow control
-- [ ] Define all status enums with type guards
-- [ ] Define API request/response types
-- [ ] Add JSDoc comments for all exported types
-- [ ] Ensure types match database schema from CONV-001
+- [x] Create `backend/src/types/conversation.ts` with all backend types
+- [x] Create `frontend/src/types/conversation.ts` with frontend types
+- [x] Define PodcastPersona interface with all persona fields
+- [x] Define ConversationSession interface with status tracking
+- [x] Define ConversationParticipant interface for persona+model mapping
+- [x] Define ConversationUtterance interface with direct addressing
+- [x] Define ContextBoardState interface for shared whiteboard
+- [x] Define SpeakerSignal interface for hybrid flow control
+- [x] Define all status enums with type guards
+- [x] Define API request/response types
+- [x] Add JSDoc comments for all exported types
+- [x] Ensure types match database schema from CONV-001
 
 ---
 
@@ -665,14 +665,14 @@ export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
 
 ### Definition of Done
 
-- [ ] `backend/src/types/conversation.ts` created with all types
-- [ ] `frontend/src/types/conversation.ts` created with frontend types
-- [ ] All interfaces have JSDoc comments
-- [ ] Type guards implemented for all status enums
-- [ ] Constants defined (constraints, defaults)
-- [ ] Types match database schema exactly
-- [ ] TypeScript compiles without errors
-- [ ] Types exported correctly
+- [x] `backend/src/types/conversation.ts` created with all types
+- [x] `frontend/src/types/conversation.ts` created with frontend types
+- [x] All interfaces have JSDoc comments
+- [x] Type guards implemented for all status enums
+- [x] Constants defined (constraints, defaults)
+- [x] Types match database schema exactly
+- [x] TypeScript compiles without errors
+- [x] Types exported correctly
 
 ---
 

@@ -1,0 +1,571 @@
+/**
+ * ConversationViewer Styles
+ * Design: Command Center Editorial aesthetic
+ */
+
+/* Color variables - matching dashboard theme */
+:root {
+  --bg-primary: #0f1419;
+  --bg-secondary: #1a2332;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --primary: #06b6d4;
+  --green-100: rgba(16, 185, 129, 0.15);
+  --green-600: #10b981;
+  --green-700: #059669;
+  --yellow-100: rgba(245, 158, 11, 0.15);
+  --yellow-700: #b45309;
+  --yellow-800: #92400e;
+  --blue-100: rgba(59, 130, 246, 0.15);
+  --blue-700: #1d4ed8;
+  --gray-100: rgba(148, 163, 184, 0.15);
+  --gray-700: #475569;
+  --red-600: #dc2626;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.backButton {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.sessionInfo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topic {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status badges */
+.statusBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.statusConfiguring {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.statusLive {
+  background: var(--green-100);
+  color: var(--green-700);
+  animation: pulse 2s infinite;
+}
+
+.statusPaused {
+  background: var(--yellow-100);
+  color: var(--yellow-700);
+}
+
+.statusCompleted {
+  background: var(--blue-100);
+  color: var(--blue-700);
+}
+
+.statusError {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Connection indicator */
+.connectionIndicator {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.connected {
+  color: var(--green-600);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.disconnected {
+  color: var(--red-600);
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.toggleButton {
+  padding: 0.5rem 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggleButton:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* Main content */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Launching overlay */
+.launchingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(15, 20, 25, 0.9);
+  z-index: 50;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Awaiting advance indicator */
+.awaitingAdvance {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.2));
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: 8px;
+  color: #a78bfa;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  z-index: 40;
+  animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.3);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    opacity: 0.9;
+  }
+}
+
+/* Loading state */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error state */
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.error h2 {
+  color: #f43f5e;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.error p {
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  margin: 0;
+}
+
+.error button {
+  padding: 0.75rem 1.5rem;
+  background: var(--primary);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.error button:hover {
+  background: #0891b2;
+}
+
+/* Connection error banner */
+.connectionError {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.5rem;
+  background: var(--yellow-100);
+  color: var(--yellow-800);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  z-index: 100;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Truncation Retry Indicator */
+.truncationRetry {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 8px;
+  color: #fbbf24;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  z-index: 100;
+  animation: slideUp 0.3s ease-out;
+}
+
+.retrySpinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(251, 191, 36, 0.3);
+  border-top-color: #fbbf24;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Truncation Alert Dialog */
+.truncationAlertOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.truncationAlertDialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 90%;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.truncationAlertHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.truncationAlertHeader h3 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.warningIcon {
+  font-size: 1.5rem;
+}
+
+.truncationAlertContent {
+  margin-bottom: 1.5rem;
+}
+
+.truncationAlertContent p {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem 0;
+}
+
+.truncationPreview {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid rgba(251, 191, 36, 0.5);
+}
+
+.truncationHint {
+  font-size: 0.8125rem !important;
+  color: var(--text-muted) !important;
+}
+
+.truncationAlertActions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modelSelector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.modelSelector label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.modelSelector select {
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.modelSelector select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.truncationButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dismissButton {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dismissButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.dismissButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.regenerateButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--primary);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.regenerateButton:hover:not(:disabled) {
+  background: #0891b2;
+}
+
+.regenerateButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buttonSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .headerLeft,
+  .headerRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .topic {
+    font-size: 1rem;
+    max-width: 200px;
+  }
+
+  .main {
+    flex-direction: column;
+  }
+
+  .truncationAlertDialog {
+    width: 95%;
+    padding: 1rem;
+  }
+
+  .truncationButtons {
+    flex-direction: column;
+  }
+
+  .dismissButton,
+  .regenerateButton {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** S (2-4 hours)
 **Dependencies:** CONV-010 (Control Routes)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,12 +25,12 @@ This task extends the existing SSE Manager to support conversation-specific even
 
 ### Acceptance Criteria
 
-- [ ] Add conversation event types to SSE type definitions
-- [ ] Add `addConversationClient()` method to SSE Manager
-- [ ] Add `removeConversationClient()` method
-- [ ] Add `broadcastToConversation()` method
-- [ ] Update existing SSE Manager to handle conversation clients
-- [ ] Add conversation client tracking (separate from debate clients)
+- [x] Add conversation event types to SSE type definitions
+- [x] Add `addConversationClient()` method to SSE Manager
+- [x] Add `removeConversationClient()` method
+- [x] Add `broadcastToConversation()` method
+- [x] Update existing SSE Manager to handle conversation clients
+- [x] Add conversation client tracking (separate from debate clients)
 
 ---
 
@@ -431,15 +431,15 @@ export const sseManager = new SSEManager();
 
 ### Definition of Done
 
-- [ ] `ConversationSSEEventType` and payloads defined in types
-- [ ] `addConversationClient()` adds client to session
-- [ ] `removeConversationClient()` cleans up properly
-- [ ] `broadcastToConversation()` sends to all session clients
-- [ ] Failed clients cleaned up automatically
-- [ ] Stats method reports both debate and conversation clients
-- [ ] Stale connection cleanup works
-- [ ] TypeScript compiles without errors
-- [ ] Integration test passes
+- [x] `ConversationSSEEventType` and payloads defined in types
+- [x] `addConversationClient()` adds client to session
+- [x] `removeConversationClient()` cleans up properly
+- [x] `broadcastToConversation()` sends to all session clients
+- [x] Failed clients cleaned up automatically
+- [x] Stats method reports both debate and conversation clients
+- [x] Stale connection cleanup works
+- [x] TypeScript compiles without errors
+- [x] Integration test passes
 
 ---
 

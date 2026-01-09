@@ -53,12 +53,16 @@ const TRUSTED_PROVIDERS = new Set([
  * Based on OpenRouter documentation and model capabilities
  */
 const REASONING_MODEL_PATTERNS = [
-  // Claude models with thinking support
+  // Claude 4.x models with thinking support
+  'claude-sonnet-4.5',
+  'claude-sonnet-4',
+  'claude-opus-4.5',
+  'claude-opus-4.1',
+  'claude-opus-4',
+  'claude-haiku-4.5',
+  // Claude 3.7 models
   'claude-3-7-sonnet',
   'claude-3.7-sonnet',
-  'claude-sonnet-4',
-  'claude-opus-4',
-  'claude-haiku-4',
   // OpenAI o1/o3 reasoning models
   'o1-preview',
   'o1-mini',

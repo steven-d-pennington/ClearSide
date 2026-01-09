@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-003 (Persona Repository), CONV-004 (Session Repositories)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,14 +25,14 @@ This task creates the API routes for managing personas and conversation sessions
 
 ### Acceptance Criteria
 
-- [ ] Create `conversation-routes.ts` in `backend/src/routes/`
-- [ ] Implement `GET /api/conversations/personas` - list all personas
-- [ ] Implement `GET /api/conversations/personas/:slug` - get single persona
-- [ ] Implement `POST /api/conversations/sessions` - create session
-- [ ] Implement `GET /api/conversations/sessions/:id` - get session details
-- [ ] Implement `GET /api/conversations/sessions` - list user's sessions
-- [ ] Register routes in `backend/src/routes/index.ts`
-- [ ] Add request validation with Zod
+- [x] Create `conversation-routes.ts` in `backend/src/routes/`
+- [x] Implement `GET /api/conversations/personas` - list all personas
+- [x] Implement `GET /api/conversations/personas/:slug` - get single persona
+- [x] Implement `POST /api/conversations/sessions` - create session
+- [x] Implement `GET /api/conversations/sessions/:id` - get session details
+- [x] Implement `GET /api/conversations/sessions` - list user's sessions
+- [x] Register routes in `backend/src/index.ts`
+- [x] Add request validation with Zod
 
 ---
 

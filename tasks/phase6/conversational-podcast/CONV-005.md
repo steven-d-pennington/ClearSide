@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-002 (Types), CONV-003 (Persona Repository)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,14 +25,14 @@ This task creates the PersonaAgent class that represents individual participants
 
 ### Acceptance Criteria
 
-- [ ] Create `PersonaAgent` class in `backend/src/services/conversation/persona-agent.ts`
-- [ ] Build persona-based system prompts from persona definitions
-- [ ] Implement `generateResponse()` for conversation turns
-- [ ] Implement `evaluateSpeakingDesire()` for signal generation
-- [ ] Support direct addressing of other participants
-- [ ] Maintain conversation history with memory trimming
-- [ ] Support RAG context injection
-- [ ] Stream tokens via SSE manager
+- [x] Create `PersonaAgent` class in `backend/src/services/conversation/persona-agent.ts`
+- [x] Build persona-based system prompts from persona definitions
+- [x] Implement `generateResponse()` for conversation turns
+- [x] Implement `evaluateSpeakingDesire()` for signal generation
+- [x] Support direct addressing of other participants
+- [x] Maintain conversation history with memory trimming
+- [x] Support RAG context injection
+- [x] Stream tokens via SSE manager
 
 ---
 

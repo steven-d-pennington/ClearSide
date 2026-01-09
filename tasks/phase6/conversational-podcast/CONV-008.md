@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** L (8-16 hours)
 **Dependencies:** CONV-005 (PersonaAgent), CONV-006 (ContextBoard), CONV-007 (HostAgent)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -26,15 +26,15 @@ This task creates the ConversationalOrchestrator - the main engine that coordina
 
 ### Acceptance Criteria
 
-- [ ] Create `ConversationalOrchestrator` in `backend/src/services/conversation/conversational-orchestrator.ts`
-- [ ] Implement opening phase (host introduces guests)
-- [ ] Implement main conversation loop with hybrid flow control
-- [ ] Implement closing phase (host summarizes)
-- [ ] Support manual mode (advance on user request)
-- [ ] Support auto-stream mode (continuous with configurable pace)
-- [ ] Emit SSE events for all state changes
-- [ ] Handle pause/resume
-- [ ] Persist utterances to database
+- [x] Create `ConversationalOrchestrator` in `backend/src/services/conversation/conversational-orchestrator.ts`
+- [x] Implement opening phase (host introduces guests)
+- [x] Implement main conversation loop with hybrid flow control
+- [x] Implement closing phase (host summarizes)
+- [x] Support manual mode (advance on user request)
+- [x] Support auto-stream mode (continuous with configurable pace)
+- [x] Emit SSE events for all state changes
+- [x] Handle pause/resume
+- [x] Persist utterances to database
 
 ---
 

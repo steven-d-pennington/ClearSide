@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** S (2-4 hours)
 **Dependencies:** CONV-013 (Viewer Base)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -24,14 +24,14 @@ This task creates the ControlBar component - the bottom control panel for managi
 
 ### Acceptance Criteria
 
-- [ ] Create `ControlBar` component
-- [ ] "Next" button for manual mode advancement
-- [ ] Pause/Resume button toggle
-- [ ] Flow mode selector dropdown
-- [ ] Pace slider for natural pace mode
-- [ ] Export button
-- [ ] Turn counter display
-- [ ] Disable controls appropriately based on status
+- [x] Create `ControlBar` component
+- [x] "Next" button for manual mode advancement
+- [x] Pause/Resume button toggle
+- [x] Flow mode selector dropdown
+- [x] Pace slider for natural pace mode
+- [x] Export button
+- [x] Turn counter display
+- [x] Disable controls appropriately based on status
 
 ---
 
@@ -550,17 +550,17 @@ export { default as ControlBar } from './ControlBar';
 
 ### Definition of Done
 
-- [ ] ControlBar renders all controls
-- [ ] Next button works in manual mode
-- [ ] Pause/Resume toggles correctly
-- [ ] Flow mode selector works
-- [ ] Pace slider appears in natural pace mode
-- [ ] Export button triggers callback
-- [ ] Turn counter displays correctly
-- [ ] Status indicator shows current state
-- [ ] Controls disabled based on status
-- [ ] Responsive layout works
-- [ ] TypeScript compiles without errors
+- [x] ControlBar renders all controls
+- [x] Next button works in manual mode
+- [x] Pause/Resume toggles correctly
+- [x] Flow mode selector works
+- [x] Pace slider appears in natural pace mode
+- [x] Export button triggers callback
+- [x] Turn counter displays correctly
+- [x] Status indicator shows current state
+- [x] Controls disabled based on status
+- [x] Responsive layout works
+- [x] TypeScript compiles without errors
 
 ---
 

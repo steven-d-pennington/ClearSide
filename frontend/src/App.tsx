@@ -5,7 +5,8 @@
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { HomePage, HistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage, AdminEventsPage, AdminTestingPage, AdminDuelogicResearchPage, AdminDuelogicProposalsPage, AdminDuelogicProposalDetailPage } from './pages';
+import { HomePage, HistoryPage, ConversationHistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage, AdminEventsPage, AdminTestingPage, AdminDuelogicResearchPage, AdminDuelogicProposalsPage, AdminDuelogicProposalDetailPage } from './pages';
+import { ConversationViewer } from './components/ConversationalPodcast';
 import './styles/tokens.css';
 import './App.css';
 
@@ -22,6 +23,7 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/conversations" element={<ConversationHistoryPage />} />
             <Route path="/debates/:debateId" element={<DebateViewPage />} />
             <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="/admin/debates" element={<AdminDebatesPage />} />
@@ -33,6 +35,7 @@ function App() {
             <Route path="/admin/duelogic/research" element={<AdminDuelogicResearchPage />} />
             <Route path="/admin/duelogic/proposals" element={<AdminDuelogicProposalsPage />} />
             <Route path="/admin/duelogic/proposals/:id" element={<AdminDuelogicProposalDetailPage />} />
+            <Route path="/conversation/:sessionId" element={<ConversationViewer />} />
           </Routes>
         </main>
       </div>

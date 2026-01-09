@@ -6,7 +6,7 @@
 **Priority:** P1
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-008 (Orchestrator), Existing Podcast Pipeline
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,13 +25,13 @@ This task creates a script refiner for conversation sessions that prepares trans
 
 ### Acceptance Criteria
 
-- [ ] Create `ConversationScriptRefiner` service
-- [ ] Preserve talk show format (host + guests)
-- [ ] Add provider-appropriate audio cues
-- [ ] Support ElevenLabs and Gemini TTS providers
-- [ ] Create API endpoint for export
-- [ ] Integrate with existing podcast export pipeline
-- [ ] Generate voice assignment data
+- [x] Create `ConversationScriptRefiner` service
+- [x] Preserve talk show format (host + guests)
+- [x] Add provider-appropriate audio cues
+- [x] Support ElevenLabs, Gemini, and Google Cloud TTS providers
+- [x] Create API endpoint for export
+- [x] Integrate with existing podcast export pipeline
+- [x] Generate voice assignment data
 
 ---
 
@@ -397,15 +397,16 @@ router.post('/sessions/:id/export-to-podcast', async (req, res, next) => {
 
 ### Definition of Done
 
-- [ ] `ConversationScriptRefiner` service created
-- [ ] Refine method processes all utterances
-- [ ] Audio cues added for ElevenLabs
-- [ ] Audio cues added for Gemini
-- [ ] Content cleaned for TTS
-- [ ] Voice assignments generated
-- [ ] API endpoint works
-- [ ] Duration estimation reasonable
-- [ ] TypeScript compiles without errors
+- [x] `ConversationScriptRefiner` service created
+- [x] Refine method processes all utterances
+- [x] Audio cues added for ElevenLabs
+- [x] Audio cues added for Gemini
+- [x] Audio cues added for Google Cloud
+- [x] Content cleaned for TTS
+- [x] Voice assignments generated
+- [x] API endpoint works
+- [x] Duration estimation reasonable
+- [x] TypeScript compiles without errors
 
 ---
 

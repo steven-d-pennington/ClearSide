@@ -308,9 +308,10 @@ export interface ITTSService {
    * Generate speech from text
    * @param text - Text to convert to speech
    * @param voiceType - Voice type to use (pro, con, moderator, narrator)
+   * @param customVoiceId - Optional custom voice ID to override the default voice profile
    * @returns Audio buffer and metadata
    */
-  generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult>;
+  generateSpeech(text: string, voiceType: VoiceType, customVoiceId?: string): Promise<TTSResult>;
 
   /**
    * Get voice configuration for a voice type

@@ -4,12 +4,13 @@
  * Main landing page with input form to start new debates.
  */
 
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardFooter, Button } from '../components/ui';
 import { InputForm } from '../components/InputForm';
 import { DebateStream } from '../components/DebateStream';
 import { DebateStage } from '../components/DebateStage/DebateStage';
+import { ConversationConfigModal } from '../components/ConversationalPodcast';
 import { useDebateStore, selectIsLivelyMode, selectIsInformalMode } from '../stores/debate-store';
 import styles from './HomePage.module.css';
 
@@ -18,12 +19,18 @@ export function HomePage() {
   const debate = useDebateStore((state) => state.debate);
   const isLivelyMode = useDebateStore(selectIsLivelyMode);
   const isInformalMode = useDebateStore(selectIsInformalMode);
+  const [showConversationModal, setShowConversationModal] = useState(false);
 
   const handleDebateCreated = useCallback((debateId: string) => {
     console.log('Debate started:', debateId);
     // Navigate to the debate view page
     navigate(`/debates/${debateId}`);
   }, [navigate]);
+
+  const handleLaunchConversation = (sessionId: string) => {
+    setShowConversationModal(false);
+    navigate(`/conversation/${sessionId}`);
+  };
 
   // If a debate is active, show the appropriate view
   // DebateStage handles both lively mode and informal discussion mode
@@ -49,8 +56,26 @@ export function HomePage() {
               View Previous Debates
             </Button>
           </Link>
+          <Link to="/conversations">
+            <Button variant="secondary">
+              View Previous Conversations
+            </Button>
+          </Link>
+          <Button
+            variant="secondary"
+            className={styles.conversationButton}
+            onClick={() => setShowConversationModal(true)}
+          >
+            Start Conversation
+          </Button>
         </CardFooter>
       </Card>
+
+      <ConversationConfigModal
+        isOpen={showConversationModal}
+        onClose={() => setShowConversationModal(false)}
+        onLaunch={handleLaunchConversation}
+      />
     </div>
   );
 }

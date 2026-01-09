@@ -1,5 +1,6 @@
 export { HomePage } from './HomePage';
 export { HistoryPage } from './HistoryPage';
+export { ConversationHistoryPage } from './ConversationHistoryPage';
 export { DebateViewPage } from './DebateViewPage';
 export { AdminDashboardPage } from './AdminDashboardPage';
 export { AdminDebatesPage } from './AdminDebatesPage';

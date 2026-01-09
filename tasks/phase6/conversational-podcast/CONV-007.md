@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** L (8-16 hours)
 **Dependencies:** CONV-002 (Types), CONV-005 (PersonaAgent), CONV-006 (ContextBoard)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -27,14 +27,14 @@ The host uses "ultrathink" (extended thinking with Claude models) for complex de
 
 ### Acceptance Criteria
 
-- [ ] Create `PodcastHostAgent` in `backend/src/services/agents/podcast-host-agent.ts`
-- [ ] Implement `generateOpening()` - introduce guests and topic
-- [ ] Implement `decideNextSpeaker()` - consider signals, balance, topic coverage
-- [ ] Implement `generateFollowUp()` - ask probing questions
-- [ ] Implement `generateBridge()` - connect viewpoints
-- [ ] Implement `generateClosing()` - summarize without declaring winners
-- [ ] Use extended thinking for speaker selection decisions
-- [ ] Consider context board state in all decisions
+- [x] Create `PodcastHostAgent` in `backend/src/services/agents/podcast-host-agent.ts`
+- [x] Implement `generateOpening()` - introduce guests and topic
+- [x] Implement `decideNextSpeaker()` - consider signals, balance, topic coverage
+- [x] Implement `generateFollowUp()` - ask probing questions
+- [x] Implement `generateBridge()` - connect viewpoints
+- [x] Implement `generateClosing()` - summarize without declaring winners
+- [x] Use extended thinking for speaker selection decisions
+- [x] Consider context board state in all decisions
 
 ---
 

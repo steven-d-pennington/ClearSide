@@ -20,6 +20,7 @@ function mapRow(row: any): PodcastExportJob {
   return {
     id: row.id,
     debateId: row.debate_id,
+    conversationSessionId: row.conversation_session_id,
     status: row.status,
     config: row.config,
     refinedScript: row.refined_script,
@@ -61,7 +62,7 @@ function mapSegmentRow(row: any): PodcastSegmentStatus {
 }
 
 /**
- * Create a new podcast export job
+ * Create a new podcast export job for a debate
  */
 export async function create(debateId: string, config: PodcastExportConfig): Promise<PodcastExportJob> {
   const result = await pool.query(`
@@ -69,6 +70,19 @@ export async function create(debateId: string, config: PodcastExportConfig): Pro
       VALUES ($1, $2)
       RETURNING *
     `, [debateId, JSON.stringify(config)]);
+
+  return mapRow(result.rows[0]);
+}
+
+/**
+ * Create a new podcast export job for a conversation session
+ */
+export async function createForConversation(conversationSessionId: string, config: PodcastExportConfig): Promise<PodcastExportJob> {
+  const result = await pool.query(`
+      INSERT INTO podcast_export_jobs (conversation_session_id, config)
+      VALUES ($1, $2)
+      RETURNING *
+    `, [conversationSessionId, JSON.stringify(config)]);
 
   return mapRow(result.rows[0]);
 }
@@ -378,6 +392,7 @@ export async function resetGenerationState(id: string): Promise<void> {
 // Export all functions as default object for convenience
 export default {
   create,
+  createForConversation,
   findById,
   findByDebateId,
   updateStatus,

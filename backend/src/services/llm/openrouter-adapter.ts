@@ -526,6 +526,76 @@ export class OpenRouterLLMClient extends LLMClient {
       throw error;
     }
   }
+
+  /**
+   * Stream chat with metadata - returns content and finish_reason
+   * Used for truncation detection
+   */
+  async streamChatWithMetadata(
+    messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    options?: {
+      temperature?: number;
+      maxTokens?: number;
+    },
+    onToken?: (token: string) => void
+  ): Promise<{ content: string; finishReason: 'stop' | 'length' | 'unknown' }> {
+    const rateLimiter = getRateLimiter();
+
+    // Wait if rate limited before starting stream
+    await rateLimiter.waitIfNeeded(this.modelId);
+
+    // Record the request
+    rateLimiter.recordRequest(this.modelId);
+
+    const chunks: string[] = [];
+    let finishReason: 'stop' | 'length' | 'unknown' = 'unknown';
+
+    try {
+      const reasoning = this.buildReasoningParam();
+      const baseRequest = {
+        model: this.modelId,
+        messages,
+        temperature: options?.temperature ?? 0.7,
+        max_tokens: options?.maxTokens ?? 1024,
+        stream: true as const,
+      };
+
+      const stream = await this.openRouterClient.chat.completions.create({
+        ...baseRequest,
+        ...(reasoning && { reasoning }),
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          chunks.push(content);
+          if (onToken) {
+            onToken(content);
+          }
+        }
+
+        // Capture finish_reason from the final chunk
+        const chunkFinishReason = chunk.choices[0]?.finish_reason;
+        if (chunkFinishReason) {
+          finishReason = chunkFinishReason === 'length' ? 'length' : 'stop';
+        }
+      }
+
+      return {
+        content: chunks.join(''),
+        finishReason,
+      };
+    } catch (error) {
+      // Update rate limiter from error if rate limit
+      const rateLimitHeaders = this.extractRateLimitHeaders(error);
+      if (rateLimitHeaders) {
+        rateLimiter.updateFromHeaders(this.modelId, rateLimitHeaders);
+      }
+
+      logger.error({ error, modelId: this.modelId }, 'OpenRouter stream error');
+      throw error;
+    }
+  }
 }
 
 /**

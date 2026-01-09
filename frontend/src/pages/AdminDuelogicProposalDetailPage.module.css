@@ -375,6 +375,18 @@
   border-radius: 0.75rem;
 }
 
+.conversationButton {
+  background: linear-gradient(135deg, var(--dashboard-violet), #7c3aed) !important;
+  color: white !important;
+  border: none !important;
+}
+
+.conversationButton:hover {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
 .launchedBadge {
   display: inline-flex;
   align-items: center;

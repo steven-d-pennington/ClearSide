@@ -556,45 +556,45 @@ Free-form podcast conversations where 2-6 AI personas discuss topics in a natura
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| CONV-001 | Database Migration | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-001.md) |
-| CONV-002 | TypeScript Types | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-002.md) |
-| CONV-003 | Persona Repository | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-003.md) |
-| CONV-004 | Session Repositories | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-004.md) |
+| CONV-001 | Database Migration | P0 | S | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-001.md) |
+| CONV-002 | TypeScript Types | P0 | S | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-002.md) |
+| CONV-003 | Persona Repository | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-003.md) |
+| CONV-004 | Session Repositories | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-004.md) |
 
 ### 🤖 Core Services
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| CONV-005 | PersonaAgent Class | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-005.md) |
-| CONV-006 | ContextBoardService | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-006.md) |
-| CONV-007 | PodcastHostAgent (Ultrathink) | P0 | L | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-007.md) |
-| CONV-008 | ConversationalOrchestrator | P0 | L | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-008.md) |
+| CONV-005 | PersonaAgent Class | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-005.md) |
+| CONV-006 | ContextBoardService | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-006.md) |
+| CONV-007 | PodcastHostAgent (Ultrathink) | P0 | L | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-007.md) |
+| CONV-008 | ConversationalOrchestrator | P0 | L | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-008.md) |
 
 ### 🔌 API Layer
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| CONV-009 | Persona and Session Routes | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-009.md) |
-| CONV-010 | Control and Streaming Routes | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-010.md) |
-| CONV-011 | SSE Manager Integration | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-011.md) |
+| CONV-009 | Persona and Session Routes | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-009.md) |
+| CONV-010 | Control and Streaming Routes | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-010.md) |
+| CONV-011 | SSE Manager Integration | P0 | S | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-011.md) |
 
 ### 🎨 Frontend
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| CONV-012 | ConversationConfigModal | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-012.md) |
-| CONV-013 | ConversationViewer Base | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-013.md) |
-| CONV-014 | TranscriptPanel + UtteranceCard | P0 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-014.md) |
-| CONV-015 | ContextBoardPanel | P1 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-015.md) |
-| CONV-016 | ControlBar Component | P0 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-016.md) |
+| CONV-012 | ConversationConfigModal | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-012.md) |
+| CONV-013 | ConversationViewer Base | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-013.md) |
+| CONV-014 | TranscriptPanel + UtteranceCard | P0 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-014.md) |
+| CONV-015 | ContextBoardPanel | P1 | S | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-015.md) |
+| CONV-016 | ControlBar Component | P0 | S | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-016.md) |
 
 ### 🔗 Integration
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| CONV-017 | Entry from Proposals Page | P1 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-017.md) |
-| CONV-018 | Entry from Main Screen | P1 | S | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-018.md) |
-| CONV-019 | Podcast Export (Native Format) | P1 | M | 🟢 Ready | [View Task](../tasks/phase6/conversational-podcast/CONV-019.md) |
+| CONV-017 | Entry from Proposals Page | P1 | S | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-017.md) |
+| CONV-018 | Entry from Main Screen | P1 | S | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-018.md) |
+| CONV-019 | Podcast Export (Native Format) | P1 | M | ✅ Done | [View Task](../tasks/phase6/conversational-podcast/CONV-019.md) |
 
 ### ✨ Polish
 
@@ -623,7 +623,7 @@ Free-form podcast conversations where 2-6 AI personas discuss topics in a natura
 
 **Critical Path:** CONV-001 → CONV-002 → CONV-005 → CONV-007 → CONV-008 → CONV-019
 
-**Start Here:** CONV-001 (Database Migration)
+**Start Here:** CONV-020 (RAG Integration) - Native export complete! Now add RAG context injection for informed conversations.
 
 ---
 

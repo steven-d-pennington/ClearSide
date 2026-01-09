@@ -507,7 +507,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
         },
         {
           description: 'DebateID',
-          value: job.debateId,
+          value: job.debateId || job.conversationSessionId || 'unknown',
         },
       ],
     };

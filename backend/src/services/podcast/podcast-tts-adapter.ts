@@ -120,7 +120,7 @@ export class PodcastTTSAdapter {
       // Convert tags for the target provider
       const convertedText = this.tagConverter.convert(segment.text);
 
-      // Map speaker role to voice type
+      // Map speaker role to voice type (fallback if no custom voice ID)
       const voiceType = this.mapSpeakerToVoiceType(segment.speaker);
 
       // For Gemini, prepend director's notes if available
@@ -131,6 +131,7 @@ export class PodcastTTSAdapter {
       logger.debug({
         speaker: segment.speaker,
         voiceType,
+        customVoiceId: segment.voiceId,
         provider: this.provider,
         originalLength: segment.text.length,
         convertedLength: convertedText.length,
@@ -139,7 +140,8 @@ export class PodcastTTSAdapter {
       }, 'Generating segment audio');
 
       // Generate speech using the underlying service
-      const result = await this.service.generateSpeech(textWithDirection, voiceType);
+      // Pass customVoiceId if provided in the segment (user-selected voice)
+      const result = await this.service.generateSpeech(textWithDirection, voiceType, segment.voiceId);
 
       // Track usage (only count the actual transcript text, not director's notes)
       this.trackUsage(convertedText.length);

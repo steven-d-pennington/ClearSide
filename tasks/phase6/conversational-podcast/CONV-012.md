@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-002 (Types), CONV-009 (API Routes)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,15 +25,15 @@ This task creates the ConversationConfigModal - the main configuration UI for se
 
 ### Acceptance Criteria
 
-- [ ] Create `ConversationConfigModal` component
-- [ ] Create `TopicInput` subcomponent for topic entry
-- [ ] Create `ParticipantSelector` for 2-6 participant slots
-- [ ] Create `PersonaCard` for persona + model assignment
-- [ ] Create `FlowModeSelector` for flow mode choice
-- [ ] Fetch personas from API on mount
-- [ ] Validate at least 2 participants selected
-- [ ] Submit creates session via API
-- [ ] Handle loading and error states
+- [x] Create `ConversationConfigModal` component
+- [x] Create `TopicInput` subcomponent for topic entry
+- [x] Create `ParticipantSelector` for 2-6 participant slots
+- [x] Create `PersonaCard` for persona + model assignment
+- [x] Create `FlowModeSelector` for flow mode choice
+- [x] Fetch personas from API on mount
+- [x] Validate at least 2 participants selected
+- [x] Submit creates session via API
+- [x] Handle loading and error states
 
 ---
 
@@ -679,17 +679,17 @@ export { default as FlowModeSelector } from './FlowModeSelector';
 
 ### Definition of Done
 
-- [ ] Modal opens and closes correctly
-- [ ] Personas and models load from API
-- [ ] Can configure 2-6 participants
-- [ ] Each participant has persona + model selection
-- [ ] Duplicate persona selection prevented
-- [ ] Flow mode selection works
-- [ ] Natural pace shows delay slider
-- [ ] Validation prevents invalid submissions
-- [ ] Session creation calls API correctly
-- [ ] Loading and error states displayed
-- [ ] TypeScript compiles without errors
+- [x] Modal opens and closes correctly
+- [x] Personas and models load from API
+- [x] Can configure 2-6 participants
+- [x] Each participant has persona + model selection
+- [x] Duplicate persona selection prevented
+- [x] Flow mode selection works
+- [x] Natural pace shows delay slider
+- [x] Validation prevents invalid submissions
+- [x] Session creation calls API correctly
+- [x] Loading and error states displayed
+- [x] TypeScript compiles without errors
 
 ---
 

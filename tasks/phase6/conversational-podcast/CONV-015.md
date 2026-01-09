@@ -6,7 +6,7 @@
 **Priority:** P1
 **Estimated Effort:** S (2-4 hours)
 **Dependencies:** CONV-013 (Viewer Base), CONV-006 (ContextBoardService)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -24,13 +24,13 @@ This task creates the ContextBoardPanel - a sidebar component that displays the 
 
 ### Acceptance Criteria
 
-- [ ] Create `ContextBoardPanel` component
-- [ ] Display topics discussed with status badges
-- [ ] Show claims made with participant attribution
-- [ ] Display agreements and disagreements
-- [ ] Show key points per participant
-- [ ] Display current conversational thread
-- [ ] Collapsible sections for each category
+- [x] Create `ContextBoardPanel` component
+- [x] Display topics discussed with status badges
+- [x] Show claims made with participant attribution
+- [x] Display agreements and disagreements
+- [x] Show key points per participant
+- [x] Display current conversational thread
+- [x] Collapsible sections for each category
 
 ---
 
@@ -588,15 +588,15 @@ Create file: `ContextBoardPanel.module.css`
 
 ### Definition of Done
 
-- [ ] ContextBoardPanel renders all sections
-- [ ] Topics display with status badges
-- [ ] Claims show participant and stance
-- [ ] Agreements/disagreements display correctly
-- [ ] Key points grouped by participant
-- [ ] Sections collapsible
-- [ ] Current thread prominently displayed
-- [ ] Empty states for each section
-- [ ] TypeScript compiles without errors
+- [x] ContextBoardPanel renders all sections
+- [x] Topics display with status badges
+- [x] Claims show participant and stance
+- [x] Agreements/disagreements display correctly
+- [x] Key points grouped by participant
+- [x] Sections collapsible
+- [x] Current thread prominently displayed
+- [x] Empty states for each section
+- [x] TypeScript compiles without errors
 
 ---
 

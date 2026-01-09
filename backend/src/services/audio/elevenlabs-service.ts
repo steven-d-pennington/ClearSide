@@ -169,8 +169,9 @@ export class ElevenLabsService implements ITTSService {
    * @param voiceType - Voice type to use
    * @returns Audio buffer and metadata
    */
-  async generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult> {
-    const voice = this.voiceProfiles[voiceType];
+  async generateSpeech(text: string, voiceType: VoiceType, customVoiceId?: string): Promise<TTSResult> {
+    const baseVoice = this.voiceProfiles[voiceType];
+    const voice = customVoiceId ? { ...baseVoice, voiceId: customVoiceId } : baseVoice;
 
     logger.debug(
       { voiceType, voiceId: voice.voiceId, textLength: text.length },

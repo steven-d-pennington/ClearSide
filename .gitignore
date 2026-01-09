@@ -420,3 +420,5 @@ FodyWeavers.xsd
 debate_exports
 docs/clearside-tts-key.json
 backend/temp*
+backend/exports/
+.mcp.json

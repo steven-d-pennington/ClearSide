@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-008 (Orchestrator), CONV-009 (Base Routes)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,15 +25,15 @@ This task adds control routes to the conversation API for launching, pausing, re
 
 ### Acceptance Criteria
 
-- [ ] Add `POST /sessions/:id/launch` - start conversation
-- [ ] Add `POST /sessions/:id/advance` - next turn (manual mode)
-- [ ] Add `POST /sessions/:id/pause` - pause conversation
-- [ ] Add `POST /sessions/:id/resume` - resume conversation
-- [ ] Add `POST /sessions/:id/flow-mode` - change flow mode
-- [ ] Add `GET /sessions/:id/stream` - SSE endpoint
-- [ ] Add `GET /sessions/:id/transcript` - markdown export
-- [ ] Add `GET /sessions/:id/context-board` - context state
-- [ ] Store active orchestrators in memory for control
+- [x] Add `POST /sessions/:id/launch` - start conversation
+- [x] Add `POST /sessions/:id/advance` - next turn (manual mode)
+- [x] Add `POST /sessions/:id/pause` - pause conversation
+- [x] Add `POST /sessions/:id/resume` - resume conversation
+- [x] Add `POST /sessions/:id/flow-mode` - change flow mode
+- [x] Add `GET /sessions/:id/stream` - SSE endpoint
+- [x] Add `GET /sessions/:id/transcript` - markdown export
+- [x] Add `GET /sessions/:id/context-board` - context state
+- [x] Store active orchestrators in memory for control
 
 ---
 
@@ -474,16 +474,16 @@ app.use('/api/conversations', createConversationRoutes(pool, sseManager));
 
 ### Definition of Done
 
-- [ ] Launch endpoint creates and starts orchestrator
-- [ ] Advance endpoint works in manual mode
-- [ ] Pause/resume work correctly
-- [ ] Flow mode can be changed during conversation
-- [ ] SSE stream delivers all events
-- [ ] Transcript export produces valid markdown
-- [ ] Context board state retrievable
-- [ ] Active orchestrators tracked in memory
-- [ ] Orchestrators cleaned up on completion/error
-- [ ] TypeScript compiles without errors
+- [x] Launch endpoint creates and starts orchestrator
+- [x] Advance endpoint works in manual mode
+- [x] Pause/resume work correctly
+- [x] Flow mode can be changed during conversation
+- [x] SSE stream delivers all events
+- [x] Transcript export produces valid markdown
+- [x] Context board state retrievable
+- [x] Active orchestrators tracked in memory
+- [x] Orchestrators cleaned up on completion/error
+- [x] TypeScript compiles without errors
 
 ---
 

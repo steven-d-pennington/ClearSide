@@ -6,7 +6,12 @@
 import type { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { createLogger } from '../../utils/logger.js';
-import type { SSEClient, SSEEventType } from '../../types/sse.js';
+import type {
+  SSEClient,
+  SSEEventType,
+  ConversationSSEEventType,
+  ConversationSSEEventPayload,
+} from '../../types/sse.js';
 
 const logger = createLogger({ module: 'SSEManager' });
 
@@ -296,6 +301,132 @@ export class SSEManager {
       logger.info('Heartbeat stopped');
     }
   }
+
+  // =========================================================================
+  // CONVERSATION-SPECIFIC METHODS
+  // =========================================================================
+
+  /**
+   * Add a client to a conversation's SSE stream
+   * Wrapper around registerClient for conversation-specific tracking
+   *
+   * @param sessionId - ID of the conversation session
+   * @param res - Express response object
+   * @param lastEventId - Optional last event ID for reconnection
+   * @returns Client ID for the newly registered client
+   */
+  addConversationClient(sessionId: string, res: Response, lastEventId?: string): string {
+    // Use the existing registerClient but treat sessionId as debateId
+    // This reuses the existing infrastructure while providing a semantic API
+    return this.registerClient(sessionId, res, lastEventId);
+  }
+
+  /**
+   * Remove a client from a conversation's SSE stream
+   *
+   * @param sessionId - ID of the conversation session (not used, but provided for API consistency)
+   * @param clientId - ID of the client to remove
+   */
+  removeConversationClient(_sessionId: string, clientId: string): void {
+    this.unregisterClient(clientId);
+  }
+
+  /**
+   * Broadcast a conversation event to all clients watching a specific session
+   *
+   * @param sessionId - ID of the conversation session
+   * @param eventType - Type of conversation SSE event
+   * @param data - Event payload data
+   */
+  broadcastToConversation<T extends ConversationSSEEventPayload>(
+    sessionId: string,
+    eventType: ConversationSSEEventType,
+    data: T
+  ): void {
+    const sessionClients = Array.from(this.clients.values()).filter(
+      (client) => client.debateId === sessionId
+    );
+
+    if (sessionClients.length === 0) {
+      logger.debug({ sessionId, eventType }, 'No clients to broadcast conversation event to');
+      return;
+    }
+
+    logger.debug(
+      { sessionId, eventType, clientCount: sessionClients.length },
+      'Broadcasting conversation event'
+    );
+
+    // Generate a unique event ID for this broadcast
+    const eventId = uuidv4();
+
+    // Send to all clients, handling failures gracefully
+    for (const client of sessionClients) {
+      try {
+        this.sendEvent(client.res, eventType as SSEEventType, data, eventId);
+
+        // Update last event ID for reconnection support
+        client.lastEventId = eventId;
+      } catch (error) {
+        logger.error(
+          { clientId: client.id, sessionId, error },
+          'Failed to send conversation event to client'
+        );
+
+        // Remove client if connection is broken
+        this.unregisterClient(client.id);
+      }
+    }
+  }
+
+  /**
+   * Get the number of clients connected to a conversation
+   *
+   * @param sessionId - ID of the conversation session
+   * @returns Number of connected clients
+   */
+  getConversationClientCount(sessionId: string): number {
+    return Array.from(this.clients.values()).filter(
+      (client) => client.debateId === sessionId
+    ).length;
+  }
+
+  /**
+   * Check if a conversation has any connected clients
+   *
+   * @param sessionId - ID of the conversation session
+   * @returns True if clients are connected
+   */
+  hasConversationClients(sessionId: string): boolean {
+    return this.getConversationClientCount(sessionId) > 0;
+  }
+
+  /**
+   * Send a heartbeat to conversation clients
+   *
+   * @param sessionId - ID of the conversation session
+   */
+  sendConversationHeartbeat(sessionId: string): void {
+    const sessionClients = Array.from(this.clients.values()).filter(
+      (client) => client.debateId === sessionId
+    );
+
+    for (const client of sessionClients) {
+      try {
+        this.sendHeartbeat(client.res);
+      } catch (error) {
+        logger.warn(
+          { clientId: client.id, sessionId, error },
+          'Failed to send heartbeat to conversation client'
+        );
+        this.unregisterClient(client.id);
+      }
+    }
+  }
+
+  // =========================================================================
+  // LIFECYCLE METHODS
+  // =========================================================================
 
   /**
    * Shutdown the SSE manager

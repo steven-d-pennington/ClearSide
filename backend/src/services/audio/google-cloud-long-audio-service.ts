@@ -72,12 +72,17 @@ interface LongAudioOperation {
 
 /**
  * Voice profiles for Google Cloud Long Audio
- * Using Journey voices - optimized for long-form content like podcasts
- * Journey voices provide more natural prosody and better suited for storytelling
+ * Using Neural2 voices which support SSML for pauses, emphasis, and prosody.
+ * Journey/Chirp HD voices do NOT support SSML and should not be used with SSML content.
+ *
+ * Neural2 voices support these SSML tags:
+ * - <break time="Xms"/> for pauses
+ * - <emphasis level="moderate|strong"> for emphasis
+ * - <prosody> for pitch, rate, volume
  */
 export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
   pro: {
-    voiceId: 'en-US-Journey-F', // Journey female - expressive, long-form optimized
+    voiceId: 'en-US-Neural2-F', // Neural2 female - SSML supported
     name: 'Pro Advocate',
     stability: 0.5,
     similarityBoost: 0.75,
@@ -85,7 +90,7 @@ export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
     useSpeakerBoost: true,
   },
   con: {
-    voiceId: 'en-US-Journey-D', // Journey male - expressive, long-form optimized
+    voiceId: 'en-US-Neural2-D', // Neural2 male - SSML supported
     name: 'Con Advocate',
     stability: 0.5,
     similarityBoost: 0.75,
@@ -93,7 +98,7 @@ export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
     useSpeakerBoost: true,
   },
   moderator: {
-    voiceId: 'en-US-Journey-O', // Journey neutral - balanced, authoritative
+    voiceId: 'en-US-Neural2-A', // Neural2 male - SSML supported
     name: 'Moderator',
     stability: 0.7,
     similarityBoost: 0.8,
@@ -101,7 +106,7 @@ export const GOOGLE_CLOUD_LONG_VOICE_PROFILES: VoiceProfiles = {
     useSpeakerBoost: true,
   },
   narrator: {
-    voiceId: 'en-US-Journey-D', // Journey male - warm narrator tone
+    voiceId: 'en-US-Neural2-J', // Neural2 male - SSML supported
     name: 'Narrator',
     stability: 0.8,
     similarityBoost: 0.75,
@@ -230,9 +235,16 @@ export class GoogleCloudLongAudioService implements ITTSService {
 
   /**
    * Generate speech from text using Long Audio API
+   * @param text - Text to convert to speech (may contain SSML)
+   * @param voiceType - Voice type to use (pro, con, moderator, narrator)
+   * @param customVoiceId - Optional custom voice ID to override default voice profile
    */
-  async generateSpeech(text: string, voiceType: VoiceType): Promise<TTSResult> {
-    const voice = this.voiceProfiles[voiceType];
+  async generateSpeech(text: string, voiceType: VoiceType, customVoiceId?: string): Promise<TTSResult> {
+    // Use custom voice ID if provided, otherwise use voice profile
+    const baseVoice = this.voiceProfiles[voiceType];
+    const voice: VoiceConfig = customVoiceId
+      ? { ...baseVoice, voiceId: customVoiceId }
+      : baseVoice;
     const startTime = Date.now();
 
     // Guard against empty input - Journey voices reject empty text
@@ -281,7 +293,7 @@ export class GoogleCloudLongAudioService implements ITTSService {
       // Calculate duration from WAV (LINEAR16: 48kHz, mono, 16-bit)
       // WAV header is 44 bytes, data is 2 bytes per sample
       const wavDataSize = wavBuffer.length - 44;
-      const durationMs = (wavDataSize / 2 / 48000) * 1000;
+      const durationMs = Math.round((wavDataSize / 2 / 48000) * 1000);
 
       const processingTime = Date.now() - startTime;
 
@@ -291,7 +303,7 @@ export class GoogleCloudLongAudioService implements ITTSService {
           textLength: text.length,
           wavSize: wavBuffer.length,
           mp3Size: audioBuffer.length,
-          durationMs: Math.round(durationMs),
+          durationMs,
           processingTime,
         },
         'Long audio synthesis complete'
@@ -312,6 +324,25 @@ export class GoogleCloudLongAudioService implements ITTSService {
   }
 
   /**
+   * Check if text contains SSML markup
+   */
+  private containsSSML(text: string): boolean {
+    // Check for common SSML tags
+    return /<(break|emphasis|prosody|say-as|sub|mark|phoneme|audio|p|s)\b/i.test(text);
+  }
+
+  /**
+   * Wrap content in <speak> tags for SSML
+   */
+  private wrapInSpeakTags(content: string): string {
+    // If already wrapped, return as-is
+    if (content.trim().startsWith('<speak>')) {
+      return content;
+    }
+    return `<speak>${content}</speak>`;
+  }
+
+  /**
    * Start long audio synthesis operation
    */
   private async startSynthesis(
@@ -326,10 +357,20 @@ export class GoogleCloudLongAudioService implements ITTSService {
 
     const parent = `projects/${this.projectId}/locations/${this.location}`;
 
+    // Detect if content has SSML and format accordingly
+    const hasSSML = this.containsSSML(text);
+    const input = hasSSML
+      ? { ssml: this.wrapInSpeakTags(text) }
+      : { text };
+
+    if (hasSSML) {
+      logger.debug({ textLength: text.length }, 'Using SSML input for synthesis');
+    }
+
     const requestBody = {
       parent,
       output_gcs_uri: outputGcsUri,
-      input: { text },
+      input,
       voice: {
         languageCode,
         name: voice.voiceId,

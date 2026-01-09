@@ -90,7 +90,8 @@ export interface PodcastExportConfig {
 
 export interface PodcastExportJob {
   id: string;
-  debateId: string;
+  debateId?: string;
+  conversationSessionId?: string;
   status: PodcastJobStatus;
   config: PodcastExportConfig;
 

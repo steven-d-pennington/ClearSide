@@ -6,7 +6,7 @@
 **Priority:** P1
 **Estimated Effort:** S (2-4 hours)
 **Dependencies:** CONV-012 (Config Modal)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -24,12 +24,12 @@ This task adds a "Launch Conversation" button to the episode proposal detail pag
 
 ### Acceptance Criteria
 
-- [ ] Add "Launch Conversation" button to proposal detail page
-- [ ] Button appears alongside existing "Launch Debate" button
-- [ ] Opens ConversationConfigModal with proposal data pre-filled
-- [ ] Pass episode proposal ID to session creation
-- [ ] Navigate to ConversationViewer on launch
-- [ ] Only show for approved proposals
+- [x] Add "Launch Conversation" button to proposal detail page
+- [x] Button appears alongside existing "Launch Debate" button
+- [x] Opens ConversationConfigModal with proposal data pre-filled
+- [x] Pass episode proposal ID to session creation
+- [x] Navigate to ConversationViewer on launch
+- [x] Only show for approved proposals
 
 ---
 
@@ -157,13 +157,13 @@ import { ConversationViewer } from './components/ConversationalPodcast/Conversat
 
 ### Definition of Done
 
-- [ ] "Launch Conversation" button added to proposal page
-- [ ] Button only shows for approved proposals
-- [ ] Modal opens with topic pre-filled from proposal
-- [ ] Episode proposal ID passed to session
-- [ ] Navigation to viewer works
-- [ ] Route configured correctly
-- [ ] TypeScript compiles without errors
+- [x] "Launch Conversation" button added to proposal page
+- [x] Button only shows for approved proposals
+- [x] Modal opens with topic pre-filled from proposal
+- [x] Episode proposal ID passed to session
+- [x] Navigation to viewer works
+- [x] Route configured correctly
+- [x] TypeScript compiles without errors
 
 ---
 

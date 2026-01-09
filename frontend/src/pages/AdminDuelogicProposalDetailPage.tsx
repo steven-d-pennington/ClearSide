@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button, Alert } from '../components/ui';
 import { LaunchDebateModal } from '../components/LaunchDebateModal';
+import { ConversationConfigModal } from '../components/ConversationalPodcast';
 import styles from './AdminDuelogicProposalDetailPage.module.css';
 import type { EpisodeProposal, PhilosophicalChair } from '../types/duelogic-research';
 import { CATEGORY_LABELS, type ResearchCategory } from '../types/duelogic-research';
@@ -32,6 +33,7 @@ export function AdminDuelogicProposalDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
   const [showLaunchModal, setShowLaunchModal] = useState(false);
+  const [showConversationModal, setShowConversationModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isRelaunching, setIsRelaunching] = useState(false);
@@ -252,6 +254,11 @@ export function AdminDuelogicProposalDetailPage() {
     }
   };
 
+  const handleLaunchConversation = (sessionId: string) => {
+    setShowConversationModal(false);
+    navigate(`/conversation/${sessionId}`);
+  };
+
   const updateField = (field: keyof EpisodeProposal, value: unknown) => {
     setEditedProposal(prev => ({ ...prev, [field]: value }));
   };
@@ -432,6 +439,9 @@ export function AdminDuelogicProposalDetailPage() {
                 <Button onClick={() => setShowLaunchModal(true)} variant="primary">
                   Launch Debate
                 </Button>
+                <Button onClick={() => setShowConversationModal(true)} variant="secondary" className={styles.conversationButton}>
+                  Launch Conversation
+                </Button>
                 <Button onClick={handleSchedule} variant="secondary">
                   Schedule
                 </Button>
@@ -444,6 +454,9 @@ export function AdminDuelogicProposalDetailPage() {
               <>
                 <Button onClick={() => setShowLaunchModal(true)} variant="primary">
                   Launch Debate
+                </Button>
+                <Button onClick={() => setShowConversationModal(true)} variant="secondary" className={styles.conversationButton}>
+                  Launch Conversation
                 </Button>
                 <Button onClick={handleUnapprove} variant="secondary">
                   Unapprove
@@ -771,6 +784,16 @@ export function AdminDuelogicProposalDetailPage() {
         onClose={() => setShowLaunchModal(false)}
         onLaunch={handleLaunchDebate}
         isLaunching={isLaunching}
+      />
+
+      {/* Launch Conversation Modal */}
+      <ConversationConfigModal
+        isOpen={showConversationModal}
+        onClose={() => setShowConversationModal(false)}
+        onLaunch={handleLaunchConversation}
+        initialTopic={proposal.title}
+        initialContext={proposal.contextForPanel || proposal.description}
+        episodeProposalId={proposal.id}
       />
     </div>
   );

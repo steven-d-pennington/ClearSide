@@ -6,7 +6,7 @@
 **Priority:** P0
 **Estimated Effort:** M (4-8 hours)
 **Dependencies:** CONV-011 (SSE), CONV-012 (Config Modal)
-**Status:** Ready
+**Status:** Done
 
 ---
 
@@ -25,13 +25,13 @@ This task creates the main ConversationViewer page that displays a live or compl
 
 ### Acceptance Criteria
 
-- [ ] Create `ConversationViewer` page component
-- [ ] Connect to SSE stream on mount
-- [ ] Handle all conversation event types
-- [ ] Display conversation status (live, paused, completed)
-- [ ] Layout with transcript panel and sidebar
-- [ ] Pass events to child components
-- [ ] Handle errors and reconnection
+- [x] Create `ConversationViewer` page component
+- [x] Connect to SSE stream on mount
+- [x] Handle all conversation event types
+- [x] Display conversation status (live, paused, completed)
+- [x] Layout with transcript panel and sidebar
+- [x] Pass events to child components
+- [x] Handle errors and reconnection
 
 ---
 
@@ -616,15 +616,15 @@ Create file: `ConversationViewer.module.css`
 
 ### Definition of Done
 
-- [ ] ConversationViewer loads session data on mount
-- [ ] SSE connection established and events handled
-- [ ] Utterances display as they arrive
-- [ ] Streaming content shows during generation
-- [ ] Status badge reflects current state
-- [ ] Connection indicator shows SSE status
-- [ ] Context board toggleable
-- [ ] All control handlers work
-- [ ] TypeScript compiles without errors
+- [x] ConversationViewer loads session data on mount
+- [x] SSE connection established and events handled
+- [x] Utterances display as they arrive
+- [x] Streaming content shows during generation
+- [x] Status badge reflects current state
+- [x] Connection indicator shows SSE status
+- [x] Context board toggleable
+- [x] All control handlers work
+- [x] TypeScript compiles without errors
 
 ---
 

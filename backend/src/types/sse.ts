@@ -74,7 +74,22 @@ export type SSEEventType =
   | 'episode_generated'        // Episode proposal generated
   | 'research_complete'        // Research job completed
   | 'research_failed'          // Research job failed
-  | 'research_log';
+  | 'research_log'
+  // Conversational Podcast Mode events
+  | 'conversation_connected'       // Client connected to conversation stream
+  | 'conversation_started'         // Conversation session started
+  | 'conversation_utterance'       // New utterance from participant or host
+  | 'conversation_token'           // Streaming token for live display
+  | 'conversation_speaker_changed' // Speaker changed
+  | 'conversation_context_updated' // Context board updated
+  | 'conversation_paused'          // Conversation paused
+  | 'conversation_resumed'         // Conversation resumed
+  | 'conversation_completed'       // Conversation ended normally
+  | 'conversation_error'           // Error in conversation
+  | 'conversation_host_message'    // Host message (intro, transition, etc.)
+  | 'conversation_signal'          // Participant signaled desire to speak
+  | 'conversation_truncation_retry'      // Attempting to recover from truncation
+  | 'conversation_truncation_detected';  // Truncation detected, user can choose model
 
 /**
  * SSE Client
@@ -594,3 +609,208 @@ export interface ResearchLogEventData {
   details?: Record<string, unknown>;
   timestampMs: number;
 }
+
+// ============================================================================
+// Conversational Podcast Mode Event Types and Payloads
+// ============================================================================
+
+/** Conversation-specific SSE event types */
+export type ConversationSSEEventType =
+  | 'conversation_connected'
+  | 'conversation_started'
+  | 'conversation_utterance'
+  | 'conversation_token'
+  | 'conversation_speaker_changed'
+  | 'conversation_context_updated'
+  | 'conversation_paused'
+  | 'conversation_resumed'
+  | 'conversation_completed'
+  | 'conversation_error'
+  | 'conversation_host_message'
+  | 'conversation_signal'
+  | 'conversation_truncation_retry'
+  | 'conversation_truncation_detected';
+
+/** Conversation connected event payload */
+export interface ConversationConnectedEventData {
+  sessionId: string;
+  clientId: string;
+  status: string;
+  isActive: boolean;
+  message: string;
+}
+
+/** Conversation started event payload */
+export interface ConversationStartedEventData {
+  sessionId: string;
+  topic: string;
+  participants: Array<{
+    id: string;
+    name: string;
+    personaSlug: string;
+    modelId: string;
+  }>;
+  flowMode: string;
+  timestampMs: number;
+}
+
+/** Conversation utterance event payload */
+export interface ConversationUtteranceEventData {
+  sessionId: string;
+  utteranceId: number;
+  participantId: string | null;
+  speakerName: string;
+  personaSlug: string;
+  content: string;
+  isHost: boolean;
+  isKeyPoint: boolean;
+  topicMarker?: string;
+  addressedToId?: string;
+  turnCount: number;
+  timestampMs: number;
+}
+
+/** Conversation token event payload (for streaming) */
+export interface ConversationTokenEventData {
+  sessionId: string;
+  participantId: string | null;
+  personaSlug: string;
+  personaName: string;
+  isHost: boolean;
+  segment: string;
+  token: string;
+  tokenPosition: number;
+  timestampMs: number;
+}
+
+/** Conversation speaker changed event */
+export interface ConversationSpeakerChangedEventData {
+  sessionId: string;
+  speakerId: string | null;
+  speakerName: string;
+  personaSlug?: string;
+  isHost: boolean;
+  turnCount: number;
+  timestampMs: number;
+}
+
+/** Conversation context update event */
+export interface ConversationContextUpdateEventData {
+  sessionId: string;
+  summary: string;
+  topicsDiscussed: string[];
+  keyPointsCount: number;
+  turnCount: number;
+  timestampMs: number;
+}
+
+/** Conversation paused event payload */
+export interface ConversationPausedEventData {
+  sessionId: string;
+  pausedAt: string;
+  turnCount: number;
+  reason?: string;
+}
+
+/** Conversation resumed event payload */
+export interface ConversationResumedEventData {
+  sessionId: string;
+  resumedAt: string;
+  turnCount: number;
+}
+
+/** Conversation completed event payload */
+export interface ConversationCompletedEventData {
+  sessionId: string;
+  completedAt: string;
+  totalDurationMs: number;
+  turnCount: number;
+  utteranceCount: number;
+  summary?: string;
+}
+
+/** Conversation error event payload */
+export interface ConversationErrorEventData {
+  sessionId: string;
+  error: string;
+  code?: string;
+  phase?: string;
+  timestampMs: number;
+}
+
+/** Conversation host message event payload */
+export interface ConversationHostMessageEventData {
+  sessionId: string;
+  messageType: 'opening' | 'question' | 'bridge' | 'redirect' | 'interjection' | 'closing';
+  content: string;
+  targetParticipantId?: string;
+  turnCount: number;
+  timestampMs: number;
+}
+
+/** Conversation signal event payload */
+export interface ConversationSignalEventData {
+  sessionId: string;
+  participantId: string;
+  personaSlug: string;
+  personaName: string;
+  urgency: 'high' | 'medium' | 'low';
+  reason: string;
+  preview?: string;
+  timestampMs: number;
+}
+
+/** Conversation truncation retry event payload */
+export interface ConversationTruncationRetryEventData {
+  sessionId: string;
+  participantId: string;
+  personaSlug: string;
+  personaName: string;
+  /** Which retry attempt this is (1, 2, etc.) */
+  retryAttempt: number;
+  /** Maximum retries that will be attempted */
+  maxRetries: number;
+  /** Current content length before retry */
+  currentContentLength: number;
+  timestampMs: number;
+}
+
+/** Conversation truncation detected event payload */
+export interface ConversationTruncationDetectedEventData {
+  sessionId: string;
+  participantId: string;
+  personaSlug: string;
+  personaName: string;
+  /** The partial content that was truncated */
+  partialContent: string;
+  /** Character count of truncated content */
+  contentLength: number;
+  /** How the response ended */
+  lastChars: string;
+  /** What triggered truncation detection: 'length' (API limit) or 'heuristic' (mid-sentence) */
+  detectionType: 'length' | 'heuristic';
+  /** The current model that produced the truncated response */
+  currentModelId: string;
+  /** Turn count when this occurred */
+  turnCount: number;
+  /** Utterance ID if already saved (for regeneration) */
+  utteranceId?: number;
+  timestampMs: number;
+}
+
+/** All conversation event payloads */
+export type ConversationSSEEventPayload =
+  | ConversationConnectedEventData
+  | ConversationStartedEventData
+  | ConversationUtteranceEventData
+  | ConversationTokenEventData
+  | ConversationSpeakerChangedEventData
+  | ConversationContextUpdateEventData
+  | ConversationPausedEventData
+  | ConversationResumedEventData
+  | ConversationCompletedEventData
+  | ConversationErrorEventData
+  | ConversationHostMessageEventData
+  | ConversationSignalEventData
+  | ConversationTruncationRetryEventData
+  | ConversationTruncationDetectedEventData;

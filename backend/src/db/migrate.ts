@@ -24,6 +24,21 @@ const MIGRATIONS = [
   '005_add_lively_mode.sql',
   '006_add_export_jobs.sql',
   '007_add_system_events.sql',
+  '008_add_model_defaults.sql',
+  '009_add_informal_discussion.sql',
+  '009_add_debate_models.sql',
+  '010_add_discussion_style.sql',
+  '011_add_duelogic_mode.sql',
+  '012_add_podcast_export.sql',
+  '013_add_duelogic_research.sql',
+  '014_add_podcast_segment_tracking.sql',
+  '015_add_episode_linkage.sql',
+  '016_add_launched_status.sql',
+  '017_add_viral_metrics.sql',
+  '018_add_min_trend_alignment.sql',
+  '019_add_conversational_podcast.sql',
+  '020_add_conversation_podcast_support.sql',
+  '021_add_refined_script_storage.sql',
 ];
 
 /**
