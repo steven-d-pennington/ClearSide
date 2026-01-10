@@ -3,7 +3,7 @@ builder = "nixpacks"
 buildCommand = "npm install && npm run build"
 
 [deploy]
-startCommand = "npx serve dist -s -l tcp://0.0.0.0:${PORT:-3000}"
+startCommand = "sh -c 'npx serve dist -s -l tcp://0.0.0.0:$PORT'"
 healthcheckPath = "/"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
