@@ -26,6 +26,8 @@ ClearSide closes the gap in modern decision-making by orchestrating **live adver
 - **🎯 Lively Debate Mode**: Dynamic interruption-enabled debates with real-time cross-talk and interjections
 - **🎭 Persona System**: 6 distinct argumentation archetypes (Theorist, Pragmatist, Skeptic, Advocate, Analyst, Synthesizer)
 - **🌐 OpenRouter Integration**: Multi-model debates with automatic or manual model pairing across 100+ LLMs
+- **🎙️ Conversational Podcast Mode**: Free-form talk show discussions with 2-6 AI personas and a host
+- **🔬 Duelogic Research**: Automated topic discovery and episode generation with RAG-powered citations
 
 ### What Makes ClearSide Different
 
@@ -441,7 +443,7 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ## 🎯 Current Status
 
-**Version:** 1.0.0 (MVP Complete)
+**Version:** 2.0.0 (Phase 6 In Progress)
 
 ### ✅ Phase 1 Complete (36/36 tasks)
 
@@ -460,21 +462,40 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 - ✅ Lively mode TTS with interruption awareness
 - ✅ Export panel UI with format selection
 
-### ✅ Recent Additions (Phase 2.5)
+### ✅ Phase 4 Complete (Podcast Export Pipeline)
 
-- ✅ **Lively Debate Mode**: Interruption-enabled debates with dynamic pacing
-- ✅ **Persona System**: 6 argumentation archetypes
-- ✅ **OpenRouter Integration**: Multi-model debates with 100+ LLM options
-- ✅ **Debate History**: Browse and replay completed debates
+- ✅ LLM-powered script refinement for broadcast-quality audio
+- ✅ ElevenLabs TTS integration with per-speaker voice settings
+- ✅ Script preview/edit UI before TTS generation
+- ✅ Full generation pipeline with progress tracking
 
-### 🔮 Phase 3+ Planned
+### ✅ Phase 5 Complete (Duelogic Research - 7/7 tasks)
+
+- ✅ **Automated Topic Discovery**: Perplexity integration via OpenRouter for trending topics
+- ✅ **Episode Proposal Generation**: LLM-powered Duelogic format proposals
+- ✅ **Vector Database Integration**: Pinecone RAG for debate citations
+- ✅ **Admin Dashboard**: Review, edit, and approve research proposals
+- ✅ **Research Job Scheduler**: Cron-based automation with token tracking
+
+### 🚀 Phase 6 In Progress (Conversational Podcast Mode - 19/22 tasks)
+
+- ✅ **Talk Show Format**: 2-6 AI personas in natural conversations with a host
+- ✅ **12 Unique Personas**: Distinct characters with backstories and speaking styles
+- ✅ **Context Board**: Real-time tracking of topics, claims, and agreements
+- ✅ **Hybrid Flow Control**: Host steers discussion, participants can signal to speak
+- ✅ **Native Podcast Export**: Preserves talk show format (not converted to debate)
+- 🔄 **RAG Integration**: Context injection for informed conversations
+- 🔄 **Vector Indexing**: Index utterances for semantic search
+- 🔄 **Testing & Refinement**: Comprehensive quality assurance
+
+### 🔮 Future Planned
 
 - PDF export with professional formatting
 - Video export: Remotion pipeline with avatars
 - Team debates (3v3 agents)
 - API access for developers
 - Analytics and insights
-- Advanced Lively features: Real-time sentiment analysis, auto-highlights
+- Lively Debate Arena: Multi-panel human-AI panel discussions
 
 ---
 
@@ -482,34 +503,49 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ClearSide introduces several first-of-their-kind features in AI debate systems:
 
-### 1. Lively Debate Mode
+### 1. Conversational Podcast Mode
+**Talk show-style AI discussions** with natural conversation flow:
+- 2-6 AI personas with distinct backstories and speaking styles
+- Host agent that introduces guests, asks probing questions, steers discussion
+- Hybrid flow control: Host steers, but participants can signal desire to speak
+- Shared context board tracking topics, claims, agreements, and disagreements
+- Native podcast export preserving the talk show format
+
+### 2. Duelogic Research & RAG
+**Automated research pipeline** for discovering and generating episode content:
+- Perplexity integration discovers trending ethical/moral topics via web search
+- LLM generates episode proposals matching Duelogic format
+- Vector database (Pinecone) indexes research for RAG during debates
+- Debate agents cite real sources gathered during research
+
+### 3. Lively Debate Mode
 **First AI interruption-enabled debate system** that creates natural, dynamic conversations with:
 - Real-time relevance and contradiction detection
 - Safe boundary interruption (sentence-aware)
 - Configurable pacing modes (Slow → Frantic)
 - Podcast-style audio export with preserved interruptions
 
-### 2. Persona System
+### 4. Persona System
 **6 distinct argumentation archetypes** that transform debate dynamics:
 - Each persona has unique vocabulary, rhetorical style, and focus areas
 - System prompt modifications ensure authentic personality differences
 - Mix and match personas for Pro vs Con (e.g., Theorist vs Pragmatist)
 
-### 3. OpenRouter Multi-Model Debates
+### 5. OpenRouter Multi-Model Debates
 **Pit different LLMs against each other** in the same debate:
 - Auto-pairing with cost optimization
 - 100+ models across all major providers
 - Real-time cost estimation
 - Tier-based smart matching (Frontier vs Mid-tier vs Budget)
 
-### 4. Hybrid Live-Replay Model
+### 6. Hybrid Live-Replay Model
 **Every debate is both live AND replayable:**
 - Watch debates unfold in real-time with full participation
 - Instantly replay any completed debate with timeline scrubbing
 - Export to text, audio, or video formats
 - Phase-based navigation
 
-### 5. Steel-Man Quality Enforcement
+### 7. Steel-Man Quality Enforcement
 **No straw-man arguments allowed:**
 - Agents must construct strongest possible opposing arguments
 - Moderator neutrality validation (never picks a winner)
