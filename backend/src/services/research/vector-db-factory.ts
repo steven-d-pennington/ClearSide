@@ -7,13 +7,14 @@ import pino from 'pino';
 import { VectorDBClient } from '../../types/vector-db.js';
 import { createPineconeClient } from './pinecone-client.js';
 import { createChromaClient } from './chroma-client.js';
+import { createPgVectorClient } from './pgvector-client.js';
 
 const logger = pino({
   name: 'vector-db-factory',
   level: process.env.LOG_LEVEL || 'info',
 });
 
-export type VectorDBProvider = 'pinecone' | 'chroma' | 'none';
+export type VectorDBProvider = 'pinecone' | 'chroma' | 'pgvector' | 'none';
 
 /**
  * Get the configured vector database provider
@@ -29,6 +30,10 @@ export function getVectorDBProvider(): VectorDBProvider {
     return 'chroma';
   }
 
+  if (provider === 'pgvector') {
+    return 'pgvector';
+  }
+
   // Auto-detect based on available credentials
   if (process.env.PINECONE_API_KEY && process.env.PINECONE_INDEX_NAME) {
     return 'pinecone';
@@ -36,6 +41,12 @@ export function getVectorDBProvider(): VectorDBProvider {
 
   if (process.env.CHROMA_HOST) {
     return 'chroma';
+  }
+
+  // pgvector uses the existing DATABASE_URL, so check if explicitly enabled
+  // or if we have a DATABASE_URL and no other vector DB configured
+  if (process.env.PGVECTOR_ENABLED === 'true') {
+    return 'pgvector';
   }
 
   return 'none';
@@ -62,6 +73,11 @@ export function createVectorDBClient(): VectorDBClient | null {
     case 'chroma': {
       logger.info('Using ChromaDB vector database');
       return createChromaClient();
+    }
+
+    case 'pgvector': {
+      logger.info('Using pgvector (PostgreSQL) vector database');
+      return createPgVectorClient();
     }
 
     case 'none':
@@ -107,6 +123,8 @@ export function getVectorDBStatus(): {
       PINECONE_INDEX_NAME: process.env.PINECONE_INDEX_NAME,
       CHROMA_HOST: process.env.CHROMA_HOST,
       CHROMA_PORT: process.env.CHROMA_PORT,
+      PGVECTOR_ENABLED: process.env.PGVECTOR_ENABLED,
+      PGVECTOR_TABLE_NAME: process.env.PGVECTOR_TABLE_NAME,
     },
   };
 }
