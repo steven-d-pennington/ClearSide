@@ -17,7 +17,6 @@ import type {
   OrchestratorAgent,
   NormalizedProposition,
 } from './types.js';
-import type { LLMClient } from '../llm/client.js';
 
 /**
  * Base mock agent with common functionality
@@ -44,10 +43,17 @@ abstract class BaseMockAgent implements BaseAgent {
   }
 
   /**
-   * Mock agents don't support streaming
+   * Mock agents return a null LLM client (no streaming support)
    */
-  getLLMClient(): LLMClient {
-    throw new Error('Mock agents do not have LLM clients - streaming not supported');
+  getLLMClient(): any {
+    // Return a minimal mock that satisfies the type requirement
+    // Mock agents don't support actual LLM operations
+    return {
+      chat: async () => '[Mock LLM Response]',
+      complete: async () => ({ content: '[Mock]', model: 'mock', usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, finishReason: 'stop' as const, provider: 'openai' as const }),
+      streamChat: async function* () { yield '[Mock Stream]'; },
+      getMetadata: () => ({ name: 'mock', version: '0.0.0' }),
+    };
   }
 }
 

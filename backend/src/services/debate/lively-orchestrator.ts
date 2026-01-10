@@ -1083,8 +1083,8 @@ export class LivelyDebateOrchestrator {
     const temperature = context.configuration?.llmSettings?.temperature || 0.7;
     const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 4096;
 
-    // Stream from LLM
-    for await (const chunk of llmClient.streamChat(messages, {
+    // Stream from LLM (type assertion for streaming support)
+    for await (const chunk of (llmClient as any).streamChat(messages, {
       temperature,
       maxTokens,
     })) {
@@ -1105,7 +1105,8 @@ export class LivelyDebateOrchestrator {
     const temperature = context.configuration?.llmSettings?.temperature || 0.7;
     const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 4096;
 
-    for await (const chunk of llmClient.streamChat(messages, {
+    // Type assertion for streaming support
+    for await (const chunk of (llmClient as any).streamChat(messages, {
       temperature,
       maxTokens,
     })) {
@@ -1126,7 +1127,8 @@ export class LivelyDebateOrchestrator {
     const temperature = context.configuration?.llmSettings?.temperature || 0.7;
     const maxTokens = context.configuration?.llmSettings?.maxTokensPerResponse || 4096;
 
-    for await (const chunk of llmClient.streamChat(messages, {
+    // Type assertion for streaming support
+    for await (const chunk of (llmClient as any).streamChat(messages, {
       temperature,
       maxTokens,
     })) {
