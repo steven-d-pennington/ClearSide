@@ -571,6 +571,52 @@
   border-top: 1px solid var(--modal-border);
 }
 
+/* Rapid Fire Section */
+.rapidFireSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rapidFireToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.rapidFireToggle:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rapidFireCheckbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-amber);
+  cursor: pointer;
+}
+
+.rapidFireLabel {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rapidFireDescription {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+  padding-left: 0.25rem;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .modal {

@@ -51,6 +51,8 @@ export function ConversationConfigModal({
   ]);
   const [flowMode, setFlowMode] = useState<FlowMode>('manual');
   const [paceDelayMs, setPaceDelayMs] = useState(3000);
+  const [rapidFire, setRapidFire] = useState(false);
+  const [minimalPersonaMode, setMinimalPersonaMode] = useState(false);
 
   // Loading/error states
   const [isLoading, setIsLoading] = useState(true);
@@ -162,6 +164,8 @@ export function ConversationConfigModal({
           episodeProposalId,
           flowMode,
           paceDelayMs,
+          rapidFire,
+          minimalPersonaMode,
           participants: participants.map(p => ({
             personaId: p.personaId,
             modelId: p.modelId,
@@ -252,6 +256,40 @@ export function ConversationConfigModal({
               onPaceChange={setPaceDelayMs}
               disabled={isCreating}
             />
+
+            <div className={styles.divider} />
+
+            <div className={styles.rapidFireSection}>
+              <label className={styles.rapidFireToggle}>
+                <input
+                  type="checkbox"
+                  checked={rapidFire}
+                  onChange={(e) => setRapidFire(e.target.checked)}
+                  disabled={isCreating}
+                  className={styles.rapidFireCheckbox}
+                />
+                <span className={styles.rapidFireLabel}>Rapid Fire Mode</span>
+              </label>
+              <p className={styles.rapidFireDescription}>
+                Quick back-and-forth with short, punchy responses (2-4 sentences)
+              </p>
+            </div>
+
+            <div className={styles.rapidFireSection}>
+              <label className={styles.rapidFireToggle}>
+                <input
+                  type="checkbox"
+                  checked={minimalPersonaMode}
+                  onChange={(e) => setMinimalPersonaMode(e.target.checked)}
+                  disabled={isCreating}
+                  className={styles.rapidFireCheckbox}
+                />
+                <span className={styles.rapidFireLabel}>Model Debate Mode</span>
+              </label>
+              <p className={styles.rapidFireDescription}>
+                AI models speak from their own reasoning without character personas
+              </p>
+            </div>
           </div>
         )}
 

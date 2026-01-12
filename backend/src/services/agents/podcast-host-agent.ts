@@ -59,6 +59,7 @@ export interface PodcastHostAgentOptions {
   topic: string;
   topicContext?: string;
   guests: GuestInfo[];
+  rapidFire?: boolean;
 }
 
 /**
@@ -92,6 +93,7 @@ export class PodcastHostAgent {
   private guests: GuestInfo[];
   private conversationHistory: ConversationEntry[];
   private systemPrompt: string;
+  private rapidFire: boolean;
 
   constructor(options: PodcastHostAgentOptions) {
     this.llmClient = options.llmClient || createOpenRouterClient(HOST_MODEL);
@@ -100,6 +102,7 @@ export class PodcastHostAgent {
     this.topic = options.topic;
     this.topicContext = options.topicContext;
     this.guests = options.guests;
+    this.rapidFire = options.rapidFire || false;
 
     this.systemPrompt = this.buildSystemPrompt();
     this.conversationHistory = [
@@ -110,6 +113,7 @@ export class PodcastHostAgent {
       sessionId: this.sessionId,
       topic: this.topic,
       guestCount: this.guests.length,
+      rapidFire: this.rapidFire,
     }, 'PodcastHostAgent initialized');
   }
 
@@ -152,6 +156,11 @@ export class PodcastHostAgent {
       `- ${g.displayName} (${g.persona.avatarEmoji || '🎙️'}): ${this.getFirstSentence(g.persona.backstory)}`
     ).join('\n');
 
+    // Add rapid fire mode instruction if enabled
+    const rapidFireInstruction = this.rapidFire
+      ? `\n\nRAPID FIRE MODE: Keep ALL transitions brief (1 sentence max). No lengthy introductions or summaries. Quick, punchy hosting - just facilitate the rapid exchange!`
+      : '';
+
     return `You are the host of "Duel-Logic", a podcast where diverse thinkers explore complex topics together.
 Your hosting style combines the best of Terry Gross, Joe Rogan, and Lex Fridman.
 
@@ -177,7 +186,7 @@ GUIDELINES:
 5. Notice when someone seems to want to respond and invite them in
 6. Keep responses concise - you're the host, not the star
 7. Never declare one guest "right" or "wrong"
-8. Build bridges: "Interesting - [Name], how does that connect to what you said about...?"`;
+8. Build bridges: "Interesting - [Name], how does that connect to what you said about...?"${rapidFireInstruction}`;
   }
 
   private getFirstSentence(text: string): string {
@@ -193,7 +202,7 @@ GUIDELINES:
    * Generate the opening segment - introduce guests and topic
    */
   async generateOpening(): Promise<string> {
-    logger.info({ sessionId: this.sessionId }, 'Generating podcast opening');
+    logger.info({ sessionId: this.sessionId, rapidFire: this.rapidFire }, 'Generating podcast opening');
 
     const guestDetails = this.guests.map(g => `
 ${g.displayName}:
@@ -202,7 +211,12 @@ ${g.displayName}:
 - Worldview: ${g.persona.worldview}`
     ).join('\n');
 
-    const prompt = `Generate an engaging podcast opening (2-3 paragraphs).
+    // Adjust opening prompt and length for rapid fire mode
+    const openingInstruction = this.rapidFire
+      ? 'Generate a BRIEF podcast opening (2-3 sentences max). Quick welcome, quick guest names, dive right into the topic with a punchy question.'
+      : 'Generate an engaging podcast opening (2-3 paragraphs).';
+
+    const prompt = `${openingInstruction}
 
 SHOW NAME: Duel-Logic (always use this name when welcoming listeners)
 
@@ -214,20 +228,23 @@ ${this.topicContext ? `CONTEXT: ${this.topicContext}` : ''}
 
 Your opening should:
 1. Welcome listeners to Duel-Logic
-2. Introduce each guest with their name, a bit of their background, and what perspective they bring
-3. Present the topic in an engaging, accessible way
+2. Introduce each guest with their name${this.rapidFire ? '' : ', a bit of their background, and what perspective they bring'}
+3. Present the topic ${this.rapidFire ? 'quickly' : 'in an engaging, accessible way'}
 4. End with an opening question directed at one specific guest
 
-Be conversational and warm, like you're excited to have these guests together.`;
+${this.rapidFire ? 'Keep it FAST - this is rapid fire mode!' : 'Be conversational and warm, like you\'re excited to have these guests together.'}`;
 
     try {
-      const content = await this.generate(prompt, 'opening', 0.8, 600);
+      // Reduce tokens for rapid fire mode (200 vs 600)
+      const maxTokens = this.rapidFire ? 200 : 600;
+      const content = await this.generate(prompt, 'opening', 0.8, maxTokens);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
 
       logger.info({
         sessionId: this.sessionId,
         length: content.length,
+        rapidFire: this.rapidFire,
       }, 'Opening generated');
 
       return content;
@@ -266,6 +283,16 @@ Be conversational and warm, like you're excited to have these guests together.`;
       ? state.topicsDiscussed.map(t => t.topic).join(', ')
       : 'none yet';
 
+    // Add rapid fire guidance for more host interjections
+    const hostInterjectionGuidance = this.rapidFire
+      ? `\n\nRAPID FIRE MODE: The host should interject MORE OFTEN to keep pace and redirect. Consider interjecting:
+- After 2-3 guest exchanges to ask a probing question
+- When a point needs clarification or deeper exploration
+- To redirect the conversation to an underexplored angle
+- To bring in a quieter guest with a direct question
+Be more aggressive about host interjections to maintain energy and focus.`
+      : '';
+
     const prompt = `Decide who should speak next in this podcast conversation.
 
 RECENT TRANSCRIPT:
@@ -279,13 +306,13 @@ CONTEXT BOARD STATE:
 ${signalInfo}
 
 TURN BALANCE:
-${turnCounts.map(t => `- ${t.name}: ${t.turns} turns`).join('\n')}
+${turnCounts.map(t => `- ${t.name}: ${t.turns} turns`).join('\n')}${hostInterjectionGuidance}
 
 Consider:
 1. Does anyone have a high-urgency signal?
 2. Is someone being left out of the conversation?
 3. Would it be natural for someone to respond to what was just said?
-4. Should I (the host) ask a follow-up question instead?
+4. Should I (the host) ask a follow-up question${this.rapidFire ? ' to maintain pace and focus' : ' instead'}?
 
 Respond in this EXACT format:
 DECISION: [participant_id OR "host"]
@@ -321,9 +348,10 @@ QUESTION: [optional - if host should ask a specific question]`;
       sessionId: this.sessionId,
       targetGuest: targetGuest.displayName,
       reason,
+      rapidFire: this.rapidFire,
     }, 'Generating follow-up question');
 
-    const prompt = `Generate a follow-up question for ${targetGuest.displayName}.
+    const prompt = `Generate a ${this.rapidFire ? 'quick, punchy' : 'natural, probing'} follow-up question for ${targetGuest.displayName}.
 
 WHAT THEY JUST SAID (or context):
 ${recentContent}
@@ -336,19 +364,22 @@ ${targetGuest.persona.backstory}
 THEIR WORLDVIEW:
 ${targetGuest.persona.worldview}
 
-Generate a natural, probing question that:
+Generate a ${this.rapidFire ? 'BRIEF' : 'natural, probing'} question that:
 - Addresses them by name
-- Digs deeper into what they said OR connects to their expertise
-- Is conversational (1-2 sentences max)
+- ${this.rapidFire ? 'Gets right to the point (1 sentence max)' : 'Digs deeper into what they said OR connects to their expertise'}
+- ${this.rapidFire ? 'Keeps the rapid pace going' : 'Is conversational (1-2 sentences max)'}
 - Shows genuine curiosity`;
 
-    const content = await this.generate(prompt, 'followup', 0.8, 150);
+    // Reduce tokens for rapid fire mode (60 vs 150)
+    const maxTokens = this.rapidFire ? 60 : 150;
+    const content = await this.generate(prompt, 'followup', 0.8, maxTokens);
     this.addToHistory('assistant', content);
 
     logger.info({
       sessionId: this.sessionId,
       targetGuest: targetGuest.displayName,
       length: content.length,
+      rapidFire: this.rapidFire,
     }, 'Follow-up question generated');
 
     return content;
@@ -366,9 +397,10 @@ Generate a natural, probing question that:
       sessionId: this.sessionId,
       guestA: guestA.displayName,
       guestB: guestB.displayName,
+      rapidFire: this.rapidFire,
     }, 'Generating bridge statement');
 
-    const prompt = `Generate a bridging statement connecting viewpoints from ${guestA.displayName} and ${guestB.displayName}.
+    const prompt = `Generate a ${this.rapidFire ? 'quick' : 'natural'} bridging statement connecting viewpoints from ${guestA.displayName} and ${guestB.displayName}.
 
 POINT OF CONNECTION: ${pointOfConnection}
 
@@ -378,18 +410,21 @@ ${guestA.persona.worldview}
 ${guestB.displayName}'s perspective:
 ${guestB.persona.worldview}
 
-Create a natural transition that:
-- Acknowledges what ${guestA.displayName} said
-- Draws a connection to ${guestB.displayName}'s perspective or expertise
+Create a ${this.rapidFire ? 'fast transition (1 sentence)' : 'natural transition'} that:
+- ${this.rapidFire ? 'Quickly pivots' : 'Acknowledges what ' + guestA.displayName + ' said'}
+- ${this.rapidFire ? 'Passes to' : 'Draws a connection to'} ${guestB.displayName}
 - Invites ${guestB.displayName} to respond
-- Is warm and curious, not confrontational (1-2 sentences)`;
+- ${this.rapidFire ? 'Keeps pace up' : 'Is warm and curious, not confrontational (1-2 sentences)'}`;
 
-    const content = await this.generate(prompt, 'bridge', 0.8, 120);
+    // Reduce tokens for rapid fire mode (50 vs 120)
+    const maxTokens = this.rapidFire ? 50 : 120;
+    const content = await this.generate(prompt, 'bridge', 0.8, maxTokens);
     this.addToHistory('assistant', content);
 
     logger.info({
       sessionId: this.sessionId,
       length: content.length,
+      rapidFire: this.rapidFire,
     }, 'Bridge statement generated');
 
     return content;
@@ -457,7 +492,7 @@ This should be a natural reaction that:
     contextBoard: ContextBoardService,
     _fullTranscript?: string
   ): Promise<string> {
-    logger.info({ sessionId: this.sessionId }, 'Generating podcast closing');
+    logger.info({ sessionId: this.sessionId, rapidFire: this.rapidFire }, 'Generating podcast closing');
 
     const state = contextBoard.getState();
 
@@ -474,7 +509,11 @@ This should be a natural reaction that:
       ? state.topicsDiscussed.map(t => `- ${t.topic} (${t.status})`).join('\n')
       : '- General discussion';
 
-    const prompt = `Generate a warm closing for this podcast conversation.
+    const closingInstruction = this.rapidFire
+      ? 'Generate a BRIEF closing (2-3 sentences max). Quick thanks to guests, one key takeaway, done!'
+      : 'Generate a warm closing for this podcast conversation.';
+
+    const prompt = `${closingInstruction}
 
 TOPICS COVERED:
 ${topicsInfo}
@@ -489,19 +528,20 @@ YOUR GUESTS (to thank):
 ${this.guests.map(g => `- ${g.displayName}`).join('\n')}
 
 Your closing should:
-1. Thank each guest by name for their unique contribution
-2. Summarize 2-3 key threads WITHOUT declaring anyone right or wrong
-3. Note any interesting agreements or productive tensions
-4. End warmly, leaving listeners with something to think about
+1. Thank ${this.rapidFire ? 'the guests quickly' : 'each guest by name for their unique contribution'}
+2. ${this.rapidFire ? 'One sentence takeaway' : 'Summarize 2-3 key threads WITHOUT declaring anyone right or wrong'}
+${this.rapidFire ? '' : '3. Note any interesting agreements or productive tensions\n4. End warmly, leaving listeners with something to think about'}
 
-Be genuine and appreciative. This is a conversation, not a competition.`;
+${this.rapidFire ? 'Keep it FAST!' : 'Be genuine and appreciative. This is a conversation, not a competition.'}`;
 
     try {
-      const content = await this.generate(prompt, 'closing', 0.8, 450);
+      // Reduce tokens for rapid fire mode (150 vs 450)
+      const maxTokens = this.rapidFire ? 150 : 450;
+      const content = await this.generate(prompt, 'closing', 0.8, maxTokens);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
 
-      logger.info({ sessionId: this.sessionId }, 'Closing generated');
+      logger.info({ sessionId: this.sessionId, rapidFire: this.rapidFire }, 'Closing generated');
       return content;
     } catch (error) {
       logger.error({ error, sessionId: this.sessionId }, 'Failed to generate closing');
@@ -701,7 +741,8 @@ export function createPodcastHostAgent(
   topic: string,
   guests: Array<{ participant: ConversationParticipant; persona: PodcastPersona }>,
   topicContext?: string,
-  sseManager?: SSEManager
+  sseManager?: SSEManager,
+  rapidFire: boolean = false
 ): PodcastHostAgent {
   const guestInfos: GuestInfo[] = guests.map(g => ({
     participantId: g.participant.id,
@@ -716,6 +757,7 @@ export function createPodcastHostAgent(
     topicContext,
     guests: guestInfos,
     sseManager,
+    rapidFire,
   });
 }
 
@@ -728,7 +770,8 @@ export function createPodcastHostAgentWithClient(
   guests: GuestInfo[],
   llmClient: LLMClient,
   topicContext?: string,
-  sseManager?: SSEManager
+  sseManager?: SSEManager,
+  rapidFire: boolean = false
 ): PodcastHostAgent {
   return new PodcastHostAgent({
     sessionId,
@@ -737,5 +780,6 @@ export function createPodcastHostAgentWithClient(
     guests,
     llmClient,
     sseManager,
+    rapidFire,
   });
 }

@@ -174,7 +174,8 @@ export class ConversationalOrchestrator extends EventEmitter {
       this.session.topic,
       guestInfos,
       this.session.topicContext || undefined,
-      this.sseManager
+      this.sseManager,
+      this.session.rapidFire
     );
 
     // Create persona agents
@@ -182,7 +183,9 @@ export class ConversationalOrchestrator extends EventEmitter {
       this.sessionId,
       this.session.topic,
       guestInfos,
-      this.sseManager
+      this.sseManager,
+      this.session.rapidFire,
+      this.session.minimalPersonaMode
     );
 
     console.log('ORCHESTRATOR: Initialization complete', {

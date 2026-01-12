@@ -94,6 +94,8 @@ export interface ConversationSessionConfig {
   paceDelayMs?: number;
   hostModelId?: string;
   hostDisplayName?: string;
+  rapidFire?: boolean;
+  minimalPersonaMode?: boolean; // Model Debate mode: models speak without persona constraints
 }
 
 /**
@@ -118,6 +120,8 @@ export interface ConversationSession {
   participantCount: number;
   flowMode: FlowMode;
   paceDelayMs: number;
+  rapidFire: boolean;
+  minimalPersonaMode: boolean; // Model Debate mode: models speak without persona constraints
   status: SessionStatus;
   currentSpeakerIndex: number;
   hostModelId?: string;
@@ -140,6 +144,8 @@ export interface ConversationSessionRow {
   participant_count: number;
   flow_mode: string;
   pace_delay_ms: number;
+  rapid_fire: boolean;
+  minimal_persona_mode: boolean; // Model Debate mode: models speak without persona constraints
   status: string;
   current_speaker_index: number;
   host_model_id?: string;
@@ -347,6 +353,7 @@ export interface CreateSessionRequest {
   paceDelayMs?: number;
   hostModelId?: string;
   hostDisplayName?: string;
+  rapidFire?: boolean;
 }
 
 /**
@@ -476,6 +483,7 @@ export const DEFAULT_SESSION_CONFIG: Partial<ConversationSessionConfig> = {
   flowMode: 'manual',
   paceDelayMs: 3000,
   hostDisplayName: 'Host',
+  rapidFire: false,
 };
 
 /**
@@ -527,6 +535,8 @@ export function mapSessionRow(row: ConversationSessionRow): ConversationSession 
     participantCount: row.participant_count,
     flowMode: row.flow_mode as FlowMode,
     paceDelayMs: row.pace_delay_ms,
+    rapidFire: row.rapid_fire,
+    minimalPersonaMode: row.minimal_persona_mode,
     status: row.status as SessionStatus,
     currentSpeakerIndex: row.current_speaker_index,
     hostModelId: row.host_model_id,

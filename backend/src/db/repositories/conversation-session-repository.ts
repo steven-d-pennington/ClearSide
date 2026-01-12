@@ -44,10 +44,10 @@ export class ConversationSessionRepository {
     const result = await this.pool.query<ConversationSessionRow>(`
       INSERT INTO conversation_sessions (
         topic, topic_context, episode_proposal_id,
-        participant_count, flow_mode, pace_delay_ms,
+        participant_count, flow_mode, pace_delay_ms, rapid_fire, minimal_persona_mode,
         host_model_id, host_display_name, status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'configuring')
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'configuring')
       RETURNING *
     `, [
       config.topic,
@@ -56,6 +56,8 @@ export class ConversationSessionRepository {
       config.participants.length,
       config.flowMode,
       config.paceDelayMs || 3000,
+      config.rapidFire || false,
+      config.minimalPersonaMode || false,
       config.hostModelId || null,
       config.hostDisplayName || 'Host',
     ]);

@@ -13,8 +13,40 @@ import type { PodcastPersona } from '../../../types/conversation.js';
 export function buildPersonaSystemPrompt(
   persona: PodcastPersona,
   topic: string,
-  otherParticipantNames: string[]
+  otherParticipantNames: string[],
+  rapidFire: boolean = false,
+  minimalPersonaMode: boolean = false
 ): string {
+  // MINIMAL PERSONA MODE: Model speaks naturally without character constraints
+  if (minimalPersonaMode) {
+    const lengthGuideline = rapidFire
+      ? `- Keep responses to 2-4 sentences typically
+- Be focused and avoid repetition - make each sentence count
+- Cut unnecessary throat-clearing and preambles
+- Get to your core point quickly and clearly
+- Build naturally on what others say without rehashing`
+      : '- Keep responses concise (2-4 paragraphs typically, unless asked for more detail)';
+
+    return `You are ${persona.name}, an AI model participating in a debate about ${topic}.
+
+OTHER PARTICIPANTS: ${otherParticipantNames.join(', ')}
+
+GUIDELINES:
+1. Speak from your own reasoning and training - there's no character to play
+2. Take clear positions based on evidence and logic
+3. Engage substantively with what others say - agree or disagree honestly
+4. Challenge assumptions when warranted
+5. Show your reasoning process, not just conclusions
+${lengthGuideline}
+6. Be conversational but substantive - this is a thoughtful discussion
+7. Don't shy away from disagreement when you see issues differently
+8. Build on points made by ${otherParticipantNames.join(' and ')}
+9. When you disagree, explain why with specific reasoning
+
+Speak authentically as an AI - no need to pretend otherwise.`;
+  }
+
+  // NORMAL PERSONA MODE: Full character with backstory/worldview
   const quirksText = persona.quirks.length > 0
     ? `\n\nQUIRKS:\n${persona.quirks.map(q => `- ${q}`).join('\n')}`
     : '';
@@ -26,6 +58,16 @@ export function buildPersonaSystemPrompt(
   const topicsText = persona.preferredTopics.length > 0
     ? `\n\nYOUR PREFERRED TOPICS: ${persona.preferredTopics.join(', ')}`
     : '';
+
+  // Response length guideline changes based on rapid fire mode
+  const lengthGuideline = rapidFire
+    ? `6. RAPID FIRE MODE - This is a fast-paced, focused exchange:
+   - Keep responses to 2-4 sentences typically
+   - Be focused and avoid repetition - make each sentence count
+   - Cut unnecessary throat-clearing and preambles
+   - Get to your core point quickly and clearly
+   - Build naturally on what others say without rehashing`
+    : '6. Keep responses concise (2-4 paragraphs typically, unless asked for more detail)';
 
   return `You are ${persona.name}, a participant in a podcast conversation.
 
@@ -51,7 +93,7 @@ GUIDELINES:
 3. You may address other participants by name when responding to them
 4. Express your genuine perspective based on your worldview
 5. Be conversational - this is a podcast, not a debate or lecture
-6. Keep responses concise (2-4 paragraphs typically, unless asked for more detail)
+${lengthGuideline}
 7. Show authentic reactions - agreement, curiosity, skepticism, surprise, etc.
 8. Build on what others say rather than just stating your position
 9. When you disagree, do so respectfully while staying true to your perspective
@@ -73,7 +115,8 @@ export function buildResponsePrompt(
   conversationContext: string,
   addressedTo?: string,
   previousSpeaker?: string,
-  participantNames?: string[]
+  participantNames?: string[],
+  rapidFire: boolean = false
 ): string {
   let prompt = `RECENT CONVERSATION:
 ${conversationContext}
@@ -94,9 +137,14 @@ ${conversationContext}
     prompt += `You may address ${participantNames.join(' or ')} directly if relevant. `;
   }
 
+  // Length instruction changes based on rapid fire mode
+  const lengthInstruction = rapidFire
+    ? 'RAPID FIRE: 2-4 sentences typically. Be focused and avoid repetition - make every sentence count!'
+    : 'Keep your response focused and conversational (2-4 paragraphs unless more detail is explicitly requested).';
+
   prompt += `
 
-Stay in character and be authentic to your worldview. Keep your response focused and conversational (2-4 paragraphs unless more detail is explicitly requested).
+Stay in character and be authentic to your worldview. ${lengthInstruction}
 
 IMPORTANT: Vary your response style! Don't repeat the same verbal tics, action tags, or opening phrases you've used before. Each response should feel fresh.`;
 
@@ -141,8 +189,13 @@ If you don't feel compelled to speak, use URGENCY: none`;
 export function buildIntroductionResponsePrompt(
   persona: PodcastPersona,
   topic: string,
-  hostIntroduction: string
+  hostIntroduction: string,
+  rapidFire: boolean = false
 ): string {
+  const lengthInstruction = rapidFire
+    ? 'Keep it to ONE sentence - just a quick greeting and jump in!'
+    : 'Keep it warm, natural, and in character (1-2 paragraphs).';
+
   return `The host just introduced you:
 
 "${hostIntroduction}"
@@ -155,7 +208,7 @@ As ${persona.name}, respond briefly to your introduction. You might:
 - Give a quick preview of your perspective
 - Share a brief anecdote or connection to the topic
 
-Keep it warm, natural, and in character (1-2 paragraphs).`;
+${lengthInstruction}`;
 }
 
 /**

@@ -83,6 +83,8 @@ export interface ConversationSession {
   participantCount: number;
   flowMode: FlowMode;
   paceDelayMs: number;
+  rapidFire: boolean;
+  minimalPersonaMode: boolean;
   status: SessionStatus;
   currentSpeakerIndex: number;
   hostModelId?: string;
@@ -224,6 +226,7 @@ export interface CreateSessionRequest {
   participants: ParticipantConfig[];
   flowMode: FlowMode;
   paceDelayMs?: number;
+  rapidFire?: boolean;
   hostModelId?: string;
   hostDisplayName?: string;
 }

@@ -41,6 +41,8 @@ const createSessionSchema = z.object({
   episodeProposalId: z.string().uuid().optional(),
   flowMode: z.enum(['manual', 'auto_stream', 'natural_pace']).default('manual'),
   paceDelayMs: z.number().min(500).max(10000).default(3000),
+  rapidFire: z.boolean().default(false),
+  minimalPersonaMode: z.boolean().default(false),
   hostModelId: z.string().optional(),
   hostDisplayName: z.string().max(100).optional(),
   participants: z.array(z.object({
@@ -318,6 +320,8 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         episodeProposalId,
         flowMode,
         paceDelayMs,
+        rapidFire,
+        minimalPersonaMode,
         hostModelId,
         hostDisplayName,
         participants,
@@ -355,6 +359,8 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         episodeProposalId,
         flowMode: flowMode as FlowMode,
         paceDelayMs,
+        rapidFire,
+        minimalPersonaMode,
         hostModelId,
         hostDisplayName,
         participants: participantConfigs,
@@ -590,10 +596,13 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
       }
 
       // Create and initialize orchestrator
+      // Use fewer turns for rapid fire mode (20 vs 30)
+      const maxTurns = session.rapidFire ? 20 : 30;
       const orchestrator = await createConversationalOrchestrator(
         pool,
         sseManager,
-        id
+        id,
+        maxTurns
       );
 
       activeOrchestrators.set(id, orchestrator);

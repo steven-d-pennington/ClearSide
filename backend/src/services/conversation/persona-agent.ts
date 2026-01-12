@@ -121,6 +121,8 @@ export interface PersonaAgentOptions {
   sessionId: string;
   topic: string;
   otherParticipants: Array<{ name: string; persona: PodcastPersona }>;
+  rapidFire?: boolean;
+  minimalPersonaMode?: boolean;
 }
 
 /**
@@ -144,6 +146,8 @@ export class PersonaAgent {
   private systemPrompt: string;
   private conversationHistory: ConversationEntry[];
   private otherParticipants: Array<{ name: string; persona: PodcastPersona }>;
+  private rapidFire: boolean;
+  private minimalPersonaMode: boolean;
 
   // RAG support
   private ragService?: RAGRetrievalService;
@@ -161,12 +165,16 @@ export class PersonaAgent {
     this.sessionId = options.sessionId;
     this.topic = options.topic;
     this.otherParticipants = options.otherParticipants;
+    this.rapidFire = options.rapidFire || false;
+    this.minimalPersonaMode = options.minimalPersonaMode || false;
 
     // Build system prompt from persona definition
     this.systemPrompt = buildPersonaSystemPrompt(
       this.persona,
       this.topic,
-      this.otherParticipants.map(p => p.name)
+      this.otherParticipants.map(p => p.name),
+      this.rapidFire,
+      this.minimalPersonaMode
     );
 
     // Initialize conversation history
@@ -179,6 +187,7 @@ export class PersonaAgent {
       personaSlug: this.persona.slug,
       participantId: this.participant.id,
       modelId: this.participant.modelId,
+      rapidFire: this.rapidFire,
     }, 'PersonaAgent initialized');
   }
 
@@ -293,6 +302,7 @@ export class PersonaAgent {
       persona: this.persona.slug,
       addressedTo,
       previousSpeaker,
+      rapidFire: this.rapidFire,
     }, 'Generating persona response');
 
     const prompt = buildResponsePrompt(
@@ -300,12 +310,14 @@ export class PersonaAgent {
       conversationContext,
       addressedTo,
       previousSpeaker,
-      this.otherParticipants.map(p => p.name)
+      this.otherParticipants.map(p => p.name),
+      this.rapidFire
     );
 
     try {
-      // Use 600 tokens to prevent truncation (was 400)
-      const content = await this.generate(prompt, 'response', 0.8, 600);
+      // Reduce tokens for rapid fire mode (150 vs 600)
+      const maxTokens = this.rapidFire ? 150 : 600;
+      const content = await this.generate(prompt, 'response', 0.8, maxTokens);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
 
@@ -313,6 +325,7 @@ export class PersonaAgent {
         sessionId: this.sessionId,
         persona: this.persona.slug,
         length: content.length,
+        rapidFire: this.rapidFire,
       }, 'Persona response generated');
 
       return content;
@@ -331,16 +344,20 @@ export class PersonaAgent {
     logger.info({
       sessionId: this.sessionId,
       persona: this.persona.slug,
+      rapidFire: this.rapidFire,
     }, 'Generating introduction response');
 
     const prompt = buildIntroductionResponsePrompt(
       this.persona,
       this.topic,
-      hostIntroduction
+      hostIntroduction,
+      this.rapidFire
     );
 
     try {
-      const content = await this.generate(prompt, 'introduction', 0.75, 200);
+      // Reduce tokens for rapid fire mode (60 vs 200)
+      const maxTokens = this.rapidFire ? 60 : 200;
+      const content = await this.generate(prompt, 'introduction', 0.75, maxTokens);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
 
@@ -348,6 +365,7 @@ export class PersonaAgent {
         sessionId: this.sessionId,
         persona: this.persona.slug,
         length: content.length,
+        rapidFire: this.rapidFire,
       }, 'Introduction response generated');
 
       return content;
@@ -369,6 +387,7 @@ export class PersonaAgent {
       sessionId: this.sessionId,
       persona: this.persona.slug,
       targetName,
+      rapidFire: this.rapidFire,
     }, 'Generating direct address');
 
     const prompt = buildDirectAddressPrompt(
@@ -379,7 +398,9 @@ export class PersonaAgent {
     );
 
     try {
-      const content = await this.generate(prompt, 'direct_address', 0.8, 350);
+      // Reduce tokens for rapid fire mode (100 vs 350)
+      const maxTokens = this.rapidFire ? 100 : 350;
+      const content = await this.generate(prompt, 'direct_address', 0.8, maxTokens);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
 
@@ -388,6 +409,7 @@ export class PersonaAgent {
         persona: this.persona.slug,
         targetName,
         length: content.length,
+        rapidFire: this.rapidFire,
       }, 'Direct address generated');
 
       return content;
@@ -856,7 +878,9 @@ export function createPersonaAgents(
   sessionId: string,
   topic: string,
   participants: Array<{ participant: ConversationParticipant; persona: PodcastPersona }>,
-  sseManager?: SSEManager
+  sseManager?: SSEManager,
+  rapidFire: boolean = false,
+  minimalPersonaMode: boolean = false
 ): Map<string, PersonaAgent> {
   const agents = new Map<string, PersonaAgent>();
 
@@ -875,6 +899,8 @@ export function createPersonaAgents(
       topic,
       otherParticipants,
       sseManager,
+      rapidFire,
+      minimalPersonaMode,
     });
 
     agents.set(participant.id, agent);
@@ -884,6 +910,7 @@ export function createPersonaAgents(
     sessionId,
     participantCount: agents.size,
     personas: participants.map(p => p.persona.slug),
+    rapidFire,
   }, 'Created all persona agents for conversation');
 
   return agents;
