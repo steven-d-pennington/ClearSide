@@ -1,11 +1,21 @@
 # ClearSide Kanban Board - Live Debate Theater
 
 > Last Updated: 2026-01-11
-> Version: 8.0.0 - Phase 7 Source Management UI Added
+> Version: 9.0.0 - Phase 8 Authentication System Added
 
 ## 🔧 Recent Changes (2026-01-11)
 
-**NEW: Phase 7 - Research Source Management:**
+**NEW: Phase 8 - Authentication System:**
+- Homegrown JWT-based authentication with httpOnly cookies
+- Multi-tenant organization support from day one
+- Role-based access control (super_admin, org_admin, user)
+- Admin user management with temp password generation
+- Account lockout after 5 failed attempts (15 min lockout)
+- Password change flow for first-time users
+- Zustand state management with persist middleware
+- 6 comprehensive task files in `tasks/phase8/authentication/`
+
+**Phase 7 - Research Source Management:**
 - UI for viewing and managing research sources from Perplexity
 - Enable/disable sources for RAG indexing with checkboxes
 - Add custom sources manually (URL, title, excerpt)
@@ -249,8 +259,36 @@ OpenRouter provides unified API to 100+ models. This builds on the Persona syste
 
 ---
 
+### Option H: Authentication System (Phase 8) - NEW!
+
+**Secure user authentication with multi-tenant organization support.**
+
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| AUTH-001 | Database Schema & Types | P0 | 🟢 Ready |
+| AUTH-002 | Password & JWT Utilities | P0 | 🟢 Ready |
+| AUTH-003 | Repositories & Auth Middleware | P0 | 🟢 Ready |
+| AUTH-004 | API Routes for Authentication | P0 | 🟢 Ready |
+| AUTH-005 | Frontend Authentication Implementation | P0 | 🟢 Ready |
+| AUTH-006 | User Management UI | P0 | 🟢 Ready |
+
+**Key Features:**
+- JWT-based authentication with httpOnly cookies (stateless)
+- Multi-tenant organization architecture
+- Role-based access control (super_admin, org_admin, user)
+- Admin creates users with auto-generated temp passwords
+- First-time login forces password change
+- Account lockout after 5 failed attempts
+
+**Dependencies:** None (new feature track)
+
+**Start Here:** AUTH-001 (Database Schema & Types)
+
+---
+
 ### Recommendation
 
+For **user authentication & security**: Start with AUTH-001 (authentication system) - Critical for production deployment
 For **Duelogic episodes**: Start with DUELOGIC-001 (automated episode generation)
 For **podcast content creators**: Phase 4 complete! Audio export fully functional
 For **user-facing features**: Start with PERSONA-001 (differentiated debates)
@@ -669,6 +707,54 @@ UI for managing research sources used in RAG-enhanced debates. Control which Per
 **Dependencies:** Phase 5 (Duelogic Research must be complete)
 
 **Status:** ✅ Complete - Implemented 2026-01-11
+
+---
+
+## 📋 PHASE 8: AUTHENTICATION SYSTEM
+
+Homegrown JWT-based authentication with username/password login, multi-tenant organizations, and role-based access control.
+
+### 🏗️ Foundation
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| AUTH-001 | Database Schema & Types | P0 | S | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-001.md) |
+| AUTH-002 | Password & JWT Utilities | P0 | S | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-002.md) |
+| AUTH-003 | Repositories & Auth Middleware | P0 | M | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-003.md) |
+
+### 🔌 Backend API
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| AUTH-004 | API Routes for Authentication | P0 | M | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-004.md) |
+
+### 🎨 Frontend
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| AUTH-005 | Frontend Authentication Implementation | P0 | M | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-005.md) |
+| AUTH-006 | User Management UI | P0 | M | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-006.md) |
+
+**Key Features:**
+- **JWT Authentication**: 7-day tokens in httpOnly cookies (XSS protection)
+- **Multi-tenant**: Users belong to organizations, org admins manage only their org
+- **Three Roles**: super_admin (full access), org_admin (org-scoped), user (view/create)
+- **Temp Passwords**: First-time users must change password before proceeding
+- **Account Lockout**: 5 failed attempts → 15 minute lockout
+- **Rate Limiting**: 5 login attempts per 15 minutes per IP
+- **Super User**: steven@spennington.dev / StarDust (auto-created on boot)
+
+**Dependencies:**
+- AUTH-001 can start immediately (no blockers)
+- AUTH-002 depends on AUTH-001
+- AUTH-003 depends on AUTH-001, AUTH-002
+- AUTH-004 depends on AUTH-001, AUTH-002, AUTH-003
+- AUTH-005 depends on AUTH-001, AUTH-004
+- AUTH-006 depends on AUTH-001, AUTH-004, AUTH-005
+
+**Critical Path:** AUTH-001 → AUTH-002 → AUTH-003 → AUTH-004 → AUTH-005 → AUTH-006
+
+**Start Here:** AUTH-001 (Database Schema & Types) - Foundation for entire authentication system.
 
 ---
 
