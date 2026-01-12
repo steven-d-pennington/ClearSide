@@ -1,9 +1,21 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2026-01-08
-> Version: 7.0.0 - Phase 6 Conversational Podcast Mode Added
+> Last Updated: 2026-01-11
+> Version: 8.0.0 - Phase 7 Source Management UI Added
 
-## 🔧 Recent Changes (2026-01-08)
+## 🔧 Recent Changes (2026-01-11)
+
+**NEW: Phase 7 - Research Source Management:**
+- UI for viewing and managing research sources from Perplexity
+- Enable/disable sources for RAG indexing with checkboxes
+- Add custom sources manually (URL, title, excerpt)
+- Manual "Re-index Sources" button with progress tracking
+- Indexing metadata display (chunk count, timestamps, errors)
+- Source filtering in research indexer (enabled sources only)
+- 1 comprehensive task file in `tasks/phase7/source-management/`
+- See [Plan File](../.claude/plans/effervescent-imagining-pascal.md) for full specification
+
+## 🔧 Previous Changes (2026-01-08)
 
 **NEW: Phase 6 - Conversational Podcast Mode:**
 - Free-form podcast conversations with 2-6 AI personas
@@ -624,6 +636,39 @@ Free-form podcast conversations where 2-6 AI personas discuss topics in a natura
 **Critical Path:** CONV-001 → CONV-002 → CONV-005 → CONV-007 → CONV-008 → CONV-019
 
 **Start Here:** CONV-020 (RAG Integration) - Native export complete! Now add RAG context injection for informed conversations.
+
+---
+
+## 📋 PHASE 7: RESEARCH SOURCE MANAGEMENT
+
+UI for managing research sources used in RAG-enhanced debates. Control which Perplexity sources get indexed into vector database.
+
+### 🔧 Source Management
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| SOURCE-001 | Research Source Management UI | P0 | M | ✅ Done | [View Task](../tasks/phase7/source-management/SOURCE-001.md) |
+
+**Key Features:**
+- View all research sources from Perplexity with metadata
+- Enable/disable sources with checkboxes (UI control over indexing)
+- Add custom sources manually (URL, title, excerpt, domain)
+- "Custom" badge for user-added sources
+- Manual "Re-index Sources" button (explicit user control)
+- Indexing stats badge (chunk count, indexed timestamp)
+- Source filtering in research-indexer (only enabled sources)
+- Database tracking of indexing metadata (indexed_at, chunk_count, errors)
+
+**Implementation Details:**
+- JSONB flexibility - no schema changes for source fields
+- 3 new API endpoints: GET research, PUT sources, POST reindex
+- Repository methods: findResultWithSources, updateSources, updateIndexingMetadata
+- Frontend: Research Sources section in AdminDuelogicProposalDetailPage
+- Complete CSS styling with hover effects and transitions
+
+**Dependencies:** Phase 5 (Duelogic Research must be complete)
+
+**Status:** ✅ Complete - Implemented 2026-01-11
 
 ---
 
