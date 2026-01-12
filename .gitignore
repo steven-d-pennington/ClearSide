@@ -422,3 +422,6 @@ docs/clearside-tts-key.json
 backend/temp*
 backend/exports/
 .mcp.json
+
+# Auto Claude data directory
+.auto-claude/

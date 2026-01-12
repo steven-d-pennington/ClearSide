@@ -681,11 +681,74 @@ export class ConversationalOrchestrator extends EventEmitter {
 
     // Generate response
     const previousSpeakerName = this.getParticipantName(this.lastSpeakerId);
-    const content = await agent.generateResponse(
-      recentTranscript,
-      decision.addressDirectly ? agent.name : undefined,
-      previousSpeakerName
-    );
+    let content: string;
+
+    try {
+      content = await agent.generateResponse(
+        recentTranscript,
+        decision.addressDirectly ? agent.name : undefined,
+        previousSpeakerName
+      );
+    } catch (error: any) {
+      // Check if this is a truncation error
+      if (error?.code === 'TRUNCATION_DETECTED') {
+        logger.warn({
+          sessionId: this.sessionId,
+          participantId: decision.participantId,
+          personaName: agent.name,
+          partialContentLength: error.partialContent?.length,
+        }, 'Truncation detected - saving partial utterance and pausing for user intervention');
+
+        // Save the partial utterance so frontend has an utterance ID for regeneration
+        const partialContent = error.partialContent || '';
+        const utterance = await this.saveUtteranceWithTimestamp(
+          decision.participantId,
+          partialContent,
+          false,
+          'discussion',
+          startTimestampMs
+        );
+
+        // Broadcast the partial utterance
+        this.broadcastUtterance(
+          agent.name,
+          agent.personaSlug,
+          partialContent,
+          false,
+          'discussion',
+          decision.participantId
+        );
+
+        // Update the agent's turn context with the utterance ID
+        agent.setTurnContext(this.turnCount, utterance.id);
+
+        // Re-emit truncation event with the utterance ID so frontend can show modal
+        this.broadcastEvent('conversation_truncation_detected', {
+          sessionId: this.sessionId,
+          participantId: decision.participantId,
+          personaSlug: agent.personaSlug,
+          personaName: agent.name,
+          partialContent: partialContent,
+          contentLength: partialContent.length,
+          lastChars: partialContent.slice(-50),
+          detectionType: 'heuristic',
+          currentModelId: (this.participants.find(p => p.id === decision.participantId) as any)?.modelId || 'unknown',
+          turnCount: this.turnCount,
+          utteranceId: utterance.id,
+          timestampMs: Date.now(),
+        });
+
+        // Pause the orchestrator - user must manually resume after selecting new model
+        await this.pause();
+
+        // Return early without throwing - conversation is paused, not failed
+        // The main loop will wait for resume via waitForResume()
+        return;
+      }
+
+      // Re-throw other errors
+      throw error;
+    }
 
     // Save and broadcast (use start timestamp for correct ordering)
     const utterance = await this.saveUtteranceWithTimestamp(

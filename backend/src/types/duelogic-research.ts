@@ -65,6 +65,12 @@ export interface ResearchSource {
     publishedAt?: Date;
     excerpt: string;
     credibilityScore?: number;           // Optional: domain reputation
+
+    // Source management fields
+    enabled?: boolean;                   // Default true; false = exclude from indexing
+    customAdded?: boolean;               // True if manually added by user
+    addedBy?: string;                    // User who added custom source
+    addedAt?: Date;                      // When custom source was added
 }
 
 export interface ResearchResult {
@@ -79,6 +85,11 @@ export interface ResearchResult {
     depth: number;                       // 0-1, enough for episode?
     rawPerplexityResponse: string;
     createdAt: Date;
+
+    // Indexing metadata
+    indexedAt?: Date;                    // When sources were last indexed
+    indexedChunkCount?: number;          // Number of chunks indexed
+    indexingError?: string;              // Error message if indexing failed
 }
 
 export interface PhilosophicalChair {

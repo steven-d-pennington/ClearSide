@@ -230,6 +230,66 @@ export async function updatePhase(
 }
 
 /**
+ * Update model configuration for debate participants
+ * Allows updating pro, con, or moderator model IDs
+ */
+export async function updateModelConfig(
+  id: string,
+  modelConfig: {
+    pro_model_id?: string | null;
+    con_model_id?: string | null;
+    moderator_model_id?: string | null;
+  }
+): Promise<Debate | null> {
+  const updates: string[] = [];
+  const values: unknown[] = [id];
+  let paramIndex = 2;
+
+  if (modelConfig.pro_model_id !== undefined) {
+    updates.push(`pro_model_id = $${paramIndex}`);
+    values.push(modelConfig.pro_model_id);
+    paramIndex++;
+  }
+
+  if (modelConfig.con_model_id !== undefined) {
+    updates.push(`con_model_id = $${paramIndex}`);
+    values.push(modelConfig.con_model_id);
+    paramIndex++;
+  }
+
+  if (modelConfig.moderator_model_id !== undefined) {
+    updates.push(`moderator_model_id = $${paramIndex}`);
+    values.push(modelConfig.moderator_model_id);
+    paramIndex++;
+  }
+
+  if (updates.length === 0) {
+    throw new Error('No model configuration updates provided');
+  }
+
+  const query = `
+    UPDATE debates
+    SET ${updates.join(', ')}
+    WHERE id = $1
+    RETURNING *
+  `;
+
+  try {
+    const result = await pool.query<DebateRow>(query, values);
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+    return rowToDebate(row);
+  } catch (error) {
+    console.error('Error updating model config:', error);
+    throw new Error(
+      `Failed to update model config: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
  * Save debate transcript (JSON)
  */
 export async function saveTranscript(

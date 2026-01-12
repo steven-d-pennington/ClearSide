@@ -145,6 +145,17 @@ interface DebateState {
   /** Whether the user has clicked "Ready to Respond" - controls when input form appears */
   isReadyToRespond: boolean;
 
+  // Model error state
+  /** Whether there's a model error requiring user intervention */
+  hasModelError: boolean;
+  /** Details about the model error */
+  modelError: {
+    speaker: 'pro' | 'con' | 'moderator';
+    failedModelId: string;
+    error: string;
+    phase: string;
+  } | null;
+
   // Actions
   startDebate: (proposition: string, options?: StartDebateOptions) => Promise<void>;
   pauseDebate: () => Promise<void>;
@@ -155,6 +166,8 @@ interface DebateState {
   submitIntervention: (intervention: Omit<Intervention, 'id' | 'debateId' | 'status' | 'timestamp'>) => Promise<void>;
   submitHumanTurn: (content: string) => Promise<void>;
   setReadyToRespond: (ready: boolean) => void;
+  reassignModel: (speaker: 'pro' | 'con' | 'moderator', newModelId: string) => Promise<void>;
+  clearModelError: () => void;
 
   // SSE actions
   connectToDebate: (debateId: string) => void;
@@ -200,6 +213,9 @@ const initialState = {
   isAwaitingHumanInput: false,
   humanInputRequest: null as AwaitingHumanInputData | null,
   isReadyToRespond: false,
+  // Model error state
+  hasModelError: false,
+  modelError: null,
 };
 
 /**
@@ -609,6 +625,50 @@ export const useDebateStore = create<DebateState>()(
        */
       setReadyToRespond: (ready: boolean) => {
         set({ isReadyToRespond: ready });
+      },
+
+      /**
+       * Reassign model after model failure
+       */
+      reassignModel: async (speaker: 'pro' | 'con' | 'moderator', newModelId: string) => {
+        const { debate } = get();
+        if (!debate) return;
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/debates/${debate.id}/reassign-model`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              speaker,
+              newModelId,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || `Failed to reassign model: ${response.statusText}`);
+          }
+
+          // Clear model error state - SSE will handle the rest (model_reassigned event)
+          set({
+            hasModelError: false,
+            modelError: null,
+          });
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to reassign model',
+          });
+        }
+      },
+
+      /**
+       * Clear model error state
+       */
+      clearModelError: () => {
+        set({
+          hasModelError: false,
+          modelError: null,
+        });
       },
 
       /**
@@ -1471,6 +1531,46 @@ export const useDebateStore = create<DebateState>()(
               error: data.error,
               streamingTurn: null,
             }));
+            break;
+          }
+
+          // Backend sends 'model_error' when a model fails
+          case 'model_error': {
+            const data = message.data as {
+              debateId: string;
+              speaker: 'pro' | 'con' | 'moderator';
+              failedModelId: string;
+              error: string;
+              phase: string;
+            };
+            console.log('🔴 Model error:', data);
+            set({
+              hasModelError: true,
+              modelError: {
+                speaker: data.speaker,
+                failedModelId: data.failedModelId,
+                error: data.error,
+                phase: data.phase,
+              },
+            });
+            break;
+          }
+
+          // Backend sends 'model_reassigned' when model is successfully reassigned
+          case 'model_reassigned': {
+            const data = message.data as {
+              debateId: string;
+              speaker: 'pro' | 'con' | 'moderator';
+              oldModelId: string | null;
+              newModelId: string;
+              reassignedAt: string;
+            };
+            console.log('✅ Model reassigned:', data);
+            // Clear model error state - debate will resume automatically
+            set({
+              hasModelError: false,
+              modelError: null,
+            });
             break;
           }
 

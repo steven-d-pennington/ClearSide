@@ -1137,6 +1137,16 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         newModelId: modelId,
       });
 
+      // Update the participant's model for future turns
+      if (participant?.id) {
+        await participantRepo.updateModel(participant.id, modelId);
+        logger.info({
+          participantId: participant.id,
+          oldModelId: participant.modelId,
+          newModelId: modelId,
+        }, 'Updated participant model configuration');
+      }
+
       // Broadcast update via SSE if available
       if (sseManager) {
         sseManager.broadcastToConversation(sessionId, 'conversation_utterance', {

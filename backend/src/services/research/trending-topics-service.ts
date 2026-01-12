@@ -1,8 +1,10 @@
 /**
  * Trending Topics Service
  *
- * Aggregates trending data from Listen Notes and provides context
- * for viral podcast episode generation.
+ * Aggregates trending data from multiple sources for viral podcast episode generation:
+ * - Listen Notes (podcast trending topics)
+ * - Reddit (social media discussions, free API)
+ * - Perplexity (web/social media search, fallback when Listen Notes rate-limited)
  */
 
 import pino from 'pino';
@@ -11,7 +13,12 @@ import {
   ListenNotesClient,
   type PodcastBasic,
 } from './listen-notes-client.js';
+import {
+  getRedditClient,
+  RedditClient,
+} from './reddit-client.js';
 import type { ResearchCategory } from '../../types/duelogic-research.js';
+import type { OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 
 const logger = pino({
   name: 'trending-topics-service',
@@ -91,33 +98,171 @@ export interface CategoryTrendingData {
 
 export class TrendingTopicsService {
   private listenNotesClient: ListenNotesClient;
+  private redditClient: RedditClient;
+  private llmClient: OpenRouterLLMClient | null;
 
-  constructor(listenNotesClient?: ListenNotesClient) {
+  constructor(
+    listenNotesClient?: ListenNotesClient,
+    llmClient?: OpenRouterLLMClient,
+    redditClient?: RedditClient
+  ) {
     this.listenNotesClient = listenNotesClient || getListenNotesClient();
+    this.llmClient = llmClient || null;
+    this.redditClient = redditClient || getRedditClient();
   }
 
   /**
    * Check if the service is available (has API key configured)
    */
   isAvailable(): boolean {
-    return this.listenNotesClient.isConfigured();
+    // Available if Listen Notes, Reddit, OR Perplexity is available
+    // Reddit is always available (no auth required)
+    return true;
+  }
+
+  /**
+   * Get trending topics from Perplexity (fallback when Listen Notes is unavailable)
+   */
+  private async getTrendingFromPerplexity(): Promise<string[]> {
+    if (!this.llmClient) {
+      logger.warn('Perplexity fallback not available - no LLM client configured');
+      return [];
+    }
+
+    try {
+      logger.info('Fetching trending topics from Perplexity (Listen Notes fallback)');
+
+      const response = await this.llmClient.generate({
+        model: 'perplexity/sonar-pro',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a trending topics analyst specializing in social media and current debates.
+Identify hot topics that would make compelling podcast debates by searching social media platforms and news sources.
+Focus on controversial, timely subjects across: technology ethics, AI, climate, politics, social justice, economics, and science.`
+          },
+          {
+            role: 'user',
+            content: `What are the top 15 most trending and controversial topics on social media RIGHT NOW (today)?
+
+SEARCH THESE PLATFORMS SPECIFICALLY:
+- Twitter/X: trending topics, viral threads, controversial takes
+- Reddit: r/all hot posts, r/politics, r/technology, r/science controversial discussions
+- HackerNews: front page debates (especially tech ethics)
+- YouTube: trending videos with debate/controversy
+- Major news sites: breaking controversial stories
+
+Requirements:
+- Focus on topics with GENUINE debate potential (two legitimate sides arguing)
+- Include specific events, people, or developments (e.g., "Elon Musk Twitter changes" not just "social media")
+- Mix of categories: tech, politics, climate, AI, social issues, economics, science
+- MUST be from the past 48 hours (very recent/current)
+- Prioritize topics people are ACTIVELY ARGUING about online
+
+Return ONLY a JSON array of strings, no other text:
+["topic 1", "topic 2", ...]
+
+Example format:
+["OpenAI CEO Sam Altman firing controversy", "Supreme Court ethics reform legislation", "Climate activists gluing hands to highways debate", "AI voice cloning copyright lawsuit", ...]`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000,
+      });
+
+      // Parse response
+      const content = response.content.trim();
+
+      // Try to extract JSON array from response
+      let topics: string[] = [];
+
+      // Look for JSON array in the response
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        try {
+          topics = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          logger.warn({ parseError, content }, 'Failed to parse Perplexity JSON response');
+        }
+      }
+
+      // Fallback: split by newlines and clean up
+      if (!Array.isArray(topics) || topics.length === 0) {
+        topics = content
+          .split('\n')
+          .map(line => line.replace(/^[-*•"\d.)\s]+/, '').replace(/["']$/g, '').trim())
+          .filter(line => line.length > 5 && line.length < 100);
+      }
+
+      logger.info({ topicCount: topics.length }, 'Fetched trending topics from Perplexity');
+
+      return topics.slice(0, 15);
+    } catch (error) {
+      logger.error({ error }, 'Failed to fetch trending from Perplexity');
+      return [];
+    }
   }
 
   /**
    * Get complete trending context for episode generation
    */
   async getTrendingContext(): Promise<TrendingContext> {
-    const trendingResponse = await this.listenNotesClient.getTrendingSearches();
+    const sources: string[] = [];
+    let allTrendingTopics: string[] = [];
 
-    // Clean up trending terms - remove quotes and normalize
-    const cleanedTrendingSearches = trendingResponse.terms.map(term =>
-      term.replace(/^["']|["']$/g, '').trim()
-    ).filter(term => term.length > 0);
+    // 1. Try Listen Notes first (podcast-specific trends)
+    try {
+      const trendingResponse = await this.listenNotesClient.getTrendingSearches();
+      const cleanedTrendingSearches = trendingResponse.terms.map(term =>
+        term.replace(/^["']|["']$/g, '').trim()
+      ).filter(term => term.length > 0);
+
+      if (cleanedTrendingSearches.length > 0) {
+        allTrendingTopics.push(...cleanedTrendingSearches);
+        sources.push('Listen Notes');
+        logger.info({ count: cleanedTrendingSearches.length }, 'Got trending topics from Listen Notes');
+      }
+    } catch (error) {
+      logger.warn({ error }, 'Listen Notes fetch failed');
+    }
+
+    // 2. Always fetch from Reddit (free, no rate limits, great for debates)
+    try {
+      const redditTopics = await this.redditClient.getAllTrendingTopics(15);
+      if (redditTopics.length > 0) {
+        allTrendingTopics.push(...redditTopics);
+        sources.push('Reddit');
+        logger.info({ count: redditTopics.length }, 'Got trending topics from Reddit');
+      }
+    } catch (error) {
+      logger.warn({ error }, 'Reddit fetch failed');
+    }
+
+    // 3. If we still don't have enough, use Perplexity fallback
+    if (allTrendingTopics.length < 10 && this.llmClient) {
+      logger.info('Fetching additional topics from Perplexity');
+      const perplexityTopics = await this.getTrendingFromPerplexity();
+      if (perplexityTopics.length > 0) {
+        allTrendingTopics.push(...perplexityTopics);
+        sources.push('Perplexity');
+        logger.info({ count: perplexityTopics.length }, 'Got trending topics from Perplexity');
+      }
+    }
+
+    // Deduplicate topics (case-insensitive, similar titles)
+    const uniqueTopics = this.deduplicateTopics(allTrendingTopics);
 
     logger.info({
-      originalTerms: trendingResponse.terms,
-      cleanedTerms: cleanedTrendingSearches,
-    }, 'Cleaned trending search terms');
+      totalRaw: allTrendingTopics.length,
+      uniqueCount: uniqueTopics.length,
+      sources,
+    }, 'Aggregated trending topics from all sources');
+
+    const attribution = sources.length > 0
+      ? `Powered by ${sources.join(', ')}`
+      : 'No trending data available';
+
+    const trendingSearches = uniqueTopics.slice(0, 20); // Top 20 unique topics
 
     // Get hot topics for key categories
     const hotTopicsByCategory = new Map<ResearchCategory, string[]>();
@@ -132,12 +277,13 @@ export class TrendingTopicsService {
     ];
 
     for (const category of priorityCategories) {
+      const categoryTopics: string[] = [];
+
+      // Fetch from Listen Notes (podcasts)
       try {
         const podcasts = await this.listenNotesClient.getBestPodcastsForCategory(category);
-
-        // Extract trending terms from podcast titles and descriptions
-        const categoryTerms = this.extractTrendingTermsFromPodcasts(podcasts);
-        hotTopicsByCategory.set(category, categoryTerms);
+        const podcastTerms = this.extractTrendingTermsFromPodcasts(podcasts);
+        categoryTopics.push(...podcastTerms);
 
         // Collect top podcast titles for pattern learning
         podcasts.slice(0, 5).forEach(p => {
@@ -146,18 +292,31 @@ export class TrendingTopicsService {
           }
         });
       } catch (error) {
-        logger.warn({ category, error }, 'Failed to fetch trending for category');
+        logger.warn({ category, error }, 'Failed to fetch Listen Notes for category');
       }
+
+      // Fetch from Reddit (social media discussions)
+      try {
+        const redditPosts = await this.redditClient.getCategoryTrending(category, 10);
+        const redditTopics = this.redditClient.extractTrendingTopics(redditPosts);
+        categoryTopics.push(...redditTopics);
+      } catch (error) {
+        logger.warn({ category, error }, 'Failed to fetch Reddit for category');
+      }
+
+      // Deduplicate and store
+      const uniqueCategoryTopics = this.deduplicateTopics(categoryTopics);
+      hotTopicsByCategory.set(category, uniqueCategoryTopics.slice(0, 10));
     }
 
     return {
-      trendingSearches: cleanedTrendingSearches,
+      trendingSearches,
       hotTopicsByCategory,
       suggestedTitlePatterns: VIRAL_TITLE_PATTERNS,
       powerWords: POWER_WORDS,
       topPodcastTitles: topPodcastTitles.slice(0, 20),
       lastUpdated: new Date(),
-      attribution: 'Powered by Listen Notes',
+      attribution,
     };
   }
 
@@ -345,6 +504,58 @@ Important: We want viral QUALITY content, not outrage bait.
   }
 
   /**
+   * Deduplicate topics using similarity matching
+   */
+  private deduplicateTopics(topics: string[]): string[] {
+    const unique: string[] = [];
+    const seenLower = new Set<string>();
+
+    for (const topic of topics) {
+      const topicLower = topic.toLowerCase().trim();
+
+      // Skip if too short
+      if (topicLower.length < 5) {
+        continue;
+      }
+
+      // Check if we've seen this exact topic (case-insensitive)
+      if (seenLower.has(topicLower)) {
+        continue;
+      }
+
+      // Check if we've seen a very similar topic (>80% overlap)
+      let isDuplicate = false;
+      for (const seen of seenLower) {
+        const similarity = this.calculateSimilarity(topicLower, seen);
+        if (similarity > 0.8) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      if (!isDuplicate) {
+        unique.push(topic);
+        seenLower.add(topicLower);
+      }
+    }
+
+    return unique;
+  }
+
+  /**
+   * Calculate similarity between two strings (0-1)
+   */
+  private calculateSimilarity(str1: string, str2: string): number {
+    const words1 = new Set(str1.split(/\s+/));
+    const words2 = new Set(str2.split(/\s+/));
+
+    const intersection = new Set([...words1].filter(w => words2.has(w)));
+    const union = new Set([...words1, ...words2]);
+
+    return intersection.size / union.size;
+  }
+
+  /**
    * Extract trending terms from podcast titles and descriptions
    */
   private extractTrendingTermsFromPodcasts(podcasts: PodcastBasic[]): string[] {
@@ -457,7 +668,9 @@ export function getTrendingTopicsService(): TrendingTopicsService {
  * Create a new trending topics service with custom configuration
  */
 export function createTrendingTopicsService(
-  listenNotesClient?: ListenNotesClient
+  listenNotesClient?: ListenNotesClient,
+  llmClient?: OpenRouterLLMClient,
+  redditClient?: RedditClient
 ): TrendingTopicsService {
-  return new TrendingTopicsService(listenNotesClient);
+  return new TrendingTopicsService(listenNotesClient, llmClient, redditClient);
 }

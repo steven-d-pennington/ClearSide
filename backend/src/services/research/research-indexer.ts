@@ -112,8 +112,11 @@ export class ResearchIndexer {
   ): Promise<Omit<VectorEntry, 'embedding'>[]> {
     const chunks: Omit<VectorEntry, 'embedding'>[] = [];
 
-    // Get unique URLs
-    const urls = research.sources
+    // FILTER: Only fetch enabled sources
+    const enabledSources = research.sources.filter(s => s.enabled !== false);
+
+    // Get unique URLs from enabled sources
+    const urls = enabledSources
       .map(s => s.url)
       .filter(url => url && url.startsWith('http'));
 
@@ -132,8 +135,8 @@ export class ResearchIndexer {
         continue;
       }
 
-      // Find matching source for metadata
-      const source = research.sources.find(s => s.url === article.url);
+      // Find matching source for metadata (from enabled sources only)
+      const source = enabledSources.find(s => s.url === article.url);
 
       // Split article into chunks
       const articleChunks = this.articleFetcher.chunkArticle(article, this.config.maxChunkSize);
@@ -236,8 +239,11 @@ export class ResearchIndexer {
       },
     });
 
-    // Add each source as chunks
-    for (const source of research.sources) {
+    // FILTER: Only add enabled sources
+    const enabledSources = research.sources.filter(s => s.enabled !== false);
+
+    // Add each enabled source as chunks
+    for (const source of enabledSources) {
       // Main excerpt chunk
       if (source.excerpt && source.excerpt.length > 20) {
         chunks.push({

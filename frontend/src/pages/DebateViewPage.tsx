@@ -10,6 +10,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Badge } from '../components/ui';
 import { DebateStream, ReplayViewer } from '../components/DebateStream';
 import { ExportPanel } from '../components/ExportPanel';
+import { ModelErrorModal } from '../components/ModelErrorModal';
 import { useDebateStore } from '../stores/debate-store';
 import { DebatePhase, Speaker } from '../types/debate';
 import type { Debate, DebateTurn, FlowMode, PresetMode } from '../types/debate';
@@ -82,9 +83,13 @@ export function DebateViewPage() {
   const debate = useDebateStore((state) => state.debate);
   const connectionStatus = useDebateStore((state) => state.connectionStatus);
   const streamingTurn = useDebateStore((state) => state.streamingTurn);
+  const hasModelError = useDebateStore((state) => state.hasModelError);
+  const modelError = useDebateStore((state) => state.modelError);
   const setDebate = useDebateStore.setState;
   const connectToDebate = useDebateStore((state) => state.connectToDebate);
   const closeDebate = useDebateStore((state) => state.closeDebate);
+  const reassignModel = useDebateStore((state) => state.reassignModel);
+  const clearModelError = useDebateStore((state) => state.clearModelError);
   const _reset = useDebateStore((state) => state._reset);
 
   // Detect stalled debate: marked as 'live' but not actively streaming
@@ -419,6 +424,19 @@ export function DebateViewPage() {
           <Button variant="primary">Start New Debate</Button>
         </Link>
       </footer>
+
+      {/* Model Error Modal */}
+      {hasModelError && modelError && (
+        <ModelErrorModal
+          isOpen={hasModelError}
+          speaker={modelError.speaker}
+          failedModelId={modelError.failedModelId}
+          error={modelError.error}
+          phase={modelError.phase}
+          onReassign={(newModelId) => reassignModel(modelError.speaker, newModelId)}
+          onClose={clearModelError}
+        />
+      )}
     </div>
   );
 }

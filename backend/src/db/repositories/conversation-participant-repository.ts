@@ -234,6 +234,25 @@ export class ConversationParticipantRepository {
   }
 
   /**
+   * Update the model for a participant
+   * Used when user selects a different model during conversation (e.g., after truncation)
+   */
+  async updateModel(
+    participantId: string,
+    modelId: string,
+    modelDisplayName?: string,
+    providerName?: string
+  ): Promise<void> {
+    await this.pool.query(`
+      UPDATE conversation_participants
+      SET model_id = $1,
+          model_display_name = $2,
+          provider_name = $3
+      WHERE id = $4
+    `, [modelId, modelDisplayName || null, providerName || null, participantId]);
+  }
+
+  /**
    * Find participants by IDs
    */
   async findByIds(ids: string[]): Promise<ConversationParticipant[]> {

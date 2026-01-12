@@ -1447,6 +1447,140 @@ router.post('/debates/:debateId/stop', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /debates/:debateId/reassign-model
+ * Reassign a model for a participant after model failure
+ * Used when a model fails and needs to be replaced to continue the debate
+ *
+ * Request body:
+ * - speaker (required): Which participant's model to replace ('pro', 'con', or 'moderator')
+ * - newModelId (required): The OpenRouter model ID to use instead
+ */
+router.post('/debates/:debateId/reassign-model', async (req: Request, res: Response) => {
+  const { debateId } = req.params;
+  const { speaker, newModelId } = req.body as {
+    speaker?: 'pro' | 'con' | 'moderator';
+    newModelId?: string;
+  };
+
+  logger.info({ debateId, speaker, newModelId }, 'Model reassignment request received');
+
+  try {
+    // Validate required fields
+    if (!speaker || !['pro', 'con', 'moderator'].includes(speaker)) {
+      res.status(400).json({
+        error: 'Invalid input',
+        message: "speaker is required and must be 'pro', 'con', or 'moderator'",
+      });
+      return;
+    }
+
+    if (!newModelId || typeof newModelId !== 'string') {
+      res.status(400).json({
+        error: 'Invalid input',
+        message: 'newModelId is required and must be a string',
+      });
+      return;
+    }
+
+    // Verify debate exists
+    const debate = await debateRepository.findById(debateId!);
+
+    if (!debate) {
+      res.status(404).json({
+        error: 'Debate not found',
+        debateId,
+      });
+      return;
+    }
+
+    // Allow reassignment for debates that are live, paused, or failed
+    if (!['live', 'paused', 'failed'].includes(debate.status)) {
+      res.status(400).json({
+        error: 'Invalid debate status',
+        message: `Cannot reassign model for debate with status: ${debate.status}`,
+        currentStatus: debate.status,
+      });
+      return;
+    }
+
+    // Update the appropriate model ID in the database
+    const updateField = speaker === 'pro'
+      ? 'pro_model_id'
+      : speaker === 'con'
+      ? 'con_model_id'
+      : 'moderator_model_id';
+
+    await debateRepository.updateModelConfig(debateId!, {
+      [updateField]: newModelId,
+    });
+
+    logger.info({ debateId, speaker, newModelId }, 'Model reassigned successfully');
+
+    // Broadcast model reassignment event
+    sseManager.broadcastToDebate(debateId!, 'model_reassigned', {
+      debateId: debateId!,
+      speaker,
+      oldModelId: speaker === 'pro'
+        ? debate.proModelId
+        : speaker === 'con'
+        ? debate.conModelId
+        : debate.moderatorModelId,
+      newModelId,
+      reassignedAt: new Date().toISOString(),
+    });
+
+    // Get the running orchestrator and notify it of the reassignment
+    const orchestrator = orchestratorRegistry.get(debateId!);
+
+    if (orchestrator) {
+      // Call orchestrator's reassignModel method to resume debate
+      if (orchestrator.reassignModel) {
+        await orchestrator.reassignModel(speaker, newModelId);
+        logger.info({ debateId }, 'Orchestrator notified of model reassignment');
+      } else {
+        logger.warn({ debateId }, 'Orchestrator does not support reassignModel method');
+      }
+
+      // Broadcast resume event
+      sseManager.broadcastToDebate(debateId!, 'debate_resumed', {
+        debateId: debateId!,
+        resumedAt: new Date().toISOString(),
+        reason: 'Model reassigned',
+        phase: debate.currentPhase,
+      });
+    } else {
+      // No orchestrator found - if debate was failed, set it back to live
+      if (debate.status === 'failed' || debate.status === 'paused') {
+        await debateRepository.updateStatus(debateId!, { status: 'live' });
+
+        // Broadcast resume event
+        sseManager.broadcastToDebate(debateId!, 'debate_resumed', {
+          debateId: debateId!,
+          resumedAt: new Date().toISOString(),
+          reason: 'Model reassigned (no active orchestrator)',
+          phase: debate.currentPhase,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      debateId: debateId!,
+      speaker,
+      newModelId,
+      reassignedAt: new Date().toISOString(),
+      message: 'Model reassigned successfully',
+    });
+  } catch (error) {
+    logger.error({ debateId, error }, 'Error reassigning model');
+    res.status(500).json({
+      error: 'Failed to reassign model',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
  * DELETE /debates/:debateId
  * Delete a debate and all associated data
  */

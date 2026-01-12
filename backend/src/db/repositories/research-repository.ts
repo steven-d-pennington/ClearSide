@@ -234,6 +234,52 @@ export class ResearchRepository {
         return result.rows.map(row => this.mapResultRow(row));
     }
 
+    // ========== Source Management Methods ==========
+
+    /**
+     * Find research result with sources (alias for findResultById with clearer intent)
+     */
+    async findResultWithSources(id: string): Promise<ResearchResult | null> {
+        const result = await this.pool.query(`
+      SELECT * FROM research_results WHERE id = $1
+    `, [id]);
+
+        return result.rows[0] ? this.mapResultRow(result.rows[0]) : null;
+    }
+
+    /**
+     * Update sources for a research result
+     */
+    async updateSources(
+        resultId: string,
+        sources: any[],
+        _updatedBy: string
+    ): Promise<void> {
+        await this.pool.query(`
+      UPDATE research_results
+      SET sources = $1
+      WHERE id = $2
+    `, [JSON.stringify(sources), resultId]);
+    }
+
+    /**
+     * Update indexing metadata after indexing sources
+     */
+    async updateIndexingMetadata(
+        resultId: string,
+        indexedAt: Date,
+        chunkCount: number,
+        error?: string
+    ): Promise<void> {
+        await this.pool.query(`
+      UPDATE research_results
+      SET indexed_at = $1,
+          indexed_chunk_count = $2,
+          indexing_error = $3
+      WHERE id = $4
+    `, [indexedAt, chunkCount, error || null, resultId]);
+    }
+
     // ========== Row Mappers ==========
 
     private mapConfigRow(row: any): ResearchConfig {
@@ -282,6 +328,9 @@ export class ResearchRepository {
             depth: row.depth,
             rawPerplexityResponse: row.raw_perplexity_response,
             createdAt: row.created_at,
+            indexedAt: row.indexed_at,
+            indexedChunkCount: row.indexed_chunk_count,
+            indexingError: row.indexing_error,
         };
     }
 }

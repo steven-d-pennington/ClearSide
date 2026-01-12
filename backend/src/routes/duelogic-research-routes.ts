@@ -667,13 +667,13 @@ router.post('/proposals/:id/approve', async (req: Request, res: Response) => {
 /**
  * Index research into Pinecone asynchronously
  */
-async function indexResearchAsync(proposal: Awaited<ReturnType<typeof proposalRepo.findById>>): Promise<void> {
-  if (!proposal) return;
+async function indexResearchAsync(proposal: Awaited<ReturnType<typeof proposalRepo.findById>>): Promise<number> {
+  if (!proposal) return 0;
 
   const vectorDB = createVectorDBClient();
   if (!vectorDB) {
     logger.info('Vector DB not configured, skipping research indexing');
-    return;
+    return 0;
   }
 
   try {
@@ -682,6 +682,17 @@ async function indexResearchAsync(proposal: Awaited<ReturnType<typeof proposalRe
 
     const chunksIndexed = await indexer.indexEpisodeResearch(proposal);
     logger.info({ proposalId: proposal.id, chunksIndexed }, 'Research indexed into Pinecone');
+
+    // Update indexing metadata
+    if (proposal.researchResultId) {
+      await researchRepo.updateIndexingMetadata(
+        proposal.researchResultId,
+        new Date(),
+        chunksIndexed
+      );
+    }
+
+    return chunksIndexed;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
@@ -690,9 +701,136 @@ async function indexResearchAsync(proposal: Awaited<ReturnType<typeof proposalRe
       errorStack,
       proposalId: proposal.id
     }, 'Failed to index research');
+
+    // Update indexing metadata with error
+    if (proposal.researchResultId) {
+      await researchRepo.updateIndexingMetadata(
+        proposal.researchResultId,
+        new Date(),
+        0,
+        errorMessage
+      );
+    }
+
     throw error;
   }
 }
+
+/**
+ * GET /duelogic/proposals/:id/research
+ * Get research result with sources for a proposal
+ */
+router.get('/proposals/:id/research', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    const proposal = await proposalRepo.findById(id);
+
+    if (!proposal?.researchResultId) {
+      return res.status(404).json({ error: 'Research not found' });
+    }
+
+    const research = await researchRepo.findResultWithSources(
+      proposal.researchResultId
+    );
+
+    if (!research) {
+      return res.status(404).json({ error: 'Research result not found' });
+    }
+
+    return res.json(research);
+  } catch (error) {
+    logger.error({ error }, 'Failed to get research sources');
+    return res.status(500).json({ error: 'Failed to get research sources' });
+  }
+});
+
+/**
+ * PUT /duelogic/proposals/:id/research/sources
+ * Update research sources
+ */
+router.put('/proposals/:id/research/sources', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { sources } = req.body;
+
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    // Validate sources array with Zod
+    const SourceSchema = z.object({
+      url: z.string().url(),
+      title: z.string().min(1),
+      domain: z.string(),
+      excerpt: z.string(),
+      publishedAt: z.string().optional(),
+      credibilityScore: z.number().optional(),
+      enabled: z.boolean().optional(),
+      customAdded: z.boolean().optional(),
+      addedBy: z.string().optional(),
+      addedAt: z.string().optional(),
+    });
+
+    const schema = z.object({
+      sources: z.array(SourceSchema)
+    });
+
+    const parseResult = schema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ errors: parseResult.error.errors });
+    }
+
+    const proposal = await proposalRepo.findById(id);
+    if (!proposal?.researchResultId) {
+      return res.status(404).json({ error: 'Research not found' });
+    }
+
+    await researchRepo.updateSources(
+      proposal.researchResultId,
+      sources,
+      'admin'
+    );
+
+    logger.info({ proposalId: id, sourceCount: sources.length }, 'Research sources updated');
+    return res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, 'Failed to update research sources');
+    return res.status(500).json({ error: 'Failed to update research sources' });
+  }
+});
+
+/**
+ * POST /duelogic/proposals/:id/research/reindex
+ * Re-index research sources into vector database
+ */
+router.post('/proposals/:id/research/reindex', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'ID required' });
+
+    const proposal = await proposalRepo.findById(id);
+
+    if (!proposal?.researchResultId) {
+      return res.status(404).json({ error: 'Research not found' });
+    }
+
+    // Remove old indexed data
+    const vectorDB = createVectorDBClient();
+    if (vectorDB) {
+      await vectorDB.deleteByEpisode(proposal.id);
+      logger.info({ proposalId: proposal.id }, 'Deleted old indexed research');
+    }
+
+    // Re-index with updated sources
+    const chunksIndexed = await indexResearchAsync(proposal);
+
+    logger.info({ proposalId: proposal.id, chunksIndexed }, 'Re-indexed research sources');
+    return res.json({ success: true, chunksIndexed });
+  } catch (error) {
+    logger.error({ error }, 'Failed to re-index research sources');
+    return res.status(500).json({ error: 'Failed to re-index research sources' });
+  }
+});
 
 /**
  * POST /duelogic/proposals/:id/reject

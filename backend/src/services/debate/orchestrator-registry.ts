@@ -16,6 +16,7 @@ const logger = createLogger({ module: 'OrchestratorRegistry' });
 export interface StoppableOrchestrator {
   stop(reason?: string): Promise<void> | void;
   isStopped?(): boolean;
+  reassignModel?(speaker: 'pro' | 'con' | 'moderator', newModelId: string): Promise<void>;
 }
 
 /**

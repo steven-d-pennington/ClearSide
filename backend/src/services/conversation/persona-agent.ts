@@ -715,10 +715,17 @@ export class PersonaAgent {
         }
 
         // If truncation still detected after retries AND we have substantial content,
-        // emit SSE event for user intervention. Don't emit for empty/very short responses
-        // as those are handled by the empty response retry logic.
+        // emit SSE event for user intervention and throw error to pause conversation.
+        // Don't emit for empty/very short responses as those are handled by the empty response retry logic.
         if (detectTruncation(result.content, result.finishReason) && result.content.trim().length >= MIN_CONTENT_LENGTH) {
           this.emitTruncationDetectedEvent(result.content, result.finishReason);
+
+          // Throw specific error to signal orchestrator to pause and wait for user intervention
+          const truncationError = new Error('Response truncated after retry attempts - user intervention required');
+          (truncationError as any).code = 'TRUNCATION_DETECTED';
+          (truncationError as any).partialContent = result.content;
+          (truncationError as any).participantId = this.participant.id;
+          throw truncationError;
         }
       }
 

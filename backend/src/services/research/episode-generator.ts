@@ -3,8 +3,8 @@ import { OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 import { EpisodeProposalRepository } from '../../db/repositories/episode-proposal-repository.js';
 import { ResearchResult, EpisodeProposal, PhilosophicalChair, ViralMetrics, TopicPreScreenResult } from '../../types/duelogic-research.js';
 import {
-    getTrendingTopicsService,
     TrendingTopicsService,
+    createTrendingTopicsService,
     VIRAL_TITLE_PATTERNS,
     POWER_WORDS,
     type TrendingContext,
@@ -56,7 +56,8 @@ export class EpisodeGenerator {
         trendingService?: TrendingTopicsService
     ) {
         this.config = { ...DEFAULT_GENERATOR_CONFIG, ...config };
-        this.trendingService = trendingService || getTrendingTopicsService();
+        // Pass LLM client to trending service for Perplexity fallback
+        this.trendingService = trendingService || createTrendingTopicsService(undefined, llmClient);
     }
 
     /**

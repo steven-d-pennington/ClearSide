@@ -108,6 +108,40 @@ export interface DashboardStats {
   totalEpisodesGenerated: number;
 }
 
+export interface ResearchSource {
+  url: string;
+  title: string;
+  domain: string;
+  publishedAt?: string;
+  excerpt: string;
+  credibilityScore?: number;
+
+  // Source management fields
+  enabled?: boolean;
+  customAdded?: boolean;
+  addedBy?: string;
+  addedAt?: string;
+}
+
+export interface ResearchResult {
+  id: string;
+  jobId: string;
+  topic: string;
+  category: ResearchCategory;
+  sources: ResearchSource[];
+  summary: string;
+  controversyScore: number;
+  timeliness: number;
+  depth: number;
+  rawPerplexityResponse: string;
+  createdAt: string;
+
+  // Indexing metadata
+  indexedAt?: string;
+  indexedChunkCount?: number;
+  indexingError?: string;
+}
+
 export const CATEGORY_LABELS: Record<ResearchCategory, string> = {
   technology_ethics: 'Technology & Ethics',
   climate_environment: 'Climate & Environment',

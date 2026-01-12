@@ -27,6 +27,8 @@ export type SSEEventType =
   | 'debate_complete'        // Debate completed (alternative)
   | 'debate_stopped'         // Debate stopped by user
   | 'error'                  // Error occurred during debate
+  | 'model_error'            // Model failed, user can select replacement
+  | 'model_reassigned'       // Model was reassigned after failure
   // Catch-up events for reconnecting clients
   | 'catchup_start'          // Client reconnected, catch-up beginning
   | 'catchup_utterance'      // Historical utterance sent during catch-up
@@ -197,6 +199,39 @@ export interface ErrorEventData {
   error: string;
   code?: string;
   timestamp: string;
+}
+
+/** Model error event payload - allows user to select replacement model */
+export interface ModelErrorEventData {
+  debateId: string;
+  /** Which participant failed: 'pro', 'con', 'moderator' */
+  speaker: 'pro' | 'con' | 'moderator';
+  /** The model ID that failed */
+  failedModelId: string;
+  /** Error message from the failed model */
+  error: string;
+  /** Error code if available */
+  code?: string;
+  /** Current phase when failure occurred */
+  phase: string;
+  /** Turn number when failure occurred */
+  turnNumber?: number;
+  /** Prompt type that was being attempted */
+  promptType?: string;
+  timestamp: string;
+}
+
+/** Model reassigned event payload - confirms model replacement */
+export interface ModelReassignedEventData {
+  debateId: string;
+  /** Which participant's model was reassigned */
+  speaker: 'pro' | 'con' | 'moderator';
+  /** The old/failed model ID */
+  oldModelId: string | null;
+  /** The new model ID to use */
+  newModelId: string;
+  /** When the reassignment occurred */
+  reassignedAt: string;
 }
 
 /** Debate stopped event payload */

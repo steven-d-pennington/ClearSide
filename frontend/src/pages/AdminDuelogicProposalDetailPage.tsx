@@ -11,7 +11,7 @@ import { Button, Alert } from '../components/ui';
 import { LaunchDebateModal } from '../components/LaunchDebateModal';
 import { ConversationConfigModal } from '../components/ConversationalPodcast';
 import styles from './AdminDuelogicProposalDetailPage.module.css';
-import type { EpisodeProposal, PhilosophicalChair } from '../types/duelogic-research';
+import type { EpisodeProposal, PhilosophicalChair, ResearchSource } from '../types/duelogic-research';
 import { CATEGORY_LABELS, type ResearchCategory } from '../types/duelogic-research';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -38,6 +38,16 @@ export function AdminDuelogicProposalDetailPage() {
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isRelaunching, setIsRelaunching] = useState(false);
 
+  // Research sources state
+  const [researchSources, setResearchSources] = useState<ResearchSource[]>([]);
+  const [isEditingSources, setIsEditingSources] = useState(false);
+  const [isReindexing, setIsReindexing] = useState(false);
+  const [indexingStats, setIndexingStats] = useState<{
+    indexedAt?: string;
+    chunkCount?: number;
+    error?: string;
+  } | null>(null);
+
   const fetchProposal = useCallback(async () => {
     if (!id) return;
     setIsLoading(true);
@@ -59,6 +69,33 @@ export function AdminDuelogicProposalDetailPage() {
   useEffect(() => {
     fetchProposal();
   }, [fetchProposal]);
+
+  const fetchResearchSources = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/duelogic/proposals/${id}/research`
+      );
+      if (!response.ok) return;
+
+      const data = await response.json();
+      setResearchSources(data.sources || []);
+      setIndexingStats({
+        indexedAt: data.indexedAt,
+        chunkCount: data.indexedChunkCount,
+        error: data.indexingError,
+      });
+    } catch (err) {
+      console.error('Error fetching research sources:', err);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (proposal?.researchResultId) {
+      fetchResearchSources();
+    }
+  }, [proposal?.researchResultId, fetchResearchSources]);
 
   const handleSave = async () => {
     if (!id) return;
@@ -273,6 +310,92 @@ export function AdminDuelogicProposalDetailPage() {
     const keyTensions = [...(editedProposal.keyTensions || proposal?.keyTensions || [])];
     keyTensions[index] = value;
     setEditedProposal(prev => ({ ...prev, keyTensions }));
+  };
+
+  // Research sources handlers
+  const handleToggleSource = (index: number) => {
+    const updated = [...researchSources];
+    updated[index].enabled = updated[index].enabled === false ? true : false;
+    setResearchSources(updated);
+  };
+
+  const handleAddCustomSource = () => {
+    const url = prompt('Enter source URL:');
+    if (!url) return;
+
+    try {
+      const newSource: ResearchSource = {
+        url,
+        title: prompt('Enter source title:') || 'Custom Source',
+        domain: new URL(url).hostname.replace('www.', ''),
+        excerpt: prompt('Enter excerpt:') || '',
+        customAdded: true,
+        addedBy: 'admin',
+        addedAt: new Date().toISOString(),
+        enabled: true,
+      };
+      setResearchSources([...researchSources, newSource]);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: 'Invalid URL format' });
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
+  const handleSaveSources = async () => {
+    if (!id) return;
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/duelogic/proposals/${id}/research/sources`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sources: researchSources }),
+        }
+      );
+
+      if (response.ok) {
+        setActionMessage({ type: 'success', text: 'Sources updated' });
+        setIsEditingSources(false);
+        fetchResearchSources();
+      } else {
+        setActionMessage({ type: 'error', text: 'Failed to update sources' });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Failed to update sources' });
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
+  };
+
+  const handleReindexSources = async () => {
+    if (!id) return;
+    setIsReindexing(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/duelogic/proposals/${id}/research/reindex`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+      );
+
+      if (response.ok) {
+        const { chunksIndexed } = await response.json();
+        setActionMessage({
+          type: 'success',
+          text: `Re-indexed ${chunksIndexed} chunks`
+        });
+        fetchResearchSources();
+      } else {
+        setActionMessage({ type: 'error', text: 'Failed to re-index' });
+      }
+    } catch {
+      setActionMessage({ type: 'error', text: 'Failed to re-index' });
+    } finally {
+      setIsReindexing(false);
+      setTimeout(() => setActionMessage(null), 5000);
+    }
   };
 
   const formatDate = (dateStr: string | undefined): string => {
@@ -681,6 +804,109 @@ export function AdminDuelogicProposalDetailPage() {
             </ul>
           </div>
         </section>
+
+        {/* Research Sources Section */}
+        {researchSources.length > 0 && (
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+              </div>
+              <h2 className={styles.sectionTitle}>Research Sources</h2>
+              {indexingStats?.indexedAt && (
+                <div className={styles.indexingBadge}>
+                  <span className={styles.indexedIcon}>✓</span>
+                  {indexingStats.chunkCount} chunks indexed
+                </div>
+              )}
+            </div>
+
+            <div className={styles.sectionBody}>
+              <div className={styles.sourcesHeader}>
+                <span className={styles.sourceCount}>
+                  {researchSources.filter(s => s.enabled !== false).length} of {researchSources.length} enabled
+                </span>
+                {!isEditingSources && (
+                  <Button
+                    onClick={() => setIsEditingSources(true)}
+                    variant="secondary"
+                  >
+                    Manage Sources
+                  </Button>
+                )}
+              </div>
+
+              <div className={styles.sourcesList}>
+                {researchSources.map((source, index) => (
+                  <div
+                    key={index}
+                    className={`${styles.sourceItem} ${source.enabled === false ? styles.sourceDisabled : ''}`}
+                  >
+                    {isEditingSources && (
+                      <input
+                        type="checkbox"
+                        checked={source.enabled !== false}
+                        onChange={() => handleToggleSource(index)}
+                        className={styles.sourceCheckbox}
+                      />
+                    )}
+
+                    <div className={styles.sourceContent}>
+                      <div className={styles.sourceHeader}>
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.sourceTitle}
+                        >
+                          {source.title}
+                        </a>
+                        <span className={styles.sourceDomain}>{source.domain}</span>
+                        {source.customAdded && (
+                          <span className={styles.customBadge}>Custom</span>
+                        )}
+                      </div>
+                      <p className={styles.sourceExcerpt}>{source.excerpt}</p>
+                      {source.publishedAt && (
+                        <div className={styles.sourceMeta}>
+                          Published: {formatDate(source.publishedAt)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {isEditingSources && (
+                <div className={styles.sourcesActions}>
+                  <Button onClick={handleAddCustomSource} variant="secondary">
+                    + Add Custom Source
+                  </Button>
+                  <Button onClick={handleSaveSources} variant="primary" loading={isSaving}>
+                    Save Changes
+                  </Button>
+                  <Button onClick={() => setIsEditingSources(false)} variant="secondary">
+                    Cancel
+                  </Button>
+                </div>
+              )}
+
+              {proposal.status === 'approved' && !isEditingSources && (
+                <Button
+                  onClick={handleReindexSources}
+                  variant="secondary"
+                  loading={isReindexing}
+                  className={styles.reindexButton}
+                >
+                  Re-index Sources
+                </Button>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Viral Optimization Details */}
         {viralMetrics && (viralMetrics.suggestedHashtags?.length > 0 || viralMetrics.targetAudience) && (

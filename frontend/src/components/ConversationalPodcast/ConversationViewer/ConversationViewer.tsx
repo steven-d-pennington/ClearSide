@@ -97,6 +97,10 @@ export function ConversationViewer() {
   // Launch conversation helper
   const launchConversation = useCallback(async () => {
     if (!sessionId) return;
+    if (isLaunching) {
+      console.log('Launch already in progress, skipping duplicate call');
+      return;
+    }
 
     setIsLaunching(true);
     console.log('Launching conversation:', sessionId);
@@ -127,7 +131,7 @@ export function ConversationViewer() {
     } finally {
       setIsLaunching(false);
     }
-  }, [sessionId]);
+  }, [sessionId, isLaunching]);
 
   // Load initial session data
   useEffect(() => {
@@ -416,6 +420,7 @@ export function ConversationViewer() {
       if (response.ok) {
         const data = await response.json();
         console.log('[Regenerate] Success:', data);
+
         // Update the utterance in our local state
         setUtterances(prev =>
           prev.map(u =>
@@ -424,7 +429,27 @@ export function ConversationViewer() {
               : u
           )
         );
+
+        // Close the modal
         setTruncationAlert(null);
+
+        // Auto-resume the conversation after successful regeneration
+        try {
+          console.log('[Regenerate] Auto-resuming conversation');
+          const resumeResponse = await fetch(
+            `${API_BASE_URL}/api/conversations/sessions/${sessionId}/resume`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+          );
+
+          if (resumeResponse.ok) {
+            console.log('[Regenerate] Conversation resumed successfully');
+          } else {
+            console.warn('[Regenerate] Failed to auto-resume conversation');
+          }
+        } catch (resumeErr) {
+          console.error('[Regenerate] Error auto-resuming:', resumeErr);
+          // Don't show error to user - they can manually resume if needed
+        }
       } else {
         const data = await response.json();
         console.error('[Regenerate] API error:', data);
@@ -668,15 +693,49 @@ interface TruncationAlertDialogProps {
   onDismiss: () => void;
 }
 
-// Common models that tend to have better context handling
-const ALTERNATIVE_MODELS = [
-  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-  { id: 'anthropic/claude-3-opus', name: 'Claude 3 Opus' },
-  { id: 'openai/gpt-4-turbo', name: 'GPT-4 Turbo' },
-  { id: 'openai/gpt-4o', name: 'GPT-4o' },
-  { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5' },
-  { id: 'meta-llama/llama-3.1-70b-instruct', name: 'Llama 3.1 70B' },
-];
+interface ModelInfo {
+  id: string;
+  name: string;
+  provider?: string;
+  created?: number;
+}
+
+/**
+ * Filter models to show only the latest from each provider
+ * Groups by provider (e.g., "anthropic", "openai", "google") and takes the newest
+ */
+function filterLatestModelsByProvider(models: ModelInfo[], currentModelId: string): ModelInfo[] {
+  // Group models by provider
+  const byProvider = new Map<string, ModelInfo[]>();
+
+  for (const model of models) {
+    // Extract provider from ID (e.g., "anthropic/claude-..." -> "anthropic")
+    const provider = model.id.split('/')[0] || 'unknown';
+
+    if (!byProvider.has(provider)) {
+      byProvider.set(provider, []);
+    }
+    byProvider.get(provider)!.push(model);
+  }
+
+  // For each provider, select the latest model (by created timestamp or alphabetically)
+  const latestModels: ModelInfo[] = [];
+  for (const [provider, providerModels] of byProvider.entries()) {
+    // Sort by created date (newest first) or by ID if no date
+    const sorted = providerModels.sort((a, b) => {
+      if (a.created && b.created) return b.created - a.created;
+      return b.id.localeCompare(a.id);
+    });
+
+    // Take the first (newest) model from this provider
+    const latest = sorted[0];
+    if (latest && latest.id !== currentModelId) {
+      latestModels.push(latest);
+    }
+  }
+
+  return latestModels.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id));
+}
 
 function TruncationAlertDialog({
   personaName,
@@ -686,14 +745,55 @@ function TruncationAlertDialog({
   onRegenerate,
   onDismiss,
 }: TruncationAlertDialogProps) {
-  const [selectedModel, setSelectedModel] = useState(ALTERNATIVE_MODELS[0]?.id || '');
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-  // Filter out current model from alternatives
-  const availableModels = ALTERNATIVE_MODELS.filter(m => m.id !== currentModelId);
+  const [allModels, setAllModels] = useState<ModelInfo[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Fetch models from API on mount
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/models`);
+        if (!response.ok) throw new Error('Failed to fetch models');
+
+        const data = await response.json();
+        setAllModels(data.models || []);
+      } catch (err) {
+        console.error('Failed to load models:', err);
+        setLoadError(err instanceof Error ? err.message : 'Failed to load models');
+      } finally {
+        setIsLoadingModels(false);
+      }
+    }
+
+    fetchModels();
+  }, [API_BASE_URL]);
+
+  // Filter to latest models from each provider, excluding current model
+  const availableModels = filterLatestModelsByProvider(allModels, currentModelId);
+
+  const [selectedModel, setSelectedModel] = useState('');
+
+  // Set initial selected model when models load
+  useEffect(() => {
+    if (availableModels.length > 0 && !selectedModel) {
+      setSelectedModel(availableModels[0].id);
+    }
+  }, [availableModels, selectedModel]);
 
   return (
-    <div className={styles.truncationAlertOverlay}>
-      <div className={styles.truncationAlertDialog}>
+    <div
+      className={styles.truncationAlertOverlay}
+      onClick={(e) => {
+        // Prevent closing modal by clicking outside when regenerating
+        if (isRegenerating) {
+          e.stopPropagation();
+        }
+      }}
+    >
+      <div className={styles.truncationAlertDialog} onClick={(e) => e.stopPropagation()}>
         <div className={styles.truncationAlertHeader}>
           <span className={styles.warningIcon}>⚠️</span>
           <h3>Response Truncated</h3>
@@ -714,18 +814,26 @@ function TruncationAlertDialog({
         <div className={styles.truncationAlertActions}>
           <div className={styles.modelSelector}>
             <label htmlFor="model-select">Try different model:</label>
-            <select
-              id="model-select"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              disabled={isRegenerating}
-            >
-              {availableModels.map(model => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
+            {isLoadingModels ? (
+              <div className={styles.loadingModels}>Loading models...</div>
+            ) : loadError ? (
+              <div className={styles.loadError}>Error loading models: {loadError}</div>
+            ) : availableModels.length === 0 ? (
+              <div className={styles.noModels}>No alternative models available</div>
+            ) : (
+              <select
+                id="model-select"
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                disabled={isRegenerating}
+              >
+                {availableModels.map(model => (
+                  <option key={model.id} value={model.id}>
+                    {model.name || model.id}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div className={styles.truncationButtons}>
@@ -733,13 +841,14 @@ function TruncationAlertDialog({
               className={styles.dismissButton}
               onClick={onDismiss}
               disabled={isRegenerating}
+              title={isRegenerating ? 'Please wait for regeneration to complete' : undefined}
             >
               Keep Partial
             </button>
             <button
               className={styles.regenerateButton}
               onClick={() => onRegenerate(selectedModel)}
-              disabled={isRegenerating || !selectedModel}
+              disabled={isRegenerating || !selectedModel || isLoadingModels}
             >
               {isRegenerating ? (
                 <>

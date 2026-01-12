@@ -12,8 +12,8 @@ import {
 import { CATEGORY_PROMPTS } from './category-prompts.js';
 import { DEFAULT_PERPLEXITY_CONFIG, PerplexityConfig } from './perplexity-config.js';
 import {
-    getTrendingTopicsService,
     TrendingTopicsService,
+    createTrendingTopicsService,
     type TrendingContext,
 } from './trending-topics-service.js';
 import pino from 'pino';
@@ -57,7 +57,8 @@ export class DuelogicResearchService {
     ) {
         this.perplexityConfig = { ...DEFAULT_PERPLEXITY_CONFIG, ...config };
         this.qualityThresholds = { ...DEFAULT_QUALITY_THRESHOLDS, ...thresholds };
-        this.trendingService = trendingService || getTrendingTopicsService();
+        // Pass LLM client to trending service for Perplexity fallback
+        this.trendingService = trendingService || createTrendingTopicsService(undefined, llmClient);
     }
 
     /**

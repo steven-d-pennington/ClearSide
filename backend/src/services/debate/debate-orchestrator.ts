@@ -32,6 +32,10 @@ import type {
   NormalizedProposition,
   RAGCitationContext,
 } from '../agents/types.js';
+import { ProAdvocateAgent as ProAdvocateAgentClass } from '../agents/pro-advocate-agent.js';
+import { ConAdvocateAgent as ConAdvocateAgentClass } from '../agents/con-advocate-agent.js';
+import { ModeratorAgent as ModeratorAgentClass } from '../agents/moderator-agent.js';
+import { OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 import { createVectorDBClient } from '../research/vector-db-factory.js';
 import { createEmbeddingService } from '../research/embedding-service.js';
 import { RAGRetrievalService } from '../research/rag-retrieval-service.js';
@@ -121,6 +125,15 @@ export class DebateOrchestrator {
   private startTime: Date | null = null;
   private isPausedFlag: boolean = false;
   private isStoppedFlag: boolean = false;
+  private isAwaitingModelReassignment: boolean = false;
+  // @ts-expect-error - Reserved for future use (debugging/logging model failures)
+  private _modelFailureContext: {
+    speaker: Speaker;
+    error: Error;
+    phase: DebatePhase;
+    promptType: string;
+    context: AgentContext;
+  } | null = null;
 
   constructor(
     debateId: string,
@@ -398,7 +411,11 @@ export class DebateOrchestrator {
           break; // Success, exit retry loop
         } catch (error) {
           if (attempt === this.config.maxRetries) {
-            throw error; // Final attempt failed
+            // Final attempt failed - handle model failure
+            await this.handleModelFailure(speaker, error as Error, promptType, context);
+            // After model reassignment, retry with new model
+            response = await this.callAgentInternal(speaker, promptType, context);
+            break;
           }
           logger.warn(
             { speaker, promptType, attempt, maxRetries: this.config.maxRetries },
@@ -784,6 +801,112 @@ export class DebateOrchestrator {
   private async waitForResume(): Promise<void> {
     while (this.isPausedFlag && !this.isStoppedFlag) {
       await this.sleep(1000);
+    }
+  }
+
+  /**
+   * Handle model failure after all retries exhausted
+   * Broadcasts model_error event, pauses debate, and waits for reassignment
+   */
+  private async handleModelFailure(
+    speaker: Speaker,
+    error: Error,
+    promptType: string,
+    context: AgentContext
+  ): Promise<void> {
+    logger.error({ speaker, error, promptType }, 'Model failed after all retries');
+
+    // Store failure context for potential retry
+    const currentPhase = this.stateMachine.getCurrentPhase();
+    this._modelFailureContext = {
+      speaker,
+      error,
+      phase: currentPhase,
+      promptType,
+      context,
+    };
+
+    // Get the failed model ID
+    const debate = await debateRepo.findById(this.debateId);
+    const failedModelId =
+      speaker === Speaker.PRO
+        ? debate?.proModelId
+        : speaker === Speaker.CON
+        ? debate?.conModelId
+        : debate?.moderatorModelId;
+
+    // Broadcast model_error event
+    if (this.config.broadcastEvents) {
+      this.sseManager.broadcastToDebate(this.debateId, 'model_error', {
+        debateId: this.debateId,
+        speaker: speaker.toLowerCase() as 'pro' | 'con' | 'moderator',
+        failedModelId: failedModelId || 'unknown',
+        error: error.message,
+        code: (error as any).code,
+        phase: currentPhase,
+        promptType,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Pause the debate
+    logger.info({ debateId: this.debateId }, 'Pausing debate due to model failure');
+    this.isAwaitingModelReassignment = true;
+    this.isPausedFlag = true;
+    await debateRepo.updateStatus(this.debateId, { status: 'paused' });
+
+    // Wait for model reassignment
+    await this.waitForModelReassignment();
+
+    logger.info({ debateId: this.debateId }, 'Model reassigned, resuming debate');
+  }
+
+  /**
+   * Wait for model reassignment
+   * Polls until model is reassigned or debate is stopped
+   */
+  private async waitForModelReassignment(): Promise<void> {
+    while (this.isAwaitingModelReassignment && !this.isStoppedFlag) {
+      await this.sleep(1000);
+    }
+  }
+
+  /**
+   * Reassign model for a speaker and resume debate
+   * Called by the /reassign-model endpoint
+   */
+  async reassignModel(
+    speaker: 'pro' | 'con' | 'moderator',
+    newModelId: string
+  ): Promise<void> {
+    logger.info({ debateId: this.debateId, speaker, newModelId }, 'Reassigning model');
+
+    try {
+      // Create new LLM client with the new model
+      const newClient = new OpenRouterLLMClient(newModelId);
+
+      // Create new agent instance with the new client
+      if (speaker === 'pro') {
+        this.agents.pro = new ProAdvocateAgentClass(newClient, { model: newModelId });
+        logger.info({ debateId: this.debateId, newModelId }, 'Created new Pro agent with reassigned model');
+      } else if (speaker === 'con') {
+        this.agents.con = new ConAdvocateAgentClass(newClient, { model: newModelId });
+        logger.info({ debateId: this.debateId, newModelId }, 'Created new Con agent with reassigned model');
+      } else if (speaker === 'moderator') {
+        this.agents.moderator = new ModeratorAgentClass(newClient, { model: newModelId });
+        logger.info({ debateId: this.debateId, newModelId }, 'Created new Moderator agent with reassigned model');
+      }
+
+      // Clear model failure state
+      this.isAwaitingModelReassignment = false;
+      this.isPausedFlag = false;
+      this._modelFailureContext = null;
+
+      logger.info({ debateId: this.debateId }, 'Model reassigned successfully, debate will resume');
+    } catch (error) {
+      logger.error({ debateId: this.debateId, error }, 'Failed to reassign model');
+      // Keep paused state if reassignment fails
+      throw error;
     }
   }
 
