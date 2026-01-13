@@ -18,16 +18,6 @@ GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 GOOGLE_CLOUD_TTS_BUCKET=clearside-tts-output
 GOOGLE_CLOUD_PROJECT_ID=your-project-id
 
-# Podcast Automation
-REDIS_URL=redis://localhost:6379
-AUTO_PUBLISH_ENABLED=true
-ENABLE_BULL_BOARD=true
-PODCAST_FEED_URL=https://clearside.app/rss/podcast.xml
-PODCAST_FEED_BASE_URL=https://clearside.app
-PODCAST_ARTWORK_URL=https://clearside.app/artwork.jpg
-NOTIFICATION_EMAIL=steve.d.pennington@gmail.com
-RESEND_API_KEY=re_...
-
 # Vector Database (RAG)
 VECTOR_DB_PROVIDER=pinecone
 PINECONE_API_KEY=pcsk_...

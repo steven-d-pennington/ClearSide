@@ -529,8 +529,6 @@ export type SSEEventType =
   | 'debate_stopped'     // Backend sends this when user stops debate
   | 'debate_error'
   | 'error'              // Backend sends this
-  | 'model_error'        // Backend sends this when a model fails
-  | 'model_reassigned'   // Backend sends this when a model is reassigned
   | 'heartbeat'
   // Catch-up events for reconnecting clients
   | 'catchup_start'        // Client reconnected, receiving missed turns
