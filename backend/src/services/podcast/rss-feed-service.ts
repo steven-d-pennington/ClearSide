@@ -5,7 +5,7 @@
  * Reads from published_episodes and podcast_feed_metadata tables.
  */
 
-import { Podcast } from 'podcast';
+import { Podcast, type FeedItunesCategory } from 'podcast';
 import fs from 'fs/promises';
 import path from 'path';
 import { pool } from '../../db/connection.js';
@@ -61,6 +61,9 @@ export class RSSFeedService {
       }
 
       const meta = metaResult.rows[0];
+      if (!meta) {
+        throw new Error('Podcast feed metadata not found in database');
+      }
 
       const episodesResult = await pool.query<PublishedEpisodeRow>(
         `SELECT
@@ -125,7 +128,7 @@ export class RSSFeedService {
             type: 'audio/mpeg',
           },
           itunesDuration: episode.duration_seconds,
-          itunesKeywords: episode.tags || [],
+          itunesKeywords: (episode.tags || []).join(', '),
           itunesExplicit: episode.explicit,
           itunesSubtitle: episode.description.slice(0, 100),
           itunesSummary: episode.description,
@@ -173,10 +176,10 @@ export class RSSFeedService {
     return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
   }
 
-  private formatItunesCategories(categories: string[]): Array<{ text: string; subcats: unknown[] }> {
+  private formatItunesCategories(categories: string[]): FeedItunesCategory[] {
     return categories.map((category) => ({
       text: category,
-      subcats: [],
+      subcats: [] as FeedItunesCategory[],
     }));
   }
 }

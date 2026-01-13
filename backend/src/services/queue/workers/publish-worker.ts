@@ -4,7 +4,7 @@
  * Orchestrates end-to-end podcast publishing automation.
  */
 
-import { Job, Worker } from 'bullmq';
+import { Job, type JobProgress, Worker } from 'bullmq';
 import fs from 'fs/promises';
 import path from 'path';
 import { connection } from '../queue-manager.js';
@@ -295,11 +295,11 @@ async function getAudioStats(audioUrl: string): Promise<{ fileSizeBytes: number 
   }
 }
 
-publishWorker.on('completed', (job) => {
+publishWorker.on('completed', (job: Job) => {
   logger.info({ jobId: job.id, result: job.returnvalue }, 'Job completed');
 });
 
-publishWorker.on('failed', (job, err) => {
+publishWorker.on('failed', (job: Job | undefined, err: Error) => {
   logger.error({
     jobId: job?.id,
     error: err.message,
@@ -307,7 +307,7 @@ publishWorker.on('failed', (job, err) => {
   }, 'Job failed');
 });
 
-publishWorker.on('progress', (job, progress) => {
+publishWorker.on('progress', (job: Job, progress: JobProgress) => {
   logger.info({ jobId: job.id, progress: `${progress}%` }, 'Job progress');
 });
 

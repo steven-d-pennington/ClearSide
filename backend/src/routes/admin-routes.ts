@@ -5,6 +5,7 @@
 
 import express, { type Request, type Response } from 'express';
 import axios from 'axios';
+import type { Job } from 'bullmq';
 import { exec as execCallback } from 'child_process';
 import { promisify } from 'util';
 import { Pinecone } from '@pinecone-database/pinecone';
@@ -1424,10 +1425,14 @@ router.get('/admin/queue/stats', async (_req: Request, res: Response) => {
  * POST /admin/queue/retry/:jobId
  * Retry a failed job
  */
-router.post('/admin/queue/retry/:jobId', async (req: Request, res: Response) => {
-  try {
-    const { jobId } = req.params;
-    const job = await publishQueue.getJob(jobId);
+  router.post('/admin/queue/retry/:jobId', async (req: Request, res: Response) => {
+    try {
+      const { jobId } = req.params;
+      if (!jobId) {
+        res.status(400).json({ error: 'Job ID is required' });
+        return;
+      }
+      const job = await publishQueue.getJob(jobId);
 
     if (!job) {
       res.status(404).json({ error: 'Job not found' });
@@ -1460,7 +1465,7 @@ router.get('/admin/queue/failed', async (_req: Request, res: Response) => {
   try {
     const failed = await publishQueue.getFailed(0, 50);
 
-    const jobs = failed.map(job => ({
+    const jobs = failed.map((job: Job) => ({
       id: job.id,
       name: job.name,
       data: job.data,
