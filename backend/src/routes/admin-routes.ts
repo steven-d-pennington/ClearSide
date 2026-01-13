@@ -1427,6 +1427,12 @@ router.get('/admin/queue/stats', async (_req: Request, res: Response) => {
 router.post('/admin/queue/retry/:jobId', async (req: Request, res: Response) => {
   try {
     const { jobId } = req.params;
+
+    if (!jobId) {
+      res.status(400).json({ error: 'Job ID is required' });
+      return;
+    }
+
     const job = await publishQueue.getJob(jobId);
 
     if (!job) {
