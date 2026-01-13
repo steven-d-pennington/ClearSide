@@ -21,15 +21,10 @@ import adminRoutes from './routes/admin-routes.js';
 import duelogicRoutes from './routes/duelogic-routes.js';
 import podcastRoutes from './routes/podcast-routes.js';
 import duelogicResearchRoutes from './routes/duelogic-research-routes.js';
-import { createRSSRoutes } from './routes/rss-routes.js';
 import { createConversationRoutes } from './routes/conversation-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 import { runMigrationsOnStartup } from './db/runMigrations.js';
-import { createBullBoard } from '@bull-board/api';
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
-import { ExpressAdapter } from '@bull-board/express';
-import { publishQueue } from './services/queue/queue-manager.js';
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -77,21 +72,6 @@ app.use((req, _res, next) => {
 // Serve static files from exports directory
 const exportsDir = process.env.EXPORTS_DIR || './exports';
 app.use('/exports', express.static(path.resolve(exportsDir)));
-app.use('/public', express.static(path.resolve('public')));
-
-if (process.env.NODE_ENV === 'development' || process.env.ENABLE_BULL_BOARD === 'true') {
-  const serverAdapter = new ExpressAdapter();
-  serverAdapter.setBasePath('/admin/queue/ui');
-
-  createBullBoard({
-    queues: [new BullMQAdapter(publishQueue)],
-    serverAdapter,
-  });
-
-  app.use('/admin/queue/ui', serverAdapter.getRouter());
-
-  logger.info('Bull Board UI available at /admin/queue/ui');
-}
 
 /**
  * Routes
@@ -119,7 +99,6 @@ app.use('/api', duelogicRoutes);
 app.use('/api/exports/podcast', podcastRoutes);
 app.use('/api/duelogic', duelogicResearchRoutes);
 app.use('/api/conversations', createConversationRoutes(pool, sseManager));
-app.use('/api/rss', createRSSRoutes());
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -151,11 +130,6 @@ let server: ReturnType<typeof app.listen> | null = null;
  */
 async function start() {
   try {
-    if (process.env.AUTO_PUBLISH_ENABLED === 'true') {
-      await import('./services/queue/workers/publish-worker.js');
-      logger.info('Publish worker initialized');
-    }
-
     // Run database migrations on startup
     const migrationResult = await runMigrationsOnStartup();
 
