@@ -779,22 +779,22 @@ Fully automatic podcast publishing triggered when conversations complete. Zero m
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AUTO-001 | Job Queue Infrastructure & Database Schema | P0 | M | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-001.md) |
+| AUTO-001 | Job Queue Infrastructure & Database Schema | P0 | M | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-001.md) |
 
 ### 🎙️ Content Generation
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AUTO-002 | Metadata Generation Service | P0 | S | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-002.md) |
-| AUTO-003 | RSS Feed Generation Service | P0 | M | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-003.md) |
+| AUTO-002 | Metadata Generation Service | P0 | S | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-002.md) |
+| AUTO-003 | RSS Feed Generation Service | P0 | M | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-003.md) |
 
 ### 🔧 Orchestration
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AUTO-004 | Publish Worker & Orchestration | P0 | L | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-004.md) |
-| AUTO-005 | Notification Service | P1 | S | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-005.md) |
-| AUTO-006 | Hook Orchestrator & Admin Tools | P0 | M | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-006.md) |
+| AUTO-004 | Publish Worker & Orchestration | P0 | L | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-004.md) |
+| AUTO-005 | Notification Service | P1 | S | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-005.md) |
+| AUTO-006 | Hook Orchestrator & Admin Tools | P0 | M | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-006.md) |
 
 **Key Features:**
 - **BullMQ Job Queue**: Redis-based queue with automatic retries and exponential backoff

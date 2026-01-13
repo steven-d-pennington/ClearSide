@@ -123,7 +123,7 @@ export const ModelErrorModal: React.FC<ModelErrorModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Model Error - Select Replacement"
-      size="medium"
+      size="md"
     >
       <div className={styles.container}>
         {/* Error Information */}
