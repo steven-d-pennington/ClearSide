@@ -20,6 +20,8 @@ import { GoogleAuth } from 'google-auth-library';
 import {
   parseServiceAccountJson,
 } from '../services/audio/google-cloud-long-audio-service.js';
+import { createRSSFeedService } from '../services/podcast/rss-feed-service.js';
+import { publishQueue } from '../services/queue/queue-manager.js';
 import { createLogger } from '../utils/logger.js';
 import { getRateLimiter } from '../services/llm/rate-limiter.js';
 import type { DebateStatus, SystemEventType, EventSeverity } from '../types/database.js';
@@ -1354,6 +1356,128 @@ router.post('/admin/testing/services/:serviceId/test', async (req: Request, res:
     logger.error({ serviceId, errorMessage }, 'External service test failed');
     res.status(500).json({
       success: false,
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /admin/rss/regenerate
+ * Force regenerate RSS feed from database
+ */
+router.post('/admin/rss/regenerate', async (_req: Request, res: Response) => {
+  try {
+    const rssService = createRSSFeedService();
+    await rssService.generateFeed();
+
+    logger.info('RSS feed regenerated manually');
+
+    res.json({
+      success: true,
+      message: 'RSS feed regenerated successfully',
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to regenerate RSS feed');
+    res.status(500).json({
+      error: 'Failed to regenerate RSS feed',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/queue/stats
+ * View job queue statistics
+ */
+router.get('/admin/queue/stats', async (_req: Request, res: Response) => {
+  try {
+    const [waiting, active, completed, failed, delayed] = await Promise.all([
+      publishQueue.getWaitingCount(),
+      publishQueue.getActiveCount(),
+      publishQueue.getCompletedCount(),
+      publishQueue.getFailedCount(),
+      publishQueue.getDelayedCount(),
+    ]);
+
+    res.json({
+      queue: 'podcast-publish',
+      counts: {
+        waiting,
+        active,
+        completed,
+        failed,
+        delayed,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to get queue stats');
+    res.status(500).json({
+      error: 'Failed to get queue stats',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /admin/queue/retry/:jobId
+ * Retry a failed job
+ */
+router.post('/admin/queue/retry/:jobId', async (req: Request, res: Response) => {
+  try {
+    const { jobId } = req.params;
+    const job = await publishQueue.getJob(jobId);
+
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+
+    await job.retry();
+
+    logger.info({ jobId }, 'Job retry triggered');
+
+    res.json({
+      success: true,
+      message: `Job ${jobId} queued for retry`,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to retry job');
+    res.status(500).json({
+      error: 'Failed to retry job',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/queue/failed
+ * List failed jobs
+ */
+router.get('/admin/queue/failed', async (_req: Request, res: Response) => {
+  try {
+    const failed = await publishQueue.getFailed(0, 50);
+
+    const jobs = failed.map(job => ({
+      id: job.id,
+      name: job.name,
+      data: job.data,
+      failedReason: job.failedReason,
+      attemptsMade: job.attemptsMade,
+      timestamp: job.timestamp,
+    }));
+
+    res.json({
+      count: jobs.length,
+      jobs,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to list failed jobs');
+    res.status(500).json({
+      error: 'Failed to list failed jobs',
       message: errorMessage,
     });
   }
