@@ -1,11 +1,24 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2026-01-11
-> Version: 9.0.0 - Phase 8 Authentication System Added
+> Last Updated: 2026-01-12
+> Version: 10.0.0 - Phase 9 Podcast Automation Pipeline Added
 
-## 🔧 Recent Changes (2026-01-11)
+## 🔧 Recent Changes (2026-01-12)
 
-**NEW: Phase 8 - Authentication System:**
+**NEW: Phase 9 - Podcast Automation Pipeline:**
+- Fully automatic podcast publishing from conversation completion to Spotify
+- BullMQ job queue with Redis for reliable automation orchestration
+- LLM-powered metadata generation (titles, descriptions, tags)
+- RSS 2.0 feed with iTunes/Podcast 2.0 namespaces
+- Email notifications via Resend for episode published alerts
+- Bull Board UI for queue monitoring and admin controls
+- Cost-effective: ~$0.65 per episode (TTS + metadata + infrastructure)
+- 6 comprehensive task files in `tasks/phase9/automation/`
+- No Spotify API needed - Spotify polls RSS feed every 1-6 hours
+
+## 🔧 Previous Changes (2026-01-11)
+
+**Phase 8 - Authentication System:**
 - Homegrown JWT-based authentication with httpOnly cookies
 - Multi-tenant organization support from day one
 - Role-based access control (super_admin, org_admin, user)
@@ -755,6 +768,64 @@ Homegrown JWT-based authentication with username/password login, multi-tenant or
 **Critical Path:** AUTH-001 → AUTH-002 → AUTH-003 → AUTH-004 → AUTH-005 → AUTH-006
 
 **Start Here:** AUTH-001 (Database Schema & Types) - Foundation for entire authentication system.
+
+---
+
+## 📋 PHASE 9: PODCAST AUTOMATION PIPELINE
+
+Fully automatic podcast publishing triggered when conversations complete. Zero manual intervention from conversation end to Spotify indexing.
+
+### 🏗️ Infrastructure
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| AUTO-001 | Job Queue Infrastructure & Database Schema | P0 | M | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-001.md) |
+
+### 🎙️ Content Generation
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| AUTO-002 | Metadata Generation Service | P0 | S | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-002.md) |
+| AUTO-003 | RSS Feed Generation Service | P0 | M | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-003.md) |
+
+### 🔧 Orchestration
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| AUTO-004 | Publish Worker & Orchestration | P0 | L | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-004.md) |
+| AUTO-005 | Notification Service | P1 | S | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-005.md) |
+| AUTO-006 | Hook Orchestrator & Admin Tools | P0 | M | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-006.md) |
+
+**Key Features:**
+- **BullMQ Job Queue**: Redis-based queue with automatic retries and exponential backoff
+- **RSS 2.0 Feed**: iTunes/Podcast 2.0 namespaces for Spotify and Apple Podcasts compatibility
+- **LLM Metadata**: Gemini Flash generates episode titles, descriptions, and tags (~$0.01/episode)
+- **Email Notifications**: Resend integration for episode published alerts
+- **Admin Dashboard**: Bull Board UI for queue monitoring and manual controls
+- **Cost Effective**: ~$0.65 per episode (TTS + metadata + infrastructure)
+
+**Automation Flow:**
+```
+Conversation Completes → Script Refinement → TTS Audio Generation
+  → Metadata Generation → RSS Feed Update → Email Notification
+  → Spotify Polls Feed (1-6 hours) → Episode Live
+```
+
+**Dependencies:**
+- AUTO-001 can start immediately (no blockers)
+- AUTO-002 can start immediately (parallel to AUTO-001)
+- AUTO-003 depends on AUTO-001 (database schema)
+- AUTO-004 depends on AUTO-001, AUTO-002, AUTO-003
+- AUTO-005 can start immediately (parallel track)
+- AUTO-006 depends on AUTO-001, AUTO-004
+
+**Critical Path:** AUTO-001 → AUTO-003 → AUTO-004 → AUTO-006
+
+**Parallel Track:** AUTO-002, AUTO-005 (no blockers)
+
+**Start Here:** AUTO-001 (Job Queue & Database Schema) or AUTO-002 (Metadata Generation) - Both can start immediately.
+
+**No Spotify API:** Spotify doesn't provide upload API - they poll your RSS feed every 1-6 hours. This actually simplifies the architecture to just robust RSS feed generation.
 
 ---
 
