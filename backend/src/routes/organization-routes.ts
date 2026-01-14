@@ -91,7 +91,11 @@ export function createOrganizationRoutes(pool: Pool): Router {
                 return;
             }
 
-            const organization = await orgRepo.create(parseResult.data);
+            const createInput = {
+                ...parseResult.data,
+                description: parseResult.data.description ?? undefined,
+            };
+            const organization = await orgRepo.create(createInput);
 
             logger.info(
                 { createdBy: req.user!.userId, orgId: organization.id, name: organization.name },
@@ -129,8 +133,18 @@ export function createOrganizationRoutes(pool: Pool): Router {
      * Super admin can view any org; others can only view their own
      */
     router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+        const orgId = req.params.id;
+        if (!orgId) {
+            res.status(400).json({
+                success: false,
+                error: 'Organization ID is required',
+                code: 'INVALID_REQUEST',
+            });
+            return;
+        }
+
         try {
-            const organization = await orgRepo.findById(req.params.id);
+            const organization = await orgRepo.findById(orgId);
 
             if (!organization) {
                 res.status(404).json({
@@ -168,7 +182,7 @@ export function createOrganizationRoutes(pool: Pool): Router {
                 },
             });
         } catch (error) {
-            logger.error({ error, orgId: req.params.id }, 'Get organization error');
+            logger.error({ error, orgId }, 'Get organization error');
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',
@@ -182,6 +196,16 @@ export function createOrganizationRoutes(pool: Pool): Router {
      * Update organization (super_admin only)
      */
     router.put('/:id', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+        const orgId = req.params.id;
+        if (!orgId) {
+            res.status(400).json({
+                success: false,
+                error: 'Organization ID is required',
+                code: 'INVALID_REQUEST',
+            });
+            return;
+        }
+
         const schema = z.object({
             name: z.string().min(1).optional(),
             description: z.string().optional().nullable(),
@@ -201,7 +225,7 @@ export function createOrganizationRoutes(pool: Pool): Router {
         }
 
         try {
-            const organization = await orgRepo.findById(req.params.id);
+            const organization = await orgRepo.findById(orgId);
 
             if (!organization) {
                 res.status(404).json({
@@ -225,10 +249,14 @@ export function createOrganizationRoutes(pool: Pool): Router {
                 }
             }
 
-            const updatedOrg = await orgRepo.update(req.params.id, parseResult.data);
+            const updateInput = {
+                ...parseResult.data,
+                description: parseResult.data.description ?? undefined,
+            };
+            const updatedOrg = await orgRepo.update(orgId, updateInput);
 
             logger.info(
-                { updatedBy: req.user!.userId, orgId: req.params.id },
+                { updatedBy: req.user!.userId, orgId },
                 'Organization updated successfully'
             );
 
@@ -238,7 +266,7 @@ export function createOrganizationRoutes(pool: Pool): Router {
                 message: 'Organization updated successfully',
             });
         } catch (error) {
-            logger.error({ error, orgId: req.params.id }, 'Update organization error');
+            logger.error({ error, orgId }, 'Update organization error');
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',
@@ -253,8 +281,18 @@ export function createOrganizationRoutes(pool: Pool): Router {
      * Will fail if organization has active users
      */
     router.delete('/:id', requireAuth, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+        const orgId = req.params.id;
+        if (!orgId) {
+            res.status(400).json({
+                success: false,
+                error: 'Organization ID is required',
+                code: 'INVALID_REQUEST',
+            });
+            return;
+        }
+
         try {
-            const organization = await orgRepo.findById(req.params.id);
+            const organization = await orgRepo.findById(orgId);
 
             if (!organization) {
                 res.status(404).json({
@@ -276,7 +314,7 @@ export function createOrganizationRoutes(pool: Pool): Router {
             }
 
             // Attempt deletion (will fail if org has active users)
-            const result = await orgRepo.delete(req.params.id);
+            const result = await orgRepo.delete(orgId);
 
             if (!result.success) {
                 res.status(400).json({
@@ -288,7 +326,7 @@ export function createOrganizationRoutes(pool: Pool): Router {
             }
 
             logger.info(
-                { deletedBy: req.user!.userId, orgId: req.params.id },
+                { deletedBy: req.user!.userId, orgId },
                 'Organization deleted successfully'
             );
 
@@ -297,7 +335,7 @@ export function createOrganizationRoutes(pool: Pool): Router {
                 message: 'Organization deleted successfully',
             });
         } catch (error) {
-            logger.error({ error, orgId: req.params.id }, 'Delete organization error');
+            logger.error({ error, orgId }, 'Delete organization error');
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',

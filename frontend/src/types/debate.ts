@@ -562,7 +562,10 @@ export type SSEEventType =
   | 'chair_interrupt'         // Chair interrupted the debate
   | 'arbiter_interjection'    // Arbiter interjected
   | 'segment_start'           // Duelogic segment started
-  | 'segment_complete';       // Duelogic segment completed
+  | 'segment_complete'        // Duelogic segment completed
+  // Model error recovery events
+  | 'model_error'             // Model failed during debate
+  | 'model_reassigned';       // Model was successfully reassigned
 
 /**
  * SSE message structure

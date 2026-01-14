@@ -14,7 +14,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { Pool } from 'pg';
 import { UserRepository } from '../db/repositories/user-repository.js';
-import { requireAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import type { AuthenticatedRequest, CreateUserInput, UpdateUserInput } from '../types/auth.js';
 import { createLogger } from '../utils/logger.js';
 
@@ -166,8 +166,18 @@ export function createUserRoutes(pool: Pool): Router {
      * Get user by ID
      */
     router.get('/:id', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.params.id;
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                error: 'User ID is required',
+                code: 'INVALID_REQUEST',
+            });
+            return;
+        }
+
         try {
-            const user = await userRepo.findById(req.params.id);
+            const user = await userRepo.findById(userId);
 
             if (!user) {
                 res.status(404).json({
@@ -199,7 +209,7 @@ export function createUserRoutes(pool: Pool): Router {
                 user: userPublic,
             });
         } catch (error) {
-            logger.error({ error, userId: req.params.id }, 'Get user error');
+            logger.error({ error, userId }, 'Get user error');
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',
@@ -213,6 +223,16 @@ export function createUserRoutes(pool: Pool): Router {
      * Update user fields
      */
     router.put('/:id', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.params.id;
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                error: 'User ID is required',
+                code: 'INVALID_REQUEST',
+            });
+            return;
+        }
+
         const schema = z.object({
             email: z.string().email().optional().nullable(),
             fullName: z.string().optional().nullable(),
@@ -234,7 +254,7 @@ export function createUserRoutes(pool: Pool): Router {
         const input = parseResult.data as UpdateUserInput;
 
         try {
-            const user = await userRepo.findById(req.params.id);
+            const user = await userRepo.findById(userId);
 
             if (!user) {
                 res.status(404).json({
@@ -288,10 +308,10 @@ export function createUserRoutes(pool: Pool): Router {
                 return;
             }
 
-            const updatedUser = await userRepo.update(req.params.id, input);
+            const updatedUser = await userRepo.update(userId, input);
 
             logger.info(
-                { updatedBy: req.user!.userId, userId: req.params.id },
+                { updatedBy: req.user!.userId, userId },
                 'User updated successfully'
             );
 
@@ -301,7 +321,7 @@ export function createUserRoutes(pool: Pool): Router {
                 message: 'User updated successfully',
             });
         } catch (error) {
-            logger.error({ error, userId: req.params.id }, 'Update user error');
+            logger.error({ error, userId }, 'Update user error');
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',
@@ -315,8 +335,18 @@ export function createUserRoutes(pool: Pool): Router {
      * Soft delete user (set is_active = false)
      */
     router.delete('/:id', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.params.id;
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                error: 'User ID is required',
+                code: 'INVALID_REQUEST',
+            });
+            return;
+        }
+
         try {
-            const user = await userRepo.findById(req.params.id);
+            const user = await userRepo.findById(userId);
 
             if (!user) {
                 res.status(404).json({
@@ -350,10 +380,10 @@ export function createUserRoutes(pool: Pool): Router {
                 return;
             }
 
-            await userRepo.delete(req.params.id);
+            await userRepo.delete(userId);
 
             logger.info(
-                { deletedBy: req.user!.userId, userId: req.params.id },
+                { deletedBy: req.user!.userId, userId },
                 'User deleted successfully'
             );
 
@@ -362,7 +392,7 @@ export function createUserRoutes(pool: Pool): Router {
                 message: 'User deleted successfully',
             });
         } catch (error) {
-            logger.error({ error, userId: req.params.id }, 'Delete user error');
+            logger.error({ error, userId }, 'Delete user error');
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',
@@ -376,8 +406,18 @@ export function createUserRoutes(pool: Pool): Router {
      * Reset user password to a new temp password (admin only)
      */
     router.post('/:id/reset-password', requireAuth, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+        const userId = req.params.id;
+        if (!userId) {
+            res.status(400).json({
+                success: false,
+                error: 'User ID is required',
+                code: 'INVALID_REQUEST',
+            });
+            return;
+        }
+
         try {
-            const user = await userRepo.findById(req.params.id);
+            const user = await userRepo.findById(userId);
 
             if (!user) {
                 res.status(404).json({
@@ -401,10 +441,10 @@ export function createUserRoutes(pool: Pool): Router {
                 return;
             }
 
-            const tempPassword = await userRepo.resetPassword(req.params.id);
+            const tempPassword = await userRepo.resetPassword(userId);
 
             logger.info(
-                { resetBy: req.user!.userId, userId: req.params.id },
+                { resetBy: req.user!.userId, userId },
                 'User password reset successfully'
             );
 
@@ -414,7 +454,7 @@ export function createUserRoutes(pool: Pool): Router {
                 message: `Password reset. Share this temporary password with the user: ${tempPassword}`,
             });
         } catch (error) {
-            logger.error({ error, userId: req.params.id }, 'Reset password error');
+            logger.error({ error, userId }, 'Reset password error');
             res.status(500).json({
                 success: false,
                 error: 'Internal server error',

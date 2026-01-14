@@ -34,5 +34,9 @@
     "url": "git+https://github.com/steven-d-pennington/ClearSide.git"
   },
   "author": "steve.d.pennington@gmail.com",
-  "license": "MIT"
+  "license": "MIT",
+  "optionalDependencies": {
+    "@esbuild/win32-x64": "^0.27.2",
+    "@rollup/rollup-win32-x64-msvc": "^4.55.1"
+  }
 }
