@@ -427,3 +427,6 @@ tmpclaude-*
 .auto-claude/
 tmpclaude-01e0-cwd
 b64envars.txt
+
+.vercel
+.env*.local
