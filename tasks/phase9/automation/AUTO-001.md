@@ -14,11 +14,17 @@
 
 ClearSide needs fully automatic podcast publishing that triggers when conversations complete. This task establishes the job queue infrastructure and database foundation for the automation pipeline.
 
+**Key Design Decisions:**
+- Default to **Rapid Fire** conversation mode (shorter segments, more reliable with Gemini TTS)
+- Persona-voice mappings stored in database (see AUTO-007 for admin config)
+- Turn limits configurable per conversation mode
+
 **References:**
 - Automation plan in `C:\Users\Steven\.claude\plans\lovely-coalescing-valley.md`
 - Existing podcast pipeline: `backend/src/services/podcast/podcast-pipeline.ts`
 - Existing database patterns: `backend/src/db/`
 - Migration naming convention: 3-digit zero-padded (NNN_description.sql)
+- Admin configuration: AUTO-007 (persona voice mappings, turn limits, defaults)
 
 ---
 

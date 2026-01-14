@@ -6,6 +6,70 @@
  */
 
 import type { PodcastPersona } from '../../../types/conversation.js';
+import type { PersonaMemoryContext } from '../../../types/persona-memory.js';
+
+/**
+ * Build the memory injection section for the system prompt
+ */
+function buildMemorySection(memoryContext: PersonaMemoryContext): string {
+  const sections: string[] = [];
+
+  // Core values section (immutable personality anchors)
+  if (memoryContext.coreValues.length > 0) {
+    const values = memoryContext.coreValues
+      .slice(0, 5) // Limit to top 5 by priority
+      .map(v => `- ${v.description}`)
+      .join('\n');
+    sections.push(`YOUR CORE VALUES (Never compromise these):
+${values}`);
+  }
+
+  // Relevant opinions section (malleable stances)
+  if (memoryContext.relevantOpinions.length > 0) {
+    const opinions = memoryContext.relevantOpinions
+      .map(o => {
+        const stanceDescription = {
+          supports: 'support',
+          opposes: 'oppose',
+          neutral: 'are neutral on',
+          mixed: 'have mixed feelings about',
+          evolving: 'are still forming your view on',
+        }[o.stance] || o.stance;
+        return `- ${o.topicDisplay || o.topicKey}: You ${stanceDescription} this. ${o.summary}`;
+      })
+      .join('\n');
+    sections.push(`YOUR ESTABLISHED POSITIONS:
+${opinions}`);
+  }
+
+  // Relationships section (inter-persona dynamics)
+  if (memoryContext.relationships.length > 0) {
+    const relationships = memoryContext.relationships
+      .map(r => {
+        const dynamicDesc = r.dynamicType
+          ? ` (${r.dynamicType.replace('_', ' ')})`
+          : '';
+        const frictionNote = r.frictionPoints && r.frictionPoints.length > 0
+          ? ` You tend to clash on: ${r.frictionPoints.slice(0, 2).join(', ')}.`
+          : '';
+        const commonNote = r.commonGround && r.commonGround.length > 0
+          ? ` You tend to agree on: ${r.commonGround.slice(0, 2).join(', ')}.`
+          : '';
+        return `- ${r.otherPersonaName}${dynamicDesc}:${frictionNote}${commonNote}`;
+      })
+      .join('\n');
+    sections.push(`YOUR RELATIONSHIPS WITH TODAY'S GUESTS:
+${relationships}`);
+  }
+
+  // Personality notes section (admin-curated guidance)
+  if (memoryContext.personalityNotes) {
+    sections.push(`PERSONALITY NOTES:
+${memoryContext.personalityNotes}`);
+  }
+
+  return sections.join('\n\n');
+}
 
 /**
  * Build system prompt for a persona agent
@@ -15,7 +79,8 @@ export function buildPersonaSystemPrompt(
   topic: string,
   otherParticipantNames: string[],
   rapidFire: boolean = false,
-  minimalPersonaMode: boolean = false
+  minimalPersonaMode: boolean = false,
+  memoryContext?: PersonaMemoryContext
 ): string {
   // MINIMAL PERSONA MODE: Model speaks naturally without character constraints
   if (minimalPersonaMode) {
@@ -59,6 +124,11 @@ Speak authentically as an AI - no need to pretend otherwise.`;
     ? `\n\nYOUR PREFERRED TOPICS: ${persona.preferredTopics.join(', ')}`
     : '';
 
+  // Memory context injection (persistent personality memories)
+  const memorySection = memoryContext
+    ? `\n\n${buildMemorySection(memoryContext)}`
+    : '';
+
   // Response length guideline changes based on rapid fire mode
   const lengthGuideline = rapidFire
     ? `6. RAPID FIRE MODE - This is a fast-paced, focused exchange:
@@ -82,6 +152,7 @@ ${persona.worldview}
 ${quirksText}
 ${examplesText}
 ${topicsText}
+${memorySection}
 
 TODAY'S TOPIC: ${topic}
 

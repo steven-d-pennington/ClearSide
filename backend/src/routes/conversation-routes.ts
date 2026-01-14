@@ -268,19 +268,25 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
   });
 
   /**
-   * GET /api/conversations/personas/:slug
-   * Get a single persona by slug
+   * GET /api/conversations/personas/:idOrSlug
+   * Get a single persona by ID (UUID) or slug
    */
-  router.get('/personas/:slug', async (req: Request, res: Response, next: NextFunction) => {
+  router.get('/personas/:idOrSlug', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { slug } = req.params;
+      const { idOrSlug } = req.params;
 
-      if (!slug) {
-        res.status(400).json({ error: 'Slug is required' });
+      if (!idOrSlug) {
+        res.status(400).json({ error: 'ID or slug is required' });
         return;
       }
 
-      const persona = await personaRepo.findBySlug(slug);
+      // Check if it's a UUID (8-4-4-4-12 hex format)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isUuid = uuidRegex.test(idOrSlug);
+
+      const persona = isUuid
+        ? await personaRepo.findById(idOrSlug)
+        : await personaRepo.findBySlug(idOrSlug);
 
       if (!persona) {
         res.status(404).json({ error: 'Persona not found' });
@@ -289,7 +295,171 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
 
       res.json({ persona });
     } catch (error) {
-      logger.error({ error, slug: req.params.slug }, 'Failed to get persona');
+      logger.error({ error, idOrSlug: req.params.idOrSlug }, 'Failed to get persona');
+      next(error);
+    }
+  });
+
+  /**
+   * PUT /api/conversations/personas/:id/voice
+   * Update a persona's default voice settings
+   */
+  router.put('/personas/:id/voice', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { provider, voiceId, settings } = req.body;
+
+      if (!id) {
+        res.status(400).json({ error: 'Persona ID is required' });
+        return;
+      }
+
+      // Validate provider if specified
+      const validProviders = ['elevenlabs', 'gemini', 'google-cloud-long', 'azure', 'edge', null];
+      if (provider !== undefined && !validProviders.includes(provider)) {
+        res.status(400).json({
+          error: `Invalid provider. Must be one of: ${validProviders.filter(p => p).join(', ')}`,
+        });
+        return;
+      }
+
+      // If clearing voice settings
+      if (provider === null || (provider === undefined && voiceId === undefined)) {
+        const persona = await personaRepo.clearVoiceSettings(id);
+        if (!persona) {
+          res.status(404).json({ error: 'Persona not found' });
+          return;
+        }
+        res.json({ persona, message: 'Voice settings cleared' });
+        return;
+      }
+
+      // Update voice settings
+      const persona = await personaRepo.updateVoiceSettings(
+        id,
+        provider || null,
+        voiceId || null,
+        settings || null
+      );
+
+      if (!persona) {
+        res.status(404).json({ error: 'Persona not found' });
+        return;
+      }
+
+      logger.info({ personaId: id, provider, voiceId }, 'Updated persona voice settings');
+      res.json({ persona, message: 'Voice settings updated' });
+    } catch (error) {
+      logger.error({ error, personaId: req.params.id }, 'Failed to update persona voice');
+      next(error);
+    }
+  });
+
+  /**
+   * PUT /api/conversations/personas/:id
+   * Update a persona's profile details (name, backstory, speaking style, etc.)
+   */
+  router.put('/personas/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        res.status(400).json({ error: 'Persona ID is required' });
+        return;
+      }
+
+      const {
+        name,
+        avatarEmoji,
+        backstory,
+        speakingStyle,
+        worldview,
+        quirks,
+        examplePhrases,
+        preferredTopics,
+        voiceCharacteristics,
+      } = req.body;
+
+      // Basic validation
+      if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0)) {
+        res.status(400).json({ error: 'name must be a non-empty string' });
+        return;
+      }
+
+      if (avatarEmoji !== undefined && typeof avatarEmoji !== 'string') {
+        res.status(400).json({ error: 'avatarEmoji must be a string' });
+        return;
+      }
+
+      if (backstory !== undefined && typeof backstory !== 'string') {
+        res.status(400).json({ error: 'backstory must be a string' });
+        return;
+      }
+
+      if (speakingStyle !== undefined && typeof speakingStyle !== 'string') {
+        res.status(400).json({ error: 'speakingStyle must be a string' });
+        return;
+      }
+
+      if (worldview !== undefined && typeof worldview !== 'string') {
+        res.status(400).json({ error: 'worldview must be a string' });
+        return;
+      }
+
+      if (quirks !== undefined && !Array.isArray(quirks)) {
+        res.status(400).json({ error: 'quirks must be an array of strings' });
+        return;
+      }
+
+      if (examplePhrases !== undefined && !Array.isArray(examplePhrases)) {
+        res.status(400).json({ error: 'examplePhrases must be an array of strings' });
+        return;
+      }
+
+      if (preferredTopics !== undefined && !Array.isArray(preferredTopics)) {
+        res.status(400).json({ error: 'preferredTopics must be an array of strings' });
+        return;
+      }
+
+      // Build updates object with only provided fields
+      const updates: {
+        name?: string;
+        avatarEmoji?: string;
+        backstory?: string;
+        speakingStyle?: string;
+        worldview?: string;
+        quirks?: string[];
+        examplePhrases?: string[];
+        preferredTopics?: string[];
+        voiceCharacteristics?: Record<string, unknown>;
+      } = {};
+
+      if (name !== undefined) updates.name = name;
+      if (avatarEmoji !== undefined) updates.avatarEmoji = avatarEmoji;
+      if (backstory !== undefined) updates.backstory = backstory;
+      if (speakingStyle !== undefined) updates.speakingStyle = speakingStyle;
+      if (worldview !== undefined) updates.worldview = worldview;
+      if (quirks !== undefined) updates.quirks = quirks;
+      if (examplePhrases !== undefined) updates.examplePhrases = examplePhrases;
+      if (preferredTopics !== undefined) updates.preferredTopics = preferredTopics;
+      if (voiceCharacteristics !== undefined) updates.voiceCharacteristics = voiceCharacteristics;
+
+      if (Object.keys(updates).length === 0) {
+        res.status(400).json({ error: 'No valid fields provided for update' });
+        return;
+      }
+
+      const persona = await personaRepo.updateProfile(id, updates);
+
+      if (!persona) {
+        res.status(404).json({ error: 'Persona not found' });
+        return;
+      }
+
+      logger.info({ personaId: id, fields: Object.keys(updates) }, 'Updated persona profile');
+      res.json({ persona, message: 'Profile updated' });
+    } catch (error) {
+      logger.error({ error, personaId: req.params.id }, 'Failed to update persona profile');
       next(error);
     }
   });
@@ -1398,6 +1568,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
       const durationEstimateSeconds = Math.round((totalWords / 150) * 60);
 
       // Create refined script in podcast format
+      // Include Gemini director's notes if available (generated from persona voice characteristics)
       const refinedPodcastScript: RefinedPodcastScript = {
         title: conversationScript.title,
         segments: podcastSegments,
@@ -1407,6 +1578,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         durationEstimateSeconds,
         createdAt: new Date(),
         updatedAt: new Date(),
+        geminiDirectorNotes: conversationScript.geminiDirectorNotes,
       };
 
       // Create podcast export job

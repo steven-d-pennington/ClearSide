@@ -29,6 +29,9 @@ interface ParticipantWithPersonaRow extends ConversationParticipantRow {
   voice_characteristics: VoiceCharacteristics;
   example_phrases: string[];
   preferred_topics: string[];
+  default_voice_provider: string | null;
+  default_voice_id: string | null;
+  default_voice_settings: Record<string, unknown> | null;
   persona_created_at: Date;
   persona_updated_at: Date;
 }
@@ -146,6 +149,9 @@ export class ConversationParticipantRepository {
              pp.voice_characteristics,
              pp.example_phrases,
              pp.preferred_topics,
+             pp.default_voice_provider,
+             pp.default_voice_id,
+             pp.default_voice_settings,
              pp.created_at as persona_created_at,
              pp.updated_at as persona_updated_at
       FROM conversation_participants cp
@@ -173,6 +179,9 @@ export class ConversationParticipantRepository {
              pp.voice_characteristics,
              pp.example_phrases,
              pp.preferred_topics,
+             pp.default_voice_provider,
+             pp.default_voice_id,
+             pp.default_voice_settings,
              pp.created_at as persona_created_at,
              pp.updated_at as persona_updated_at
       FROM conversation_participants cp
@@ -199,6 +208,9 @@ export class ConversationParticipantRepository {
              pp.voice_characteristics,
              pp.example_phrases,
              pp.preferred_topics,
+             pp.default_voice_provider,
+             pp.default_voice_id,
+             pp.default_voice_settings,
              pp.created_at as persona_created_at,
              pp.updated_at as persona_updated_at
       FROM conversation_participants cp
@@ -270,6 +282,9 @@ export class ConversationParticipantRepository {
              pp.voice_characteristics,
              pp.example_phrases,
              pp.preferred_topics,
+             pp.default_voice_provider,
+             pp.default_voice_id,
+             pp.default_voice_settings,
              pp.created_at as persona_created_at,
              pp.updated_at as persona_updated_at
       FROM conversation_participants cp
@@ -298,6 +313,9 @@ export class ConversationParticipantRepository {
       voiceCharacteristics: row.voice_characteristics || {},
       examplePhrases: row.example_phrases || [],
       preferredTopics: row.preferred_topics || [],
+      defaultVoiceProvider: row.default_voice_provider ?? undefined,
+      defaultVoiceId: row.default_voice_id ?? undefined,
+      defaultVoiceSettings: row.default_voice_settings ?? undefined,
       createdAt: row.persona_created_at,
       updatedAt: row.persona_updated_at,
     };

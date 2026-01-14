@@ -55,6 +55,10 @@ export interface PodcastPersona {
   voiceCharacteristics: VoiceCharacteristics;
   examplePhrases: string[];
   preferredTopics: string[];
+  // Default voice settings for consistent podcast generation
+  defaultVoiceProvider?: string;
+  defaultVoiceId?: string;
+  defaultVoiceSettings?: Record<string, unknown>;
 }
 
 // ============================================================================

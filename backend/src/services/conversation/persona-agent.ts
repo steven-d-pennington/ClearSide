@@ -20,6 +20,7 @@ import type {
   ConversationTruncationDetectedEventData,
   ConversationTruncationRetryEventData,
 } from '../../types/sse.js';
+import type { PersonaMemoryContext } from '../../types/persona-memory.js';
 import { createOpenRouterClient, OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 import {
   buildPersonaSystemPrompt,
@@ -123,6 +124,7 @@ export interface PersonaAgentOptions {
   otherParticipants: Array<{ name: string; persona: PodcastPersona }>;
   rapidFire?: boolean;
   minimalPersonaMode?: boolean;
+  memoryContext?: PersonaMemoryContext;
 }
 
 /**
@@ -168,13 +170,14 @@ export class PersonaAgent {
     this.rapidFire = options.rapidFire || false;
     this.minimalPersonaMode = options.minimalPersonaMode || false;
 
-    // Build system prompt from persona definition
+    // Build system prompt from persona definition (with optional memory context)
     this.systemPrompt = buildPersonaSystemPrompt(
       this.persona,
       this.topic,
       this.otherParticipants.map(p => p.name),
       this.rapidFire,
-      this.minimalPersonaMode
+      this.minimalPersonaMode,
+      options.memoryContext
     );
 
     // Initialize conversation history
@@ -188,6 +191,12 @@ export class PersonaAgent {
       participantId: this.participant.id,
       modelId: this.participant.modelId,
       rapidFire: this.rapidFire,
+      hasMemoryContext: !!options.memoryContext,
+      memoryContextSize: options.memoryContext ? {
+        coreValues: options.memoryContext.coreValues.length,
+        opinions: options.memoryContext.relevantOpinions.length,
+        relationships: options.memoryContext.relationships.length,
+      } : undefined,
     }, 'PersonaAgent initialized');
   }
 
@@ -873,6 +882,7 @@ export function createPersonaAgent(options: PersonaAgentOptions): PersonaAgent {
 
 /**
  * Create all persona agents for a conversation session
+ * @param memoryContexts Optional map of persona IDs to memory contexts
  */
 export function createPersonaAgents(
   sessionId: string,
@@ -880,7 +890,8 @@ export function createPersonaAgents(
   participants: Array<{ participant: ConversationParticipant; persona: PodcastPersona }>,
   sseManager?: SSEManager,
   rapidFire: boolean = false,
-  minimalPersonaMode: boolean = false
+  minimalPersonaMode: boolean = false,
+  memoryContexts?: Map<string, PersonaMemoryContext>
 ): Map<string, PersonaAgent> {
   const agents = new Map<string, PersonaAgent>();
 
@@ -892,6 +903,9 @@ export function createPersonaAgents(
         persona: p.persona,
       }));
 
+    // Fetch memory context for this persona (keyed by persona.id)
+    const memoryContext = memoryContexts?.get(persona.id);
+
     const agent = new PersonaAgent({
       persona,
       participant,
@@ -901,6 +915,7 @@ export function createPersonaAgents(
       sseManager,
       rapidFire,
       minimalPersonaMode,
+      memoryContext,
     });
 
     agents.set(participant.id, agent);
@@ -911,6 +926,7 @@ export function createPersonaAgents(
     participantCount: agents.size,
     personas: participants.map(p => p.persona.slug),
     rapidFire,
+    withMemoryContexts: memoryContexts ? memoryContexts.size : 0,
   }, 'Created all persona agents for conversation');
 
   return agents;

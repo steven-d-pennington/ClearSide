@@ -12,3 +12,4 @@ export { AdminTestingPage } from './AdminTestingPage';
 export { AdminDuelogicResearchPage } from './AdminDuelogicResearchPage';
 export { AdminDuelogicProposalsPage } from './AdminDuelogicProposalsPage';
 export { AdminDuelogicProposalDetailPage } from './AdminDuelogicProposalDetailPage';
+export { AdminPersonaMemoryPage } from './AdminPersonaMemoryPage';

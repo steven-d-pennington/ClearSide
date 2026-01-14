@@ -9,6 +9,7 @@ import { config } from 'dotenv';
 config();
 
 import express, { type Request, type Response } from 'express';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import { sseManager } from './services/sse/index.js';
 import debateRoutes from './routes/debate-routes.js';
@@ -22,9 +23,14 @@ import duelogicRoutes from './routes/duelogic-routes.js';
 import podcastRoutes from './routes/podcast-routes.js';
 import duelogicResearchRoutes from './routes/duelogic-research-routes.js';
 import { createConversationRoutes } from './routes/conversation-routes.js';
+import { createAuthRoutes } from './routes/auth-routes.js';
+import { createUserRoutes } from './routes/user-routes.js';
+import { createOrganizationRoutes } from './routes/organization-routes.js';
+import personaMemoryRoutes from './routes/persona-memory-routes.js';
 import { logger } from './utils/logger.js';
 import { pool } from './db/connection.js';
 import { runMigrationsOnStartup } from './db/runMigrations.js';
+import { ensureSuperUser } from './db/seedSuperUser.js';
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -51,6 +57,9 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Parse cookies (for JWT authentication)
+app.use(cookieParser());
 
 // Parse JSON request bodies
 app.use(express.json());
@@ -100,6 +109,14 @@ app.use('/api/exports/podcast', podcastRoutes);
 app.use('/api/duelogic', duelogicResearchRoutes);
 app.use('/api/conversations', createConversationRoutes(pool, sseManager));
 
+// Authentication routes
+app.use('/api/auth', createAuthRoutes(pool));
+app.use('/api/users', createUserRoutes(pool));
+app.use('/api/organizations', createOrganizationRoutes(pool));
+
+// Persona memory admin routes
+app.use('/api', personaMemoryRoutes);
+
 // 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({
@@ -146,6 +163,17 @@ async function start() {
         { applied: migrationResult.applied },
         'Database migrations applied successfully'
       );
+    }
+
+    // Ensure super user exists (creates or updates password hash)
+    try {
+      await ensureSuperUser();
+    } catch (seedError) {
+      logger.warn(
+        { error: seedError },
+        'Failed to seed super user - authentication may not work'
+      );
+      // Don't exit - the server can still run, just without the super user
     }
 
     // Start the HTTP server

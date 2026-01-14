@@ -35,6 +35,16 @@ import {
   PodcastPersonaRepository,
   createPodcastPersonaRepository,
 } from '../../db/repositories/podcast-persona-repository.js';
+import {
+  PersonaMemoryRepository,
+  createPersonaMemoryRepository,
+} from '../../db/repositories/persona-memory-repository.js';
+import {
+  PersonaMemoryService,
+  createPersonaMemoryService,
+  type SessionExtractions,
+  type PostSessionInput,
+} from '../persona-memory-service.js';
 import type {
   ConversationSession,
   ConversationParticipant,
@@ -43,6 +53,7 @@ import type {
   PodcastPersona,
   SegmentType,
 } from '../../types/conversation.js';
+import type { PersonaMemoryContext } from '../../types/persona-memory.js';
 
 const logger = pino({
   name: 'conversational-orchestrator',
@@ -82,6 +93,11 @@ export class ConversationalOrchestrator extends EventEmitter {
   private participantRepo: ConversationParticipantRepository;
   private utteranceRepo: ConversationUtteranceRepository;
   private personaRepo: PodcastPersonaRepository;
+  private memoryRepo: PersonaMemoryRepository;
+
+  // Memory service
+  private memoryService: PersonaMemoryService;
+  private sessionExtractions: Map<string, SessionExtractions> = new Map();
 
   // Session state
   private session: ConversationSession | null = null;
@@ -113,6 +129,8 @@ export class ConversationalOrchestrator extends EventEmitter {
     this.participantRepo = createConversationParticipantRepository(this.pool);
     this.utteranceRepo = createConversationUtteranceRepository(this.pool);
     this.personaRepo = createPodcastPersonaRepository(this.pool);
+    this.memoryRepo = createPersonaMemoryRepository(this.pool);
+    this.memoryService = createPersonaMemoryService(this.pool);
 
     logger.info({ sessionId: this.sessionId }, 'ConversationalOrchestrator created');
   }
@@ -178,14 +196,45 @@ export class ConversationalOrchestrator extends EventEmitter {
       this.session.rapidFire
     );
 
-    // Create persona agents
+    // Fetch memory contexts for all personas (if memory system is enabled)
+    const memoryContexts = new Map<string, PersonaMemoryContext>();
+    const topicKeys = this.extractTopicKeys(this.session.topic);
+    const participantPersonaIds = guestInfos.map(g => g.persona.id);
+
+    for (const { persona } of guestInfos) {
+      try {
+        const memoryContext = await this.memoryRepo.buildMemoryContext(
+          persona.id,
+          topicKeys,
+          participantPersonaIds.filter(id => id !== persona.id) // Other participants
+        );
+        memoryContexts.set(persona.id, memoryContext);
+      } catch (error) {
+        // Memory context is optional - log warning and continue without it
+        logger.warn({
+          sessionId: this.sessionId,
+          personaId: persona.id,
+          personaSlug: persona.slug,
+          error,
+        }, 'Failed to load memory context for persona, continuing without memory');
+      }
+    }
+
+    logger.info({
+      sessionId: this.sessionId,
+      memoryContextsLoaded: memoryContexts.size,
+      topicKeys,
+    }, 'Loaded memory contexts for personas');
+
+    // Create persona agents with memory contexts
     this.personaAgents = createPersonaAgents(
       this.sessionId,
       this.session.topic,
       guestInfos,
       this.sseManager,
       this.session.rapidFire,
-      this.session.minimalPersonaMode
+      this.session.minimalPersonaMode,
+      memoryContexts
     );
 
     console.log('ORCHESTRATOR: Initialization complete', {
@@ -361,6 +410,10 @@ export class ConversationalOrchestrator extends EventEmitter {
       if (!this.shouldStop) {
         await this.runClosingPhase();
       }
+
+      // Phase 4: Post-session memory processing
+      // Process accumulated memory extractions to update persona opinions/relationships
+      await this.processPostSessionMemory();
 
       // Mark complete
       const duration = Date.now() - this.startTime;
@@ -780,6 +833,12 @@ export class ConversationalOrchestrator extends EventEmitter {
     // Process for context board
     await this.contextBoard!.processUtterance(utterance);
 
+    // Extract memory data from this utterance (async, non-blocking)
+    // Fire and forget - don't await to avoid slowing conversation
+    this.extractMemoryFromUtterance(decision.participantId, content).catch(err => {
+      logger.warn({ err, sessionId: this.sessionId }, 'Memory extraction failed (async)');
+    });
+
     this.lastSpeakerId = decision.participantId;
   }
 
@@ -1019,8 +1078,189 @@ export class ConversationalOrchestrator extends EventEmitter {
     this.sseManager.broadcastToDebate(this.sessionId, type as any, data);
   }
 
+  /**
+   * Extract topic keys from session topic for memory opinion filtering
+   * Converts topic text into normalized keys for database lookup
+   */
+  private extractTopicKeys(topic: string): string[] {
+    const keys: string[] = [];
+
+    // Normalize the topic text
+    const normalized = topic
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')  // Remove punctuation
+      .replace(/\s+/g, ' ')      // Collapse whitespace
+      .trim();
+
+    // Add the full topic as a key (snake_case)
+    const fullKey = normalized.replace(/\s/g, '_').substring(0, 100);
+    if (fullKey) {
+      keys.push(fullKey);
+    }
+
+    // Extract individual significant words (4+ chars, not common stop words)
+    const stopWords = new Set([
+      'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
+      'her', 'was', 'one', 'our', 'out', 'has', 'have', 'been', 'would',
+      'could', 'should', 'their', 'will', 'with', 'this', 'that', 'from',
+      'they', 'what', 'which', 'about', 'into', 'when', 'where', 'there',
+    ]);
+
+    const words = normalized.split(' ');
+    for (const word of words) {
+      if (word.length >= 4 && !stopWords.has(word)) {
+        keys.push(word);
+      }
+    }
+
+    // Return unique keys
+    return [...new Set(keys)];
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // =========================================================================
+  // PERSONA MEMORY INTEGRATION
+  // =========================================================================
+
+  /**
+   * Extract memory data from a participant utterance
+   * Called after each non-host utterance during conversation
+   */
+  private async extractMemoryFromUtterance(
+    participantId: string,
+    content: string
+  ): Promise<void> {
+    const participant = this.participants.find(p => p.id === participantId);
+    if (!participant) return;
+
+    const persona = this.personas.get(participant.personaId);
+    if (!persona) return;
+
+    try {
+      // Check if extraction is enabled
+      const isEnabled = await this.memoryService.isExtractionEnabled();
+      if (!isEnabled) return;
+
+      // Extract memory data from the utterance
+      const extraction = await this.memoryService.extractFromUtterance({
+        personaId: persona.id,
+        personaName: persona.name,
+        content,
+        sessionTopic: this.session?.topic || '',
+        sessionId: this.sessionId,
+      });
+
+      // If substantive, accumulate in session extractions
+      if (extraction.isSubstantive && extraction.topics.length > 0) {
+        let sessionData = this.sessionExtractions.get(persona.id);
+        if (!sessionData) {
+          sessionData = {
+            personaId: persona.id,
+            personaName: persona.name,
+            extractions: [],
+            sessionId: this.sessionId,
+          };
+          this.sessionExtractions.set(persona.id, sessionData);
+        }
+
+        sessionData.extractions.push(...extraction.topics);
+
+        logger.debug({
+          sessionId: this.sessionId,
+          personaId: persona.id,
+          personaSlug: persona.slug,
+          topicCount: extraction.topics.length,
+          totalExtractions: sessionData.extractions.length,
+        }, 'Accumulated memory extraction from utterance');
+      }
+    } catch (error) {
+      // Memory extraction is non-blocking - log and continue
+      logger.warn({
+        error,
+        sessionId: this.sessionId,
+        participantId,
+        personaSlug: persona.slug,
+      }, 'Failed to extract memory from utterance, continuing without');
+    }
+  }
+
+  /**
+   * Process accumulated memory data after session completes
+   * Updates persona opinions and relationship scores
+   */
+  private async processPostSessionMemory(): Promise<void> {
+    if (this.sessionExtractions.size === 0) {
+      logger.info({ sessionId: this.sessionId }, 'No memory extractions to process');
+      return;
+    }
+
+    try {
+      // Build agreement/disagreement pairs from context board
+      const agreementPairs: Array<{ personaId1: string; personaId2: string }> = [];
+      const disagreementPairs: Array<{ personaId1: string; personaId2: string }> = [];
+
+      // Get agreement data from context board if available
+      const contextState = this.contextBoard?.getState();
+      if (contextState) {
+        // Extract persona IDs from participants
+        const participantToPersona = new Map<string, string>();
+        for (const p of this.participants) {
+          participantToPersona.set(p.id, p.personaId);
+        }
+
+        // Track agreements and disagreements from claims
+        // Claims have participantId and supportedBy/challengedBy arrays
+        for (const claim of contextState.claims) {
+          const sourcePersonaId = participantToPersona.get(claim.participantId);
+          if (!sourcePersonaId) continue;
+
+          // Track agreements (supportedBy)
+          for (const supporterId of claim.supportedBy) {
+            const supporterPersonaId = participantToPersona.get(supporterId);
+            if (supporterPersonaId && supporterPersonaId !== sourcePersonaId) {
+              agreementPairs.push({ personaId1: sourcePersonaId, personaId2: supporterPersonaId });
+            }
+          }
+
+          // Track disagreements (challengedBy)
+          for (const challengerId of claim.challengedBy) {
+            const challengerPersonaId = participantToPersona.get(challengerId);
+            if (challengerPersonaId && challengerPersonaId !== sourcePersonaId) {
+              disagreementPairs.push({ personaId1: sourcePersonaId, personaId2: challengerPersonaId });
+            }
+          }
+        }
+      }
+
+      // Create post-session input
+      const postSessionInput: PostSessionInput = {
+        sessionId: this.sessionId,
+        sessionTopic: this.session?.topic || '',
+        participantExtractions: this.sessionExtractions,
+        agreementPairs,
+        disagreementPairs,
+      };
+
+      // Process the accumulated extractions
+      await this.memoryService.processSessionMemory(postSessionInput);
+
+      logger.info({
+        sessionId: this.sessionId,
+        participantCount: this.sessionExtractions.size,
+        totalExtractions: Array.from(this.sessionExtractions.values())
+          .reduce((sum, s) => sum + s.extractions.length, 0),
+      }, 'Completed post-session memory processing');
+
+    } catch (error) {
+      // Memory processing is non-blocking - log and continue
+      logger.error({
+        error,
+        sessionId: this.sessionId,
+      }, 'Failed to process post-session memory, continuing without');
+    }
   }
 }
 

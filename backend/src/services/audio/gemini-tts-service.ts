@@ -27,14 +27,6 @@ const logger = pino({
 });
 
 /**
- * Maximum characters per chunk for Gemini TTS
- * Gemini processing time scales non-linearly with text length.
- * ~1000 chars takes ~45s, ~2000 chars can take >120s or timeout.
- * Keep chunks small for reliable generation.
- */
-const MAX_CHUNK_SIZE = 1000;
-
-/**
  * Gemini voice configuration
  * Maps our voice types to Gemini voice names
  */
@@ -74,10 +66,43 @@ export const GEMINI_VOICE_PROFILES: VoiceProfiles = {
 };
 
 /**
- * Available Gemini TTS voices (as of Dec 2025)
+ * Available Gemini TTS voices (as of Jan 2026)
+ * Full list of 30 voices with their characteristics
+ * @see https://ai.google.dev/gemini-api/docs/speech-generation
  */
 export const GEMINI_AVAILABLE_VOICES = [
-  'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede',
+  // Original 8 voices
+  'Zephyr',    // Bright
+  'Puck',      // Upbeat
+  'Charon',    // Informative
+  'Kore',      // Firm
+  'Fenrir',    // Excitable
+  'Leda',      // Youthful
+  'Orus',      // Firm
+  'Aoede',     // Breezy
+  // Additional 22 voices
+  'Callirrhoe',    // Easy-going
+  'Autonoe',       // Bright
+  'Enceladus',     // Breathy
+  'Iapetus',       // Clear
+  'Umbriel',       // Easy-going
+  'Algieba',       // Smooth
+  'Despina',       // Smooth
+  'Erinome',       // Clear
+  'Algenib',       // Gravelly
+  'Rasalgethi',    // Informative
+  'Laomedeia',     // Upbeat
+  'Achernar',      // Soft
+  'Alnilam',       // Firm
+  'Schedar',       // Even
+  'Gacrux',        // Mature
+  'Pulcherrima',   // Forward
+  'Achird',        // Friendly
+  'Zubenelgenubi', // Casual
+  'Vindemiatrix',  // Gentle
+  'Sadachbia',     // Lively
+  'Sadaltager',    // Knowledgeable
+  'Sulafat',       // Warm
 ];
 
 export interface GeminiTTSConfig {
@@ -150,8 +175,12 @@ export class GeminiTTSService implements ITTSService {
     return this.voiceProfiles[voiceType];
   }
 
-  async generateSpeech(text: string, voiceType: VoiceType, _customVoiceId?: string): Promise<TTSResult> {
-    const voice = this.voiceProfiles[voiceType];
+  async generateSpeech(text: string, voiceType: VoiceType, customVoiceId?: string): Promise<TTSResult> {
+    // Use custom voice ID if provided (for previews), otherwise use voice profile
+    const baseVoice = this.voiceProfiles[voiceType];
+    const voice: VoiceConfig = customVoiceId
+      ? { ...baseVoice, voiceId: customVoiceId }
+      : baseVoice;
 
     logger.debug(
       { voiceType, voiceId: voice.voiceId, textLength: text.length },
@@ -164,233 +193,9 @@ export class GeminiTTSService implements ITTSService {
     // IMPORTANT: Do NOT use system_instruction - it's not supported by TTS models.
     // Pass the full text with embedded director's notes instead.
 
-    // Split text into chunks to avoid timeout
-    const chunks = this.splitIntoChunks(text);
-
-    if (chunks.length === 1) {
-      // Single chunk - direct generation
-      return this.limiter.schedule(async () => {
-        return this.generateSpeechWithRetry(text, voice, 1);
-      });
-    }
-
-    // Multiple chunks - generate each and concatenate
-    // For chunked processing with director's notes, prepend notes to each chunk
-    // to maintain consistent voice performance guidance
-    const transcriptMarker = '#### TRANSCRIPT';
-    const hasDirectorNotes = text.includes(transcriptMarker);
-    let directorNotesPrefix = '';
-    let baseTranscript = text;
-
-    if (hasDirectorNotes) {
-      const markerIndex = text.indexOf(transcriptMarker);
-      directorNotesPrefix = text.substring(0, markerIndex + transcriptMarker.length) + '\n\n';
-      baseTranscript = text.substring(markerIndex + transcriptMarker.length).trim();
-    }
-
-    // Re-chunk just the transcript portion
-    const transcriptChunks = this.splitIntoChunks(baseTranscript);
-
-    logger.info(
-      {
-        totalLength: text.length,
-        transcriptLength: baseTranscript.length,
-        chunkCount: transcriptChunks.length,
-        chunkSizes: transcriptChunks.map(c => c.length),
-        hasDirectorNotes,
-      },
-      'Splitting text into chunks for Gemini TTS'
-    );
-
-    const pcmBuffers: Buffer[] = [];
-    let totalCharacters = 0;
-
-    for (let i = 0; i < transcriptChunks.length; i++) {
-      const chunk = transcriptChunks[i]!;
-      // Prepend director's notes to each chunk for consistent voice guidance
-      const chunkWithNotes = hasDirectorNotes
-        ? directorNotesPrefix + chunk
-        : chunk;
-
-      logger.debug(
-        { chunkIndex: i + 1, totalChunks: transcriptChunks.length, chunkLength: chunk.length },
-        'Processing chunk'
-      );
-
-      const pcmBuffer = await this.limiter.schedule(async () => {
-        return this.generatePcmForChunk(chunkWithNotes, voice, 1);
-      });
-
-      pcmBuffers.push(pcmBuffer);
-      totalCharacters += chunk.length;
-    }
-
-    // Concatenate all PCM buffers
-    const combinedPcm = Buffer.concat(pcmBuffers);
-
-    // Convert final PCM to MP3
-    const audioBuffer = await this.convertPcmToMp3(combinedPcm);
-
-    // Calculate duration from combined PCM
-    const durationMs = (combinedPcm.length / 48000) * 1000;
-
-    logger.info(
-      {
-        voiceId: voice.voiceId,
-        totalLength: text.length,
-        chunkCount: transcriptChunks.length,
-        combinedPcmSize: combinedPcm.length,
-        mp3Size: audioBuffer.length,
-        durationMs: Math.round(durationMs),
-      },
-      'Chunked speech generation complete'
-    );
-
-    return {
-      audioBuffer,
-      durationMs,
-      charactersUsed: totalCharacters,
-    };
-  }
-
-  /**
-   * Split text into chunks at sentence boundaries
-   * Keeps chunks under MAX_CHUNK_SIZE for reliable Gemini processing
-   */
-  private splitIntoChunks(text: string): string[] {
-    if (text.length <= MAX_CHUNK_SIZE) {
-      return [text];
-    }
-
-    const chunks: string[] = [];
-    let remaining = text;
-
-    while (remaining.length > 0) {
-      if (remaining.length <= MAX_CHUNK_SIZE) {
-        chunks.push(remaining.trim());
-        break;
-      }
-
-      // Find a good split point (sentence boundary)
-      let splitIndex = MAX_CHUNK_SIZE;
-
-      // Look for sentence endings within the chunk
-      const searchArea = remaining.substring(0, MAX_CHUNK_SIZE);
-      const sentenceEndings = ['. ', '! ', '? ', '.\n', '!\n', '?\n', '."', '!"', '?"'];
-
-      let lastSentenceEnd = -1;
-      for (const ending of sentenceEndings) {
-        const idx = searchArea.lastIndexOf(ending);
-        if (idx > lastSentenceEnd) {
-          lastSentenceEnd = idx + ending.length;
-        }
-      }
-
-      if (lastSentenceEnd > MAX_CHUNK_SIZE * 0.4) {
-        // Found a good sentence break point (at least 40% into chunk)
-        splitIndex = lastSentenceEnd;
-      } else {
-        // No good sentence break, try comma or word boundary
-        const lastComma = searchArea.lastIndexOf(', ');
-        if (lastComma > MAX_CHUNK_SIZE * 0.5) {
-          splitIndex = lastComma + 2;
-        } else {
-          const lastSpace = searchArea.lastIndexOf(' ');
-          if (lastSpace > MAX_CHUNK_SIZE * 0.5) {
-            splitIndex = lastSpace + 1;
-          }
-          // Otherwise just split at max
-        }
-      }
-
-      chunks.push(remaining.substring(0, splitIndex).trim());
-      remaining = remaining.substring(splitIndex).trim();
-    }
-
-    return chunks;
-  }
-
-  /**
-   * Generate PCM audio for a single chunk (used for chunked processing)
-   * Returns raw PCM buffer without MP3 conversion
-   */
-  private async generatePcmForChunk(
-    text: string,
-    voice: VoiceConfig,
-    attempt: number = 1
-  ): Promise<Buffer> {
-    try {
-      const startTime = Date.now();
-
-      // Build request body - pass full text including any director's notes
-      // Gemini TTS understands structured prompts and only vocalizes transcript
-      const requestBody: Record<string, unknown> = {
-        contents: [
-          {
-            parts: [{ text }],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: voice.voiceId,
-              },
-            },
-          },
-        },
-      };
-
-      const response = await this.client.post(
-        `/models/${this.modelId}:generateContent`,
-        requestBody,
-        {
-          params: {
-            key: this.apiKey,
-          },
-        }
-      );
-
-      const audioData = response.data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-
-      if (!audioData?.data) {
-        throw new Error('No audio data in Gemini response');
-      }
-
-      const pcmBuffer = Buffer.from(audioData.data, 'base64');
-      const processingTime = Date.now() - startTime;
-
-      logger.debug(
-        {
-          voiceId: voice.voiceId,
-          textLength: text.length,
-          pcmSize: pcmBuffer.length,
-          processingTime,
-        },
-        'Chunk PCM generated'
-      );
-
-      return pcmBuffer;
-    } catch (error) {
-      const axiosError = error as AxiosError;
-
-      if (attempt < this.maxRetries && this.isRetryableError(axiosError)) {
-        const isRateLimit = axiosError.response?.status === 429;
-        const baseDelay = isRateLimit ? 5000 : 1000;
-        const delay = Math.pow(2, attempt - 1) * baseDelay + Math.random() * 500;
-
-        logger.warn(
-          { attempt, delay: Math.round(delay), isRateLimit, error: axiosError.message },
-          'Chunk generation failed, retrying'
-        );
-
-        await this.sleep(delay);
-        return this.generatePcmForChunk(text, voice, attempt + 1);
-      }
-
-      throw new Error(`Gemini TTS chunk failed: ${axiosError.message}`);
-    }
+    return this.limiter.schedule(async () => {
+      return this.generateSpeechWithRetry(text, voice, 1);
+    });
   }
 
   private async generateSpeechWithRetry(

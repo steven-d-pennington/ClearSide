@@ -19,13 +19,65 @@ import { SPEAKER_ROLES, DEFAULT_VOICE_SETTINGS } from '../../types/podcast';
 import styles from './VoiceAssignmentPanel.module.css';
 
 /**
- * Gemini voice assignments - fixed per role
+ * Voice gender type
  */
-const GEMINI_VOICES: Record<string, { voiceName: string; description: string }> = {
-  moderator: { voiceName: 'Aoede', description: 'Neutral, calm voice' },
-  pro_advocate: { voiceName: 'Kore', description: 'Firm, clear female voice' },
-  con_advocate: { voiceName: 'Charon', description: 'Thoughtful male voice' },
-  narrator: { voiceName: 'Puck', description: 'Clear narrator voice' },
+type VoiceGender = 'male' | 'female' | 'neutral';
+
+/**
+ * Available Gemini TTS voices with descriptions and gender
+ * Full list of 30 voices (as of Jan 2026)
+ * @see https://ai.google.dev/gemini-api/docs/speech-generation
+ */
+const GEMINI_VOICES_LIST: Array<{ id: string; name: string; description: string; gender: VoiceGender }> = [
+  // Original 8 voices
+  { id: 'Aoede', name: 'Aoede', description: 'Breezy', gender: 'female' },
+  { id: 'Charon', name: 'Charon', description: 'Informative', gender: 'male' },
+  { id: 'Fenrir', name: 'Fenrir', description: 'Excitable', gender: 'male' },
+  { id: 'Kore', name: 'Kore', description: 'Firm', gender: 'female' },
+  { id: 'Leda', name: 'Leda', description: 'Youthful', gender: 'female' },
+  { id: 'Orus', name: 'Orus', description: 'Firm', gender: 'male' },
+  { id: 'Puck', name: 'Puck', description: 'Upbeat', gender: 'male' },
+  { id: 'Zephyr', name: 'Zephyr', description: 'Bright', gender: 'male' },
+  // Additional 22 voices
+  { id: 'Achernar', name: 'Achernar', description: 'Soft', gender: 'female' },
+  { id: 'Achird', name: 'Achird', description: 'Friendly', gender: 'male' },
+  { id: 'Algenib', name: 'Algenib', description: 'Gravelly', gender: 'male' },
+  { id: 'Algieba', name: 'Algieba', description: 'Smooth', gender: 'male' },
+  { id: 'Alnilam', name: 'Alnilam', description: 'Firm', gender: 'male' },
+  { id: 'Autonoe', name: 'Autonoe', description: 'Bright', gender: 'female' },
+  { id: 'Callirrhoe', name: 'Callirrhoe', description: 'Easy-going', gender: 'female' },
+  { id: 'Despina', name: 'Despina', description: 'Smooth', gender: 'female' },
+  { id: 'Enceladus', name: 'Enceladus', description: 'Breathy', gender: 'male' },
+  { id: 'Erinome', name: 'Erinome', description: 'Clear', gender: 'female' },
+  { id: 'Gacrux', name: 'Gacrux', description: 'Mature', gender: 'male' },
+  { id: 'Iapetus', name: 'Iapetus', description: 'Clear', gender: 'male' },
+  { id: 'Laomedeia', name: 'Laomedeia', description: 'Upbeat', gender: 'female' },
+  { id: 'Pulcherrima', name: 'Pulcherrima', description: 'Forward', gender: 'female' },
+  { id: 'Rasalgethi', name: 'Rasalgethi', description: 'Informative', gender: 'male' },
+  { id: 'Sadachbia', name: 'Sadachbia', description: 'Lively', gender: 'male' },
+  { id: 'Sadaltager', name: 'Sadaltager', description: 'Knowledgeable', gender: 'male' },
+  { id: 'Schedar', name: 'Schedar', description: 'Even', gender: 'female' },
+  { id: 'Sulafat', name: 'Sulafat', description: 'Warm', gender: 'male' },
+  { id: 'Umbriel', name: 'Umbriel', description: 'Easy-going', gender: 'male' },
+  { id: 'Vindemiatrix', name: 'Vindemiatrix', description: 'Gentle', gender: 'female' },
+  { id: 'Zubenelgenubi', name: 'Zubenelgenubi', description: 'Casual', gender: 'male' },
+];
+
+/**
+ * Get gender icon for display
+ */
+function getGenderIcon(gender: VoiceGender): string {
+  return gender === 'female' ? '♀' : gender === 'male' ? '♂' : '⚥';
+}
+
+/**
+ * Default Gemini voice assignments per role
+ */
+const GEMINI_VOICE_DEFAULTS: Record<string, { voiceId: string; voiceName: string; description: string }> = {
+  moderator: { voiceId: 'Aoede', voiceName: 'Aoede', description: 'Neutral, calm voice' },
+  pro_advocate: { voiceId: 'Kore', voiceName: 'Kore', description: 'Firm, clear female voice' },
+  con_advocate: { voiceId: 'Charon', voiceName: 'Charon', description: 'Thoughtful male voice' },
+  narrator: { voiceId: 'Puck', voiceName: 'Puck', description: 'Clear narrator voice' },
 };
 
 /**
@@ -136,11 +188,15 @@ export function VoiceAssignmentPanel({
     });
   };
 
-  // Render Gemini voices (read-only, fixed assignments)
+  // Render Gemini voices (selectable from available Gemini voices)
   const renderGeminiVoices = () => (
     <div className={styles.roleList}>
       {SPEAKER_ROLES.map((role) => {
-        const geminiVoice = GEMINI_VOICES[role.id];
+        const defaultVoice = GEMINI_VOICE_DEFAULTS[role.id];
+        const currentVoiceId = assignments[role.id]?.voiceId || defaultVoice?.voiceId || '';
+        const currentVoice = GEMINI_VOICES_LIST.find(v => v.id === currentVoiceId) ||
+          GEMINI_VOICES_LIST.find(v => v.id === defaultVoice?.voiceId);
+
         return (
           <div key={role.id} className={styles.roleCard}>
             <div className={styles.roleHeader}>
@@ -150,16 +206,28 @@ export function VoiceAssignmentPanel({
               </div>
 
               <div className={styles.voiceControls}>
-                <div className={styles.geminiVoice}>
-                  <span className={styles.geminiVoiceName}>
-                    {geminiVoice?.voiceName || 'Default'}
-                  </span>
-                  <span className={styles.geminiVoiceDesc}>
-                    {geminiVoice?.description || ''}
-                  </span>
-                </div>
+                <select
+                  className={styles.voiceSelect}
+                  value={currentVoiceId}
+                  onChange={(e) => {
+                    const voice = GEMINI_VOICES_LIST.find(v => v.id === e.target.value);
+                    updateAssignment(role.id, {
+                      voiceId: e.target.value,
+                      voiceName: voice?.name || e.target.value,
+                    });
+                  }}
+                >
+                  {GEMINI_VOICES_LIST.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.name} - {voice.description} {getGenderIcon(voice.gender)}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
+            <p className={styles.voiceHint}>
+              {currentVoice?.description || defaultVoice?.description}
+            </p>
           </div>
         );
       })}
@@ -385,7 +453,7 @@ export function VoiceAssignmentPanel({
 
   const getDescription = () => {
     if (isGemini) {
-      return 'Gemini uses optimized voices for each speaker role.';
+      return 'Select from Gemini voices for each speaker role. Defaults are optimized for debates.';
     }
     if (isGoogleCloudLong) {
       return 'Select from Journey voices optimized for long-form podcast content.';

@@ -55,6 +55,10 @@ export interface PodcastPersona {
   voiceCharacteristics: VoiceCharacteristics;
   examplePhrases: string[];          // Sample phrases for consistency
   preferredTopics: string[];         // Topics they engage with most
+  // Default voice settings for consistent podcast generation
+  defaultVoiceProvider?: string;     // TTS provider (elevenlabs, gemini, google-cloud-long)
+  defaultVoiceId?: string;           // Voice ID for the provider
+  defaultVoiceSettings?: Record<string, unknown>; // Provider-specific settings
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,6 +78,9 @@ export interface PodcastPersonaRow {
   voice_characteristics: VoiceCharacteristics;
   example_phrases: string[];
   preferred_topics: string[];
+  default_voice_provider: string | null;
+  default_voice_id: string | null;
+  default_voice_settings: Record<string, unknown> | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -518,6 +525,9 @@ export function mapPersonaRow(row: PodcastPersonaRow): PodcastPersona {
     voiceCharacteristics: row.voice_characteristics,
     examplePhrases: row.example_phrases,
     preferredTopics: row.preferred_topics,
+    defaultVoiceProvider: row.default_voice_provider ?? undefined,
+    defaultVoiceId: row.default_voice_id ?? undefined,
+    defaultVoiceSettings: row.default_voice_settings ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

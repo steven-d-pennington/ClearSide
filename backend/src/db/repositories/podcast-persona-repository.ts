@@ -209,6 +209,116 @@ export class PodcastPersonaRepository {
     return topicMap;
   }
 
+  // ========== Update Operations ==========
+
+  /**
+   * Update a persona's default voice settings
+   */
+  async updateVoiceSettings(
+    personaId: string,
+    voiceProvider: string | null,
+    voiceId: string | null,
+    voiceSettings: Record<string, unknown> | null
+  ): Promise<PodcastPersona | null> {
+    const result = await this.pool.query<PodcastPersonaRow>(`
+      UPDATE podcast_personas
+      SET
+        default_voice_provider = $2,
+        default_voice_id = $3,
+        default_voice_settings = $4,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, [personaId, voiceProvider, voiceId, voiceSettings ? JSON.stringify(voiceSettings) : null]);
+
+    return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
+  /**
+   * Clear a persona's default voice settings
+   */
+  async clearVoiceSettings(personaId: string): Promise<PodcastPersona | null> {
+    return this.updateVoiceSettings(personaId, null, null, null);
+  }
+
+  /**
+   * Update a persona's profile fields
+   */
+  async updateProfile(
+    personaId: string,
+    updates: {
+      name?: string;
+      avatarEmoji?: string;
+      backstory?: string;
+      speakingStyle?: string;
+      worldview?: string;
+      quirks?: string[];
+      examplePhrases?: string[];
+      preferredTopics?: string[];
+      voiceCharacteristics?: VoiceCharacteristics;
+    }
+  ): Promise<PodcastPersona | null> {
+    // Build dynamic update query based on provided fields
+    const setClauses: string[] = [];
+    const values: unknown[] = [personaId];
+    let paramIndex = 2;
+
+    if (updates.name !== undefined) {
+      setClauses.push(`name = $${paramIndex++}`);
+      values.push(updates.name);
+    }
+    if (updates.avatarEmoji !== undefined) {
+      setClauses.push(`avatar_emoji = $${paramIndex++}`);
+      values.push(updates.avatarEmoji);
+    }
+    if (updates.backstory !== undefined) {
+      setClauses.push(`backstory = $${paramIndex++}`);
+      values.push(updates.backstory);
+    }
+    if (updates.speakingStyle !== undefined) {
+      setClauses.push(`speaking_style = $${paramIndex++}`);
+      values.push(updates.speakingStyle);
+    }
+    if (updates.worldview !== undefined) {
+      setClauses.push(`worldview = $${paramIndex++}`);
+      values.push(updates.worldview);
+    }
+    if (updates.quirks !== undefined) {
+      setClauses.push(`quirks = $${paramIndex++}`);
+      values.push(updates.quirks);
+    }
+    if (updates.examplePhrases !== undefined) {
+      setClauses.push(`example_phrases = $${paramIndex++}`);
+      values.push(updates.examplePhrases);
+    }
+    if (updates.preferredTopics !== undefined) {
+      setClauses.push(`preferred_topics = $${paramIndex++}`);
+      values.push(updates.preferredTopics);
+    }
+    if (updates.voiceCharacteristics !== undefined) {
+      setClauses.push(`voice_characteristics = $${paramIndex++}`);
+      values.push(JSON.stringify(updates.voiceCharacteristics));
+    }
+
+    // Always update updated_at
+    setClauses.push('updated_at = NOW()');
+
+    if (setClauses.length === 1) {
+      // Only updated_at, nothing to change
+      return this.findById(personaId);
+    }
+
+    const query = `
+      UPDATE podcast_personas
+      SET ${setClauses.join(', ')}
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const result = await this.pool.query<PodcastPersonaRow>(query, values);
+    return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
   // ========== Row Mapper ==========
 
   private mapRow(row: PodcastPersonaRow): PodcastPersona {
@@ -224,6 +334,9 @@ export class PodcastPersonaRepository {
       voiceCharacteristics: this.parseVoiceCharacteristics(row.voice_characteristics),
       examplePhrases: row.example_phrases || [],
       preferredTopics: row.preferred_topics || [],
+      defaultVoiceProvider: row.default_voice_provider ?? undefined,
+      defaultVoiceId: row.default_voice_id ?? undefined,
+      defaultVoiceSettings: row.default_voice_settings ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
