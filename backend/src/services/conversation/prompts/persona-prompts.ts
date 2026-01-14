@@ -9,9 +9,32 @@ import type { PodcastPersona } from '../../../types/conversation.js';
 import type { PersonaMemoryContext } from '../../../types/persona-memory.js';
 
 /**
- * Build the memory injection section for the system prompt
+ * Detect if a persona has a naturally verbose speaking style
+ * (storytellers, anecdote-tellers, etc.)
  */
-function buildMemorySection(memoryContext: PersonaMemoryContext): string {
+function isVerbosePersona(persona: PodcastPersona): boolean {
+  const verboseIndicators = [
+    'storyteller',
+    'story',
+    'anecdote',
+    'elaborate',
+    'detailed',
+    'verbose',
+    'let me tell you',
+    'grounds abstract issues in real people',
+    'uses examples',
+    'illustrates with',
+  ];
+
+  const styleText = (persona.speakingStyle + ' ' + persona.quirks.join(' ')).toLowerCase();
+  return verboseIndicators.some(indicator => styleText.includes(indicator));
+}
+
+/**
+ * Build the memory injection section for the system prompt
+ * Exported for use by both PersonaAgent and PodcastHostAgent
+ */
+export function buildMemorySection(memoryContext: PersonaMemoryContext): string {
   const sections: string[] = [];
 
   // Core values section (immutable personality anchors)
@@ -130,13 +153,22 @@ Speak authentically as an AI - no need to pretend otherwise.`;
     : '';
 
   // Response length guideline changes based on rapid fire mode
+  // Verbose personas (storytellers) get extra guidance to condense their style
+  const verboseOverride = rapidFire && isVerbosePersona(persona)
+    ? `
+   - YOUR STYLE ADAPTS: You're naturally a storyteller, but in rapid-fire mode, give us the TAKEAWAY, not the story
+   - Skip the setup - jump straight to your point
+   - Instead of "Let me tell you about my neighbor..." just say "In my neighborhood, we see X"
+   - Save the full anecdotes for longer formats - here, distill to essence`
+    : '';
+
   const lengthGuideline = rapidFire
     ? `6. RAPID FIRE MODE - This is a fast-paced, focused exchange:
    - Keep responses to 2-4 sentences typically
    - Be focused and avoid repetition - make each sentence count
    - Cut unnecessary throat-clearing and preambles
    - Get to your core point quickly and clearly
-   - Build naturally on what others say without rehashing`
+   - Build naturally on what others say without rehashing${verboseOverride}`
     : '6. Keep responses concise (2-4 paragraphs typically, unless asked for more detail)';
 
   return `You are ${persona.name}, a participant in a podcast conversation.
@@ -209,8 +241,13 @@ ${conversationContext}
   }
 
   // Length instruction changes based on rapid fire mode
+  // Verbose personas get extra reminder to condense
+  const verboseReminder = rapidFire && isVerbosePersona(persona)
+    ? ' Give us the takeaway, not the full story - distill to essence!'
+    : '';
+
   const lengthInstruction = rapidFire
-    ? 'RAPID FIRE: 2-4 sentences typically. Be focused and avoid repetition - make every sentence count!'
+    ? `RAPID FIRE: 2-4 sentences typically. Be focused and avoid repetition - make every sentence count!${verboseReminder}`
     : 'Keep your response focused and conversational (2-4 paragraphs unless more detail is explicitly requested).';
 
   prompt += `

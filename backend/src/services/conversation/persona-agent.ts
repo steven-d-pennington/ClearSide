@@ -324,8 +324,9 @@ export class PersonaAgent {
     );
 
     try {
-      // Reduce tokens for rapid fire mode (150 vs 600)
-      const maxTokens = this.rapidFire ? 150 : 600;
+      // Reduce tokens for rapid fire mode (220 vs 600)
+      // 220 allows verbose personas (storytellers) room while still encouraging brevity
+      const maxTokens = this.rapidFire ? 220 : 600;
       const content = await this.generate(prompt, 'response', 0.8, maxTokens);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
@@ -424,6 +425,61 @@ export class PersonaAgent {
       return content;
     } catch (error) {
       logger.error({ error, sessionId: this.sessionId }, 'Failed to generate direct address');
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a final thought/takeaway for the closing sequence
+   * Called when the host prompts each participant for their closing perspective
+   */
+  async generateFinalThought(recentContext: string): Promise<string> {
+    logger.info({
+      sessionId: this.sessionId,
+      persona: this.persona.slug,
+      rapidFire: this.rapidFire,
+    }, 'Generating final thought for closing sequence');
+
+    const lengthGuidance = this.rapidFire
+      ? 'Keep it to 2-4 sentences - quick and impactful!'
+      : 'Keep it to 1-2 paragraphs - substantial but focused.';
+
+    const prompt = `The host has asked for your final thoughts on today's discussion.
+
+RECENT CONTEXT:
+${recentContext}
+
+TOPIC: ${this.topic}
+
+Generate your final takeaway as ${this.name}. This is your chance to leave listeners with something memorable.
+
+GUIDELINES:
+- Stay true to your worldview and speaking style
+- ${lengthGuidance}
+- Focus on your key insight or perspective shift from the conversation
+- Be genuine - if you changed your mind on something, acknowledge it
+- If you want to acknowledge another participant's good point, you may
+- End on a note that reflects your character
+
+This is your closing statement - make it count!`;
+
+    try {
+      // More tokens for final thought since it's the closing statement (200 vs 400)
+      const maxTokens = this.rapidFire ? 200 : 400;
+      const content = await this.generate(prompt, 'final_thought', 0.85, maxTokens);
+      this.addToHistory('user', prompt);
+      this.addToHistory('assistant', content);
+
+      logger.info({
+        sessionId: this.sessionId,
+        persona: this.persona.slug,
+        length: content.length,
+        rapidFire: this.rapidFire,
+      }, 'Final thought generated');
+
+      return content;
+    } catch (error) {
+      logger.error({ error, sessionId: this.sessionId, persona: this.persona.slug }, 'Failed to generate final thought');
       throw error;
     }
   }

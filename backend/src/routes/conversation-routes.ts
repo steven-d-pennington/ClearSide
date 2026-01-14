@@ -43,6 +43,7 @@ const createSessionSchema = z.object({
   paceDelayMs: z.number().min(500).max(10000).default(3000),
   rapidFire: z.boolean().default(false),
   minimalPersonaMode: z.boolean().default(false),
+  maxTurns: z.number().min(5).max(100).default(30),
   hostModelId: z.string().optional(),
   hostDisplayName: z.string().max(100).optional(),
   participants: z.array(z.object({
@@ -492,6 +493,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         paceDelayMs,
         rapidFire,
         minimalPersonaMode,
+        maxTurns,
         hostModelId,
         hostDisplayName,
         participants,
@@ -531,6 +533,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         paceDelayMs,
         rapidFire,
         minimalPersonaMode,
+        maxTurns,
         hostModelId,
         hostDisplayName,
         participants: participantConfigs,
@@ -743,36 +746,42 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         return;
       }
 
-      // Check if already running
+      // Check if already running (with lock to prevent race condition)
+      // Must set placeholder BEFORE any async operations to prevent TOCTOU race
       if (activeOrchestrators.has(id)) {
         res.status(409).json({ error: 'Conversation already running' });
         return;
       }
 
+      // Set placeholder immediately to prevent concurrent launch attempts
+      // Will be replaced with real orchestrator or deleted on error
+      activeOrchestrators.set(id, null as unknown as ConversationalOrchestrator);
+
       const session = await sessionRepo.findById(id);
       if (!session) {
+        activeOrchestrators.delete(id); // Clean up placeholder
         res.status(404).json({ error: 'Session not found' });
         return;
       }
 
       if (session.status === 'completed') {
+        activeOrchestrators.delete(id); // Clean up placeholder
         res.status(400).json({ error: 'Session already completed' });
         return;
       }
 
       if (!sseManager) {
+        activeOrchestrators.delete(id); // Clean up placeholder
         res.status(500).json({ error: 'SSE manager not available' });
         return;
       }
 
-      // Create and initialize orchestrator
-      // Use fewer turns for rapid fire mode (20 vs 30)
-      const maxTurns = session.rapidFire ? 20 : 30;
+      // Create and initialize orchestrator with session's configured maxTurns
       const orchestrator = await createConversationalOrchestrator(
         pool,
         sseManager,
         id,
-        maxTurns
+        session.maxTurns
       );
 
       activeOrchestrators.set(id, orchestrator);
@@ -796,6 +805,10 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         status: 'live',
       });
     } catch (error) {
+      // Clean up placeholder on error
+      if (req.params.id) {
+        activeOrchestrators.delete(req.params.id);
+      }
       logger.error({ error, sessionId: req.params.id }, 'Failed to launch conversation');
       next(error);
     }

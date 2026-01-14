@@ -617,6 +617,84 @@
   padding-left: 0.25rem;
 }
 
+/* Turn Limit Section */
+.turnLimitSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.turnLimitLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: default;
+}
+
+.turnLimitInput {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.turnLimitNumber {
+  width: 70px;
+  padding: 0.5rem 0.75rem;
+  background: var(--modal-bg);
+  border: 1px solid var(--modal-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.turnLimitNumber:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+}
+
+.turnLimitNumber:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Hide spinner buttons on number input */
+.turnLimitNumber::-webkit-outer-spin-button,
+.turnLimitNumber::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.turnLimitNumber[type=number] {
+  -moz-appearance: textfield;
+}
+
+.turnLimitUnit {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.turnLimitDescription {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+  padding-left: 0.25rem;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .modal {

@@ -89,6 +89,7 @@ export interface ConversationSession {
   paceDelayMs: number;
   rapidFire: boolean;
   minimalPersonaMode: boolean;
+  maxTurns: number; // Maximum turns before closing sequence (5-100, default 30)
   status: SessionStatus;
   currentSpeakerIndex: number;
   hostModelId?: string;
@@ -231,6 +232,7 @@ export interface CreateSessionRequest {
   flowMode: FlowMode;
   paceDelayMs?: number;
   rapidFire?: boolean;
+  maxTurns?: number; // Maximum turns before closing sequence (5-100, default 30)
   hostModelId?: string;
   hostDisplayName?: string;
 }

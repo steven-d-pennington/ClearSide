@@ -27,6 +27,29 @@ const logger = pino({
 });
 
 /**
+ * Maximum characters for the transcript portion of each chunk.
+ * Director's notes header adds ~1200 chars, so this leaves room under typical limits.
+ */
+const MAX_TRANSCRIPT_CHARS = 3500;
+
+/**
+ * Marker that separates director's notes from the actual transcript.
+ * Everything before this marker is performance guidance (not vocalized).
+ * Everything after is the actual text to speak.
+ */
+const DIRECTOR_NOTES_MARKER = '#### TRANSCRIPT\n';
+
+/**
+ * Parsed prompt with director's notes separated from transcript
+ */
+interface ParsedPrompt {
+  /** Everything up to and including "#### TRANSCRIPT\n" */
+  directorsHeader: string;
+  /** The actual text to speak (after the marker) */
+  transcript: string;
+}
+
+/**
  * Gemini voice configuration
  * Maps our voice types to Gemini voice names
  */
@@ -182,134 +205,64 @@ export class GeminiTTSService implements ITTSService {
       ? { ...baseVoice, voiceId: customVoiceId }
       : baseVoice;
 
-    logger.debug(
-      { voiceType, voiceId: voice.voiceId, textLength: text.length },
-      'Generating speech with Gemini'
-    );
-
     // Gemini TTS understands the structured prompt format with director's notes
     // The markdown format (# AUDIO PROFILE, ## THE SCENE, ### DIRECTOR'S NOTES, #### TRANSCRIPT)
     // guides voice performance while only vocalizing the transcript section.
     // IMPORTANT: Do NOT use system_instruction - it's not supported by TTS models.
-    // Pass the full text with embedded director's notes instead.
 
-    return this.limiter.schedule(async () => {
-      return this.generateSpeechWithRetry(text, voice, 1);
-    });
-  }
+    // Parse text to separate director's notes from transcript
+    const parsed = this.parseDirectorPrompt(text);
 
-  private async generateSpeechWithRetry(
-    text: string,
-    voice: VoiceConfig,
-    attempt: number = 1
-  ): Promise<TTSResult> {
-    try {
-      const startTime = Date.now();
+    // Build chunks with director's notes prepended to each
+    const chunks = this.buildChunksWithDirectors(parsed);
 
-      // Build request body - pass full text including any director's notes
-      // Gemini TTS understands structured prompts and only vocalizes transcript
-      // NOTE: Do NOT use system_instruction - it's not supported by TTS models
-      const requestBody: Record<string, unknown> = {
-        contents: [
-          {
-            parts: [{ text }],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: voice.voiceId,
-              },
-            },
-          },
-        },
-      };
+    logger.info(
+      {
+        voiceType,
+        voiceId: voice.voiceId,
+        totalLength: text.length,
+        transcriptLength: parsed.transcript.length,
+        hasDirectorNotes: !!parsed.directorsHeader,
+        chunkCount: chunks.length,
+      },
+      'Generating speech with Gemini (chunked with director notes per chunk)'
+    );
 
-      logger.debug(
-        { voiceId: voice.voiceId, textLength: text.length },
-        'Sending TTS request to Gemini'
-      );
-
-      // Gemini TTS uses the generateContent endpoint with audio output
-      const response = await this.client.post(
-        `/models/${this.modelId}:generateContent`,
-        requestBody,
-        {
-          params: {
-            key: this.apiKey,
-          },
-        }
-      );
-
-      // Extract audio data from response
-      const audioData = response.data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-
-      if (!audioData?.data) {
-        throw new Error('No audio data in Gemini response');
-      }
-
-      // Decode base64 audio (raw PCM: 16-bit signed LE, 24kHz, mono)
-      const pcmBuffer = Buffer.from(audioData.data, 'base64');
-
-      // Convert PCM to MP3
-      const audioBuffer = await this.convertPcmToMp3(pcmBuffer);
-
-      const processingTime = Date.now() - startTime;
-
-      // Calculate actual duration from PCM data
-      // PCM: 24kHz, mono, 16-bit = 48000 bytes per second
-      const durationMs = (pcmBuffer.length / 48000) * 1000;
-
-      logger.info(
-        {
-          voiceId: voice.voiceId,
-          textLength: text.length,
-          pcmSize: pcmBuffer.length,
-          mp3Size: audioBuffer.length,
-          durationMs: Math.round(durationMs),
-          processingTime,
-        },
-        'Speech generated successfully via Gemini'
-      );
-
-      return {
-        audioBuffer,
-        durationMs,
-        charactersUsed: text.length,
-      };
-    } catch (error) {
-      const axiosError = error as AxiosError;
-
-      if (attempt < this.maxRetries && this.isRetryableError(axiosError)) {
-        // Use moderate delays for retries, slightly longer for rate limits
-        const isRateLimit = axiosError.response?.status === 429;
-        const baseDelay = isRateLimit ? 5000 : 1000; // 5s for rate limits, 1s otherwise
-        const delay = Math.pow(2, attempt - 1) * baseDelay + Math.random() * 500;
-
-        logger.warn(
-          { attempt, delay: Math.round(delay), isRateLimit, error: axiosError.message },
-          'Gemini TTS request failed, retrying'
-        );
-
-        await this.sleep(delay);
-        return this.generateSpeechWithRetry(text, voice, attempt + 1);
-      }
-
-      logger.error(
-        {
-          voiceId: voice.voiceId,
-          error: axiosError.message,
-          status: axiosError.response?.status,
-        },
-        'Gemini TTS generation failed'
-      );
-
-      throw new Error(
-        `Gemini TTS failed: ${axiosError.message}`
-      );
+    // Generate PCM for each chunk with retry logic
+    const pcmBuffers: Buffer[] = [];
+    for (const [i, chunk] of chunks.entries()) {
+      const pcm = await this.limiter.schedule(async () => {
+        return this.generatePcmForChunkWithRetry(chunk, voice, i, chunks.length, 1);
+      });
+      pcmBuffers.push(pcm);
     }
+
+    // Concatenate all PCM buffers
+    const combinedPcm = Buffer.concat(pcmBuffers);
+
+    // Convert combined PCM to MP3
+    const audioBuffer = await this.convertPcmToMp3(combinedPcm);
+
+    // Calculate duration from PCM (24kHz, mono, 16-bit = 48000 bytes/sec)
+    const durationMs = (combinedPcm.length / 48000) * 1000;
+
+    logger.info(
+      {
+        voiceId: voice.voiceId,
+        transcriptLength: parsed.transcript.length,
+        chunkCount: chunks.length,
+        pcmSize: combinedPcm.length,
+        mp3Size: audioBuffer.length,
+        durationMs: Math.round(durationMs),
+      },
+      'Speech generated successfully via Gemini (all chunks)'
+    );
+
+    return {
+      audioBuffer,
+      durationMs,
+      charactersUsed: parsed.transcript.length, // Only transcript counts for billing
+    };
   }
 
   /**
@@ -365,6 +318,203 @@ export class GeminiTTSService implements ITTSService {
       status === 503 ||
       status === 504
     );
+  }
+
+  /**
+   * Parse text to separate director's notes header from transcript.
+   * Director's notes (everything before "#### TRANSCRIPT\n") guide voice performance.
+   * Only the transcript portion is vocalized.
+   */
+  private parseDirectorPrompt(text: string): ParsedPrompt {
+    const idx = text.indexOf(DIRECTOR_NOTES_MARKER);
+
+    if (idx === -1) {
+      // No director's notes marker - treat entire text as transcript
+      return { directorsHeader: '', transcript: text };
+    }
+
+    return {
+      directorsHeader: text.slice(0, idx + DIRECTOR_NOTES_MARKER.length),
+      transcript: text.slice(idx + DIRECTOR_NOTES_MARKER.length),
+    };
+  }
+
+  /**
+   * Split long transcript into chunks at sentence boundaries.
+   * Ensures natural pauses between chunks when audio is concatenated.
+   */
+  private chunkTranscript(transcript: string): string[] {
+    if (transcript.length <= MAX_TRANSCRIPT_CHARS) {
+      return [transcript];
+    }
+
+    const chunks: string[] = [];
+    let remaining = transcript;
+
+    while (remaining.length > MAX_TRANSCRIPT_CHARS) {
+      // Find last sentence boundary within limit
+      const searchWindow = remaining.slice(0, MAX_TRANSCRIPT_CHARS);
+      const lastPeriod = searchWindow.lastIndexOf('. ');
+      const lastQuestion = searchWindow.lastIndexOf('? ');
+      const lastExclaim = searchWindow.lastIndexOf('! ');
+
+      const splitPoint = Math.max(lastPeriod, lastQuestion, lastExclaim);
+
+      if (splitPoint === -1) {
+        // No sentence boundary - split at last space
+        const lastSpace = searchWindow.lastIndexOf(' ');
+        if (lastSpace > 0) {
+          chunks.push(remaining.slice(0, lastSpace));
+          remaining = remaining.slice(lastSpace + 1);
+        } else {
+          // No space found - force split
+          chunks.push(remaining.slice(0, MAX_TRANSCRIPT_CHARS));
+          remaining = remaining.slice(MAX_TRANSCRIPT_CHARS);
+        }
+      } else {
+        // Split at sentence boundary (include the punctuation)
+        chunks.push(remaining.slice(0, splitPoint + 1));
+        remaining = remaining.slice(splitPoint + 2); // Skip ". " or "? " or "! "
+      }
+    }
+
+    if (remaining.trim()) {
+      chunks.push(remaining);
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Build final chunks by prepending director's notes header to each transcript chunk.
+   * This ensures every chunk gets the same voice performance guidance.
+   */
+  private buildChunksWithDirectors(parsed: ParsedPrompt): string[] {
+    const transcriptChunks = this.chunkTranscript(parsed.transcript);
+
+    if (!parsed.directorsHeader) {
+      return transcriptChunks; // No header to prepend
+    }
+
+    return transcriptChunks.map((chunk) => parsed.directorsHeader + chunk);
+  }
+
+  /**
+   * Generate PCM audio for a single chunk with retry logic.
+   * Wraps generatePcmForChunk with exponential backoff for retryable errors.
+   */
+  private async generatePcmForChunkWithRetry(
+    chunk: string,
+    voice: VoiceConfig,
+    chunkIndex: number,
+    totalChunks: number,
+    attempt: number = 1
+  ): Promise<Buffer> {
+    try {
+      return await this.generatePcmForChunk(chunk, voice, chunkIndex, totalChunks);
+    } catch (error) {
+      const axiosError = error as AxiosError;
+
+      if (attempt < this.maxRetries && this.isRetryableError(axiosError)) {
+        const isRateLimit = axiosError.response?.status === 429;
+        const baseDelay = isRateLimit ? 5000 : 1000;
+        const delay = Math.pow(2, attempt - 1) * baseDelay + Math.random() * 500;
+
+        logger.warn(
+          {
+            chunkIndex: chunkIndex + 1,
+            totalChunks,
+            attempt,
+            delay: Math.round(delay),
+            isRateLimit,
+            error: axiosError.message,
+          },
+          'Chunk TTS request failed, retrying'
+        );
+
+        await this.sleep(delay);
+        return this.generatePcmForChunkWithRetry(chunk, voice, chunkIndex, totalChunks, attempt + 1);
+      }
+
+      logger.error(
+        {
+          chunkIndex: chunkIndex + 1,
+          totalChunks,
+          voiceId: voice.voiceId,
+          error: axiosError.message,
+          status: axiosError.response?.status,
+        },
+        'Chunk TTS generation failed'
+      );
+
+      throw new Error(
+        `Gemini TTS failed for chunk ${chunkIndex + 1}/${totalChunks}: ${axiosError.message}`
+      );
+    }
+  }
+
+  /**
+   * Generate PCM audio for a single chunk.
+   * Returns raw PCM buffer (16-bit signed LE, 24kHz, mono).
+   */
+  private async generatePcmForChunk(
+    chunk: string,
+    voice: VoiceConfig,
+    chunkIndex: number,
+    totalChunks: number
+  ): Promise<Buffer> {
+    const startTime = Date.now();
+
+    const requestBody: Record<string, unknown> = {
+      contents: [
+        {
+          parts: [{ text: chunk }],
+        },
+      ],
+      generationConfig: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: voice.voiceId,
+            },
+          },
+        },
+      },
+    };
+
+    const response = await this.client.post(
+      `/models/${this.modelId}:generateContent`,
+      requestBody,
+      {
+        params: {
+          key: this.apiKey,
+        },
+      }
+    );
+
+    const audioData = response.data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+
+    if (!audioData?.data) {
+      throw new Error(`No audio data in Gemini response for chunk ${chunkIndex + 1}/${totalChunks}`);
+    }
+
+    const pcmBuffer = Buffer.from(audioData.data, 'base64');
+    const processingTime = Date.now() - startTime;
+
+    logger.debug(
+      {
+        chunkIndex: chunkIndex + 1,
+        totalChunks,
+        chunkLength: chunk.length,
+        pcmSize: pcmBuffer.length,
+        processingTime,
+        hasDirectorNotes: chunk.includes(DIRECTOR_NOTES_MARKER),
+      },
+      `Generated PCM for chunk ${chunkIndex + 1}/${totalChunks}`
+    );
+
+    return pcmBuffer;
   }
 
   private sleep(ms: number): Promise<void> {

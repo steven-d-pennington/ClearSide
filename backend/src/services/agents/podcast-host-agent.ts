@@ -17,7 +17,9 @@ import type {
   PodcastPersona,
   ConversationParticipant,
 } from '../../types/conversation.js';
+import type { PersonaMemoryContext } from '../../types/persona-memory.js';
 import { createOpenRouterClient, OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
+import { buildMemorySection } from '../conversation/prompts/persona-prompts.js';
 
 const logger = pino({
   name: 'podcast-host-agent',
@@ -60,6 +62,10 @@ export interface PodcastHostAgentOptions {
   topicContext?: string;
   guests: GuestInfo[];
   rapidFire?: boolean;
+  /** Host persona (Quinn) from database - enables memory system */
+  hostPersona?: PodcastPersona;
+  /** Memory context for the host - core values, opinions, relationships */
+  memoryContext?: PersonaMemoryContext;
 }
 
 /**
@@ -94,6 +100,8 @@ export class PodcastHostAgent {
   private conversationHistory: ConversationEntry[];
   private systemPrompt: string;
   private rapidFire: boolean;
+  private readonly hostPersona?: PodcastPersona;
+  private readonly memoryContext?: PersonaMemoryContext;
 
   constructor(options: PodcastHostAgentOptions) {
     this.llmClient = options.llmClient || createOpenRouterClient(HOST_MODEL);
@@ -103,6 +111,8 @@ export class PodcastHostAgent {
     this.topicContext = options.topicContext;
     this.guests = options.guests;
     this.rapidFire = options.rapidFire || false;
+    this.hostPersona = options.hostPersona;
+    this.memoryContext = options.memoryContext;
 
     this.systemPrompt = this.buildSystemPrompt();
     this.conversationHistory = [
@@ -114,6 +124,8 @@ export class PodcastHostAgent {
       topic: this.topic,
       guestCount: this.guests.length,
       rapidFire: this.rapidFire,
+      hostName: this.name,
+      hasMemoryContext: !!this.memoryContext,
     }, 'PodcastHostAgent initialized');
   }
 
@@ -122,11 +134,21 @@ export class PodcastHostAgent {
   // =========================================================================
 
   get name(): string {
-    return 'Host';
+    return this.hostPersona?.name || 'Quinn';
   }
 
   get participantId(): string {
     return 'host';
+  }
+
+  /** Get host persona ID for memory operations (undefined if no persona) */
+  get personaId(): string | undefined {
+    return this.hostPersona?.id;
+  }
+
+  /** Get host persona for external access */
+  get persona(): PodcastPersona | undefined {
+    return this.hostPersona;
   }
 
   /**
@@ -152,25 +174,42 @@ export class PodcastHostAgent {
   // =========================================================================
 
   private buildSystemPrompt(): string {
+    const hostName = this.hostPersona?.name || 'Quinn';
     const guestIntros = this.guests.map(g =>
       `- ${g.displayName} (${g.persona.avatarEmoji || '🎙️'}): ${this.getFirstSentence(g.persona.backstory)}`
     ).join('\n');
+
+    // Build memory section if available
+    const memorySection = this.memoryContext
+      ? `\n${buildMemorySection(this.memoryContext)}\n`
+      : '';
 
     // Add rapid fire mode instruction if enabled
     const rapidFireInstruction = this.rapidFire
       ? `\n\nRAPID FIRE MODE: Keep ALL transitions brief (1 sentence max). No lengthy introductions or summaries. Quick, punchy hosting - just facilitate the rapid exchange!`
       : '';
 
-    return `You are the host of "Duel-Logic", a podcast where diverse thinkers explore complex topics together.
-Your hosting style combines the best of Terry Gross, Joe Rogan, and Lex Fridman.
+    // Get speaking style from persona or use default
+    const speakingStyle = this.hostPersona?.speakingStyle
+      || 'Warm but direct. Uses rhetorical questions to probe deeper. Balances conviction with curiosity.';
 
-YOUR ROLE:
-- Guide engaging, natural conversations between your guests
-- Introduce each guest warmly with relevant backstory
-- Ask probing, thoughtful questions that draw out insights
-- Bridge between different viewpoints without taking sides
-- Ensure everyone gets heard while keeping the conversation flowing
-- Summarize discussions without declaring winners or "right" answers
+    return `You are ${hostName}, the host of "Duel-Logic" - a podcast where diverse thinkers explore complex topics together.
+
+YOUR PERSONALITY:
+${this.hostPersona?.backstory || 'You believe great conversations happen when the host has skin in the game. You\'re not afraid to push back, share your own perspective, or play devil\'s advocate. With intellectual rigor balanced with genuine warmth, you respect all viewpoints but won\'t shy away from challenging weak arguments.'}
+
+YOUR SPEAKING STYLE:
+${speakingStyle}
+${memorySection}
+YOUR HOSTING APPROACH:
+- You're an ENGAGED participant, not just a neutral facilitator
+- Share your own perspective when relevant, clearly labeled as your opinion
+- Push back on weak arguments - respectfully but directly
+- Play devil's advocate when discussions feel too comfortable
+- Acknowledge openly when a guest makes a point that shifts your thinking
+- Ask probing questions like "But what about...?" or "I'm not sure I buy that because..."
+- Look for BOTH common ground AND genuine disagreements - both are valuable
+- Don't let guests off the hook with vague or evasive answers
 
 TODAY'S TOPIC: ${this.topic}
 ${this.topicContext ? `\nCONTEXT: ${this.topicContext}` : ''}
@@ -179,14 +218,15 @@ YOUR GUESTS:
 ${guestIntros}
 
 GUIDELINES:
-1. Be warm and curious, never confrontational
+1. Be warm but intellectually rigorous - curiosity with teeth
 2. Use guests' names naturally
-3. Reference their backgrounds when relevant
-4. Ask follow-up questions like "What do you mean by...?" or "Can you give an example?"
-5. Notice when someone seems to want to respond and invite them in
-6. Keep responses concise - you're the host, not the star
-7. Never declare one guest "right" or "wrong"
-8. Build bridges: "Interesting - [Name], how does that connect to what you said about...?"${rapidFireInstruction}`;
+3. When you disagree, say so: "I'm not sure I agree with that, ${hostName} here - let me push back..."
+4. Reference their backgrounds when relevant
+5. Ask follow-up questions that probe: "What do you mean by...?" or "Can you give an example?"
+6. Notice when someone seems to want to respond and invite them in
+7. Share your own take when relevant: "Personally, I think..." or "That's interesting because in my view..."
+8. Build bridges, but also highlight real tensions: "You two seem to fundamentally disagree here..."
+9. Never declare one guest "right" but DO evaluate arguments: "That's a strong point" or "I'm not convinced by that reasoning"${rapidFireInstruction}`;
   }
 
   private getFirstSentence(text: string): string {
@@ -535,8 +575,8 @@ ${this.rapidFire ? '' : '3. Note any interesting agreements or productive tensio
 ${this.rapidFire ? 'Keep it FAST!' : 'Be genuine and appreciative. This is a conversation, not a competition.'}`;
 
     try {
-      // Reduce tokens for rapid fire mode (150 vs 450)
-      const maxTokens = this.rapidFire ? 150 : 450;
+      // Give more tokens in rapid-fire for better synthesis (350 vs 450)
+      const maxTokens = this.rapidFire ? 350 : 450;
       const content = await this.generate(prompt, 'closing', 0.8, maxTokens);
       this.addToHistory('user', prompt);
       this.addToHistory('assistant', content);
@@ -545,6 +585,94 @@ ${this.rapidFire ? 'Keep it FAST!' : 'Be genuine and appreciative. This is a con
       return content;
     } catch (error) {
       logger.error({ error, sessionId: this.sessionId }, 'Failed to generate closing');
+      throw error;
+    }
+  }
+
+  /**
+   * Generate wrap-up announcement when approaching turn limit
+   * Host creatively announces time is running out and requests final thoughts
+   */
+  async generateWrapUpAnnouncement(): Promise<string> {
+    logger.info({ sessionId: this.sessionId, rapidFire: this.rapidFire }, 'Generating wrap-up announcement');
+
+    const guestNames = this.guests.map(g => g.displayName).join(', ');
+
+    const prompt = `Generate a creative, natural announcement that we're running short on time and should get everyone's closing thoughts.
+
+YOUR GUESTS: ${guestNames}
+
+GUIDELINES:
+- Be creative and natural - don't use the exact phrase "we're almost out of time"
+- Examples of tone (DO NOT use these verbatim, be original):
+  * "I hate to interrupt this fascinating exchange, but we should start wrapping up..."
+  * "Time flies when you're having great conversations! Let's get everyone's final takes..."
+  * "Before we run out of time, I want to make sure everyone gets a chance to leave us with a final thought..."
+- Suggest getting everyone's closing perspective
+- ${this.rapidFire ? 'Keep it to 1-2 sentences max - rapid fire pace!' : 'Keep it warm and conversational (2-3 sentences)'}
+- Don't start collecting thoughts yet - just announce the transition
+
+Generate a fresh, original announcement that fits this moment.`;
+
+    try {
+      const maxTokens = this.rapidFire ? 80 : 120;
+      const content = await this.generate(prompt, 'wrapup_announcement', 0.9, maxTokens);
+      this.addToHistory('assistant', content);
+
+      logger.info({
+        sessionId: this.sessionId,
+        length: content.length,
+        rapidFire: this.rapidFire,
+      }, 'Wrap-up announcement generated');
+
+      return content;
+    } catch (error) {
+      logger.error({ error, sessionId: this.sessionId }, 'Failed to generate wrap-up announcement');
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a prompt to get a specific guest's final thought
+   */
+  async generateClosingThoughtPrompt(guest: GuestInfo): Promise<string> {
+    logger.info({
+      sessionId: this.sessionId,
+      guest: guest.displayName,
+      rapidFire: this.rapidFire,
+    }, 'Generating closing thought prompt for guest');
+
+    const prompt = `Generate a brief, natural prompt asking ${guest.displayName} for their final thought or takeaway.
+
+GUEST: ${guest.displayName}
+THEIR BACKGROUND: ${this.getFirstSentence(guest.persona.backstory)}
+
+GUIDELINES:
+- Address them by name
+- Be conversational and inviting
+- ${this.rapidFire ? 'Super brief - 1 short sentence max!' : 'Keep it to 1-2 sentences'}
+- Vary your phrasing - don't always say "final thoughts?"
+- Examples of natural variations (use your own words):
+  * "${guest.displayName.split(' ')[0]}, what's your key takeaway from all this?"
+  * "And ${guest.displayName.split(' ')[0]}, what would you want listeners to remember?"
+  * "${guest.displayName.split(' ')[0]}, bring us home - your final perspective?"
+
+Generate a fresh, unique prompt for this specific guest.`;
+
+    try {
+      const maxTokens = this.rapidFire ? 40 : 80;
+      const content = await this.generate(prompt, 'closing_prompt', 0.9, maxTokens);
+      this.addToHistory('assistant', content);
+
+      logger.info({
+        sessionId: this.sessionId,
+        guest: guest.displayName,
+        length: content.length,
+      }, 'Closing thought prompt generated');
+
+      return content;
+    } catch (error) {
+      logger.error({ error, sessionId: this.sessionId, guest: guest.displayName }, 'Failed to generate closing thought prompt');
       throw error;
     }
   }
@@ -677,8 +805,8 @@ ${this.rapidFire ? 'Keep it FAST!' : 'Be genuine and appreciative. This is a con
         if (this.sseManager) {
           this.sseManager.broadcastToDebate(this.sessionId, 'conversation_token' as any, {
             participantId: 'host',
-            personaSlug: 'host',
-            personaName: 'Host',
+            personaSlug: this.hostPersona?.slug || 'quinn',
+            personaName: this.name,
             segment,
             token: chunk,
           });
@@ -742,7 +870,9 @@ export function createPodcastHostAgent(
   guests: Array<{ participant: ConversationParticipant; persona: PodcastPersona }>,
   topicContext?: string,
   sseManager?: SSEManager,
-  rapidFire: boolean = false
+  rapidFire: boolean = false,
+  hostPersona?: PodcastPersona,
+  memoryContext?: PersonaMemoryContext
 ): PodcastHostAgent {
   const guestInfos: GuestInfo[] = guests.map(g => ({
     participantId: g.participant.id,
@@ -758,6 +888,8 @@ export function createPodcastHostAgent(
     guests: guestInfos,
     sseManager,
     rapidFire,
+    hostPersona,
+    memoryContext,
   });
 }
 

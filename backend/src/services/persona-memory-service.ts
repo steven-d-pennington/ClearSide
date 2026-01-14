@@ -9,13 +9,17 @@
  * @module services/persona-memory-service
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { Pool } from 'pg';
 import { logger } from '../utils/logger.js';
 import {
   PersonaMemoryRepository,
   createPersonaMemoryRepository,
 } from '../db/repositories/persona-memory-repository.js';
+import {
+  createOpenRouterClient,
+  isOpenRouterAvailable,
+  type OpenRouterLLMClient,
+} from './llm/openrouter-adapter.js';
 import type {
   MemoryExtractionResult,
   ExtractedTopic,
@@ -24,6 +28,9 @@ import type {
   PersonaMemoryConfig,
   EvolveOpinionInput,
 } from '../types/persona-memory.js';
+
+// Default model for memory extraction (fast and cheap)
+const EXTRACTION_MODEL = 'anthropic/claude-haiku-4.5';
 
 // ============================================================================
 // Types
@@ -60,16 +67,22 @@ export interface PostSessionInput {
 // ============================================================================
 
 export class PersonaMemoryService {
-  private anthropic: Anthropic;
+  private llmClient: OpenRouterLLMClient | null;
   private repository: PersonaMemoryRepository;
   private config: PersonaMemoryConfig | null = null;
   private configLoadedAt: Date | null = null;
   private readonly CONFIG_CACHE_TTL = 60000; // 1 minute
 
-  constructor(pool: Pool, anthropicApiKey?: string) {
-    this.anthropic = new Anthropic({
-      apiKey: anthropicApiKey || process.env.ANTHROPIC_API_KEY,
-    });
+  constructor(pool: Pool) {
+    // Use OpenRouter for LLM calls (same as rest of the app)
+    this.llmClient = isOpenRouterAvailable()
+      ? createOpenRouterClient(EXTRACTION_MODEL)
+      : null;
+
+    if (!this.llmClient) {
+      logger.warn('OpenRouter not available - memory extraction will be disabled');
+    }
+
     this.repository = createPersonaMemoryRepository(pool);
   }
 
@@ -114,6 +127,11 @@ export class PersonaMemoryService {
    * Returns structured topic/stance data for later batch processing.
    */
   async extractFromUtterance(input: ProcessUtteranceInput): Promise<MemoryExtractionResult> {
+    // Skip if OpenRouter not available
+    if (!this.llmClient) {
+      return { isSubstantive: false, topics: [] };
+    }
+
     const config = await this.getConfig();
 
     if (!config.extractionEnabled) {
@@ -151,23 +169,16 @@ Guidelines:
 Return ONLY valid JSON, no other text.`;
 
     try {
-      const response = await this.anthropic.messages.create({
-        model: config.extractionModel,
-        max_tokens: 500,
-        temperature: 0.2,
-        messages: [{ role: 'user', content: prompt }],
-      });
-
-      // Extract text content
-      const textContent = response.content.find((c) => c.type === 'text');
-      if (!textContent || textContent.type !== 'text') {
-        return { isSubstantive: false, topics: [] };
-      }
+      // Use OpenRouter client (same as rest of the app)
+      const responseText = await this.llmClient.chat(
+        [{ role: 'user', content: prompt }],
+        { temperature: 0.2, maxTokens: 500 }
+      );
 
       // Parse JSON response
-      const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        logger.warn({ response: textContent.text }, 'No JSON found in extraction response');
+        logger.warn({ response: responseText }, 'No JSON found in extraction response');
         return { isSubstantive: false, topics: [] };
       }
 
@@ -202,7 +213,12 @@ Return ONLY valid JSON, no other text.`;
 
       return result;
     } catch (error) {
-      logger.error({ error, personaId: input.personaId }, 'Failed to extract memory from utterance');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({
+        error: errorMessage,
+        errorName: error instanceof Error ? error.name : 'Unknown',
+        personaId: input.personaId
+      }, 'Failed to extract memory from utterance');
       return { isSubstantive: false, topics: [] };
     }
   }
@@ -528,9 +544,6 @@ interface AggregatedExtraction {
 /**
  * Create a PersonaMemoryService instance
  */
-export function createPersonaMemoryService(
-  pool: Pool,
-  anthropicApiKey?: string
-): PersonaMemoryService {
-  return new PersonaMemoryService(pool, anthropicApiKey);
+export function createPersonaMemoryService(pool: Pool): PersonaMemoryService {
+  return new PersonaMemoryService(pool);
 }

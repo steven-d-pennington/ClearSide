@@ -39,6 +39,7 @@ const MIGRATIONS = [
   '019_add_conversational_podcast.sql',
   '020_add_conversation_podcast_support.sql',
   '021_add_refined_script_storage.sql',
+  '037_add_session_max_turns.sql',
 ];
 
 /**
