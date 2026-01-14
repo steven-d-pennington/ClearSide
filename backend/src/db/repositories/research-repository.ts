@@ -15,9 +15,9 @@ export class ResearchRepository {
         const result = await this.pool.query(`
       INSERT INTO research_configs (
         name, schedule, enabled, categories, perplexity_model,
-        max_topics_per_run, min_controversy_score, min_trend_alignment, search_queries, exclude_topics
+        max_topics_per_run, min_controversy_score, min_trend_alignment, search_queries, exclude_topics, viral_mode
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `, [
             config.name,
@@ -29,7 +29,8 @@ export class ResearchRepository {
             config.minControversyScore,
             config.minTrendAlignment ?? 0.1,
             config.searchQueries,
-            config.excludeTopics
+            config.excludeTopics,
+            config.viralMode ?? false
         ]);
 
         return this.mapConfigRow(result.rows[0]);
@@ -103,6 +104,10 @@ export class ResearchRepository {
         if (updates.excludeTopics !== undefined) {
             fields.push(`exclude_topics = $${paramIndex++}`);
             values.push(updates.excludeTopics);
+        }
+        if (updates.viralMode !== undefined) {
+            fields.push(`viral_mode = $${paramIndex++}`);
+            values.push(updates.viralMode);
         }
 
         if (fields.length === 0) return;
@@ -295,6 +300,7 @@ export class ResearchRepository {
             minTrendAlignment: row.min_trend_alignment ?? 0.1,
             searchQueries: row.search_queries || [],
             excludeTopics: row.exclude_topics || [],
+            viralMode: row.viral_mode ?? false,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };

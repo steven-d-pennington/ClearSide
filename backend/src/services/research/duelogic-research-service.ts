@@ -9,7 +9,7 @@ import {
     QualityThresholds,
     DEFAULT_QUALITY_THRESHOLDS
 } from '../../types/duelogic-research.js';
-import { CATEGORY_PROMPTS } from './category-prompts.js';
+import { CATEGORY_PROMPTS, VIRAL_PROMPT_ENHANCEMENT } from './category-prompts.js';
 import { DEFAULT_PERPLEXITY_CONFIG, PerplexityConfig } from './perplexity-config.js';
 import {
     TrendingTopicsService,
@@ -95,12 +95,18 @@ export class DuelogicResearchService {
         // Refresh trending context at start of research run
         await this.refreshTrendingContext();
 
+        // Log if viral mode is enabled
+        if (config.viralMode) {
+            logger.info('🔥 VIRAL MODE ENABLED - Optimizing for maximum engagement');
+        }
+
         for (const category of config.categories) {
             try {
                 const categoryTopics = await this.discoverCategoryTopics(
                     category,
                     config.maxTopicsPerRun,
-                    config.excludeTopics
+                    config.excludeTopics,
+                    config.viralMode
                 );
 
                 totalTokensUsed += categoryTopics.tokensUsed;
@@ -147,7 +153,8 @@ export class DuelogicResearchService {
     private async discoverCategoryTopics(
         category: ResearchCategory,
         maxTopics: number,
-        excludeTopics: string[]
+        excludeTopics: string[],
+        viralMode: boolean = false
     ): Promise<{
         topics: DiscoveredTopic[];
         tokensUsed: number;
@@ -165,9 +172,12 @@ export class DuelogicResearchService {
         // Build trending context for this category
         const trendingClause = this.buildTrendingClause(category);
 
+        // Add viral mode enhancement if enabled
+        const viralClause = viralMode ? VIRAL_PROMPT_ENHANCEMENT : '';
+
         const response = await this.queryPerplexity(
-            prompt.systemPrompt,
-            `${prompt.searchPrompt}${excludeClause}${trendingClause}
+            prompt.systemPrompt + (viralMode ? '\n\n🔥 VIRAL MODE: Prioritize maximum engagement potential!' : ''),
+            `${prompt.searchPrompt}${excludeClause}${trendingClause}${viralClause}
 
 Return your findings as a JSON array with this structure:
 {
