@@ -83,6 +83,7 @@ export interface ResearchConfig {
   maxTopicsPerRun: number;
   minControversyScore: number;
   minTrendAlignment: number;
+  viralMode: boolean;
   createdAt: string;
   updatedAt: string;
 }
