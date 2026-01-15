@@ -497,3 +497,88 @@ export const GEMINI_TONE_PROFILES: Record<DebateTone, {
     },
   },
 };
+
+// ============================================================================
+// TTS Prompt Preview Types (for visibility into voice direction)
+// ============================================================================
+
+/**
+ * Type of injected tag for categorization
+ */
+export type InjectedTagType = 'emotion' | 'pause' | 'micro-expression' | 'modifier';
+
+/**
+ * Information about a single injected tag
+ */
+export interface InjectedTag {
+  /** The tag itself, e.g., "[excited]" */
+  tag: string;
+  /** Position in the enhanced content */
+  position: number;
+  /** Why this tag was chosen */
+  reason: string;
+  /** Category of tag */
+  type: InjectedTagType;
+}
+
+/**
+ * Full TTS prompt preview for a single segment
+ * Shows exactly what will be sent to Gemini TTS
+ */
+export interface TTSPromptPreview {
+  /** Segment index in the script */
+  segmentIndex: number;
+  /** Speaker name for this segment */
+  speakerName: string;
+  /** Speaker role (host or guest) */
+  speakerRole: 'host' | 'guest';
+
+  /** The four sections that make up the TTS prompt */
+  sections: {
+    /** Character identity and archetype */
+    audioProfile: string;
+    /** Environment and emotional vibe */
+    scene: string;
+    /** Performance guidance (style, accent, pace) */
+    directorsNotes: string;
+    /** The actual dialogue */
+    transcript: {
+      /** Original content before enhancement */
+      original: string;
+      /** Enhanced content with tags injected */
+      enhanced: string;
+    };
+  };
+
+  /** List of all tags that were injected */
+  injectedTags: InjectedTag[];
+
+  /** Character counts for reference */
+  characterCounts: {
+    audioProfile: number;
+    scene: number;
+    directorsNotes: number;
+    transcript: number;
+    total: number;
+  };
+}
+
+/**
+ * Full director's notes preview for a conversation session
+ */
+export interface DirectorNotesPreview {
+  /** Session ID */
+  sessionId: string;
+  /** Session topic */
+  topic: string;
+  /** Show context description */
+  showContext: string;
+  /** Scene context description */
+  sceneContext: string;
+  /** Pacing notes */
+  pacingNotes: string;
+  /** Per-speaker directions */
+  speakerDirections: Record<string, GeminiSpeakerDirection>;
+  /** Per-segment preview */
+  segmentPreviews: TTSPromptPreview[];
+}

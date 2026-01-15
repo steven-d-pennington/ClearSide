@@ -32,12 +32,32 @@ const logger = pino({
 const HOST_MODEL = 'anthropic/claude-sonnet-4';
 
 /**
+ * Format a model ID into a human-readable display name
+ * e.g., "anthropic/claude-opus-4.5" -> "Claude Opus 4.5"
+ */
+function formatModelIdAsDisplayName(modelId: string): string {
+  // Extract model name from provider/model format
+  const parts = modelId.split('/');
+  const modelName = parts.length > 1 ? parts[parts.length - 1] : modelId;
+
+  // Common model name transformations
+  return modelName
+    .replace(/-/g, ' ')  // Replace hyphens with spaces
+    .replace(/\b\w/g, c => c.toUpperCase())  // Capitalize first letter of each word
+    .replace(/\bGpt\b/gi, 'GPT')  // Fix GPT casing
+    .replace(/\bLlama\b/gi, 'Llama')  // Fix Llama casing
+    .replace(/\bGemini\b/gi, 'Gemini')  // Fix Gemini casing
+    .trim();
+}
+
+/**
  * Guest info for host to reference
  */
 export interface GuestInfo {
   participantId: string;
   persona: PodcastPersona;
   displayName: string;
+  modelDisplayName?: string;  // The AI model powering this persona (e.g., "Claude Opus 4.5")
   turnCount: number;
 }
 
@@ -175,9 +195,10 @@ export class PodcastHostAgent {
 
   private buildSystemPrompt(): string {
     const hostName = this.hostPersona?.name || 'Quinn';
-    const guestIntros = this.guests.map(g =>
-      `- ${g.displayName} (${g.persona.avatarEmoji || '🎙️'}): ${this.getFirstSentence(g.persona.backstory)}`
-    ).join('\n');
+    const guestIntros = this.guests.map(g => {
+      const modelInfo = g.modelDisplayName ? ` representing ${g.modelDisplayName}` : '';
+      return `- ${g.displayName}${modelInfo} (${g.persona.avatarEmoji || '🎙️'}): ${this.getFirstSentence(g.persona.backstory)}`;
+    }).join('\n');
 
     // Build memory section if available
     const memorySection = this.memoryContext
@@ -193,7 +214,7 @@ export class PodcastHostAgent {
     const speakingStyle = this.hostPersona?.speakingStyle
       || 'Warm but direct. Uses rhetorical questions to probe deeper. Balances conviction with curiosity.';
 
-    return `You are ${hostName}, the host of "Duel-Logic" - a podcast where diverse thinkers explore complex topics together.
+    return `You are ${hostName}, the host of "Duel-Logic" - a podcast where A.I. models discuss human topics through diverse persona perspectives.
 
 YOUR PERSONALITY:
 ${this.hostPersona?.backstory || 'You believe great conversations happen when the host has skin in the game. You\'re not afraid to push back, share your own perspective, or play devil\'s advocate. With intellectual rigor balanced with genuine warmth, you respect all viewpoints but won\'t shy away from challenging weak arguments.'}
@@ -244,12 +265,14 @@ GUIDELINES:
   async generateOpening(): Promise<string> {
     logger.info({ sessionId: this.sessionId, rapidFire: this.rapidFire }, 'Generating podcast opening');
 
-    const guestDetails = this.guests.map(g => `
-${g.displayName}:
+    const guestDetails = this.guests.map(g => {
+      const modelInfo = g.modelDisplayName ? `\n- AI Model: ${g.modelDisplayName}` : '';
+      return `
+${g.displayName}:${modelInfo}
 - Background: ${g.persona.backstory}
 - Speaking style: ${g.persona.speakingStyle}
-- Worldview: ${g.persona.worldview}`
-    ).join('\n');
+- Worldview: ${g.persona.worldview}`;
+    }).join('\n');
 
     // Adjust opening prompt and length for rapid fire mode
     const openingInstruction = this.rapidFire
@@ -259,6 +282,7 @@ ${g.displayName}:
     const prompt = `${openingInstruction}
 
 SHOW NAME: Duel-Logic (always use this name when welcoming listeners)
+SHOW TAGLINE: "Where A.I. models discuss human topics"
 
 GUESTS TO INTRODUCE:
 ${guestDetails}
@@ -267,10 +291,12 @@ TOPIC: ${this.topic}
 ${this.topicContext ? `CONTEXT: ${this.topicContext}` : ''}
 
 Your opening should:
-1. Welcome listeners to Duel-Logic
-2. Introduce each guest with their name${this.rapidFire ? '' : ', a bit of their background, and what perspective they bring'}
+1. Welcome listeners to Duel-Logic with the tagline (e.g., "Welcome to Duel-Logic, where A.I. models discuss human topics")
+2. Introduce each guest with their name AND the AI model they represent (e.g., "We have Dr. Sarah Reyes representing Claude Opus 4.5")${this.rapidFire ? '' : ', plus a bit of their background and perspective'}
 3. Present the topic ${this.rapidFire ? 'quickly' : 'in an engaging, accessible way'}
 4. End with an opening question directed at one specific guest
+
+IMPORTANT: Be transparent that all participants are AI models speaking through persona perspectives.
 
 ${this.rapidFire ? 'Keep it FAST - this is rapid fire mode!' : 'Be conversational and warm, like you\'re excited to have these guests together.'}`;
 
@@ -878,6 +904,8 @@ export function createPodcastHostAgent(
     participantId: g.participant.id,
     persona: g.persona,
     displayName: g.participant.displayNameOverride || g.persona.name,
+    // Use stored display name, or derive from modelId as fallback
+    modelDisplayName: g.participant.modelDisplayName || formatModelIdAsDisplayName(g.participant.modelId),
     turnCount: 0,
   }));
 

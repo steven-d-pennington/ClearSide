@@ -695,6 +695,83 @@
   padding-left: 0.25rem;
 }
 
+/* Model Healthcheck Styles */
+.modelSelectRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.modelSelectRow .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.healthcheckBtn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--modal-surface);
+  border: 1px solid var(--modal-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.healthcheckBtn:hover:not(:disabled) {
+  border-color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.healthcheckBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.healthcheckBtn.checking {
+  border-color: var(--accent-cyan);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.healthcheckBtn.healthyBtn {
+  border-color: var(--accent-emerald);
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-emerald);
+}
+
+.healthcheckBtn.unhealthyBtn {
+  border-color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-amber);
+}
+
+.unhealthySelect {
+  border-color: var(--accent-amber) !important;
+  background: rgba(245, 158, 11, 0.05) !important;
+}
+
+.healthcheckError {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.7rem;
+  color: var(--accent-amber);
+  margin-top: 0.25rem;
+  display: block;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .modal {

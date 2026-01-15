@@ -315,6 +315,88 @@
   flex-shrink: 0;
 }
 
+/* Healthcheck Styles */
+.selectWithHealthcheck {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: stretch;
+}
+
+.selectWithHealthcheck .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.healthcheckContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.healthcheckBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.healthcheckBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.healthcheckBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.healthcheckBtn.checking {
+  border-color: var(--color-primary);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.healthcheckBtn.healthy {
+  border-color: var(--color-success, #22c55e);
+  background: color-mix(in srgb, var(--color-success, #22c55e) 15%, transparent);
+  color: var(--color-success, #22c55e);
+}
+
+.healthcheckBtn.unhealthyBtn {
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  color: var(--color-warning);
+}
+
+.healthcheckError {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+  max-width: 120px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.select.unhealthy {
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 5%, var(--color-bg));
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .modelSelector {
@@ -332,5 +414,17 @@
 
   .versus {
     display: none;
+  }
+
+  .selectWithHealthcheck {
+    flex-direction: column;
+  }
+
+  .healthcheckBtn {
+    width: 100%;
+  }
+
+  .healthcheckError {
+    max-width: 100%;
   }
 }

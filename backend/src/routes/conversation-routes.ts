@@ -269,6 +269,34 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
   });
 
   /**
+   * GET /api/conversations/personas/voice-assignments
+   * Get all voice assignments across all personas (for showing which voices are taken)
+   */
+  router.get('/personas/voice-assignments', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const personas = await personaRepo.findAll();
+
+      // Build a map of voiceId -> persona info for assigned voices
+      const voiceAssignments: Record<string, { personaId: string; personaName: string; avatarEmoji: string }> = {};
+
+      for (const persona of personas) {
+        if (persona.defaultVoiceId) {
+          voiceAssignments[persona.defaultVoiceId] = {
+            personaId: persona.id,
+            personaName: persona.name,
+            avatarEmoji: persona.avatarEmoji,
+          };
+        }
+      }
+
+      res.json({ voiceAssignments });
+    } catch (error) {
+      logger.error({ error }, 'Failed to get voice assignments');
+      next(error);
+    }
+  });
+
+  /**
    * GET /api/conversations/personas/:idOrSlug
    * Get a single persona by ID (UUID) or slug
    */
@@ -352,6 +380,58 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
       res.json({ persona, message: 'Voice settings updated' });
     } catch (error) {
       logger.error({ error, personaId: req.params.id }, 'Failed to update persona voice');
+      next(error);
+    }
+  });
+
+  /**
+   * POST /api/conversations/voice/preview
+   * Generate a TTS preview for a voice (short sample text)
+   */
+  router.post('/voice/preview', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { voiceId, text, provider = 'gemini' } = req.body;
+
+      if (!voiceId || typeof voiceId !== 'string') {
+        res.status(400).json({ error: 'voiceId is required' });
+        return;
+      }
+
+      if (!text || typeof text !== 'string') {
+        res.status(400).json({ error: 'text is required' });
+        return;
+      }
+
+      // Limit preview text length
+      const previewText = text.slice(0, 200);
+
+      logger.info({ voiceId, provider, textLength: previewText.length }, 'Generating voice preview');
+
+      // Get TTS service
+      const { getTTSService } = await import('../services/audio/tts-provider-factory.js');
+      const ttsService = getTTSService(provider === 'gemini' ? 'gemini' : 'google-cloud-long');
+
+      // Generate audio with custom voice ID
+      const result = await ttsService.generateSpeech(previewText, 'narrator', voiceId);
+
+      // Return audio as base64 for easy client-side playback
+      const audioBase64 = result.audioBuffer.toString('base64');
+
+      logger.info({
+        voiceId,
+        durationMs: result.durationMs,
+        characterCount: result.charactersUsed,
+      }, 'Voice preview generated');
+
+      res.json({
+        success: true,
+        audio: audioBase64,
+        contentType: 'audio/mpeg',
+        durationMs: result.durationMs,
+        characterCount: result.charactersUsed,
+      });
+    } catch (error) {
+      logger.error({ error, voiceId: req.body?.voiceId }, 'Failed to generate voice preview');
       next(error);
     }
   });
@@ -1674,6 +1754,247 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
   });
 
   // ============================================================================
+  // TTS Prompt Preview (for viewing director's notes and voice direction)
+  // ============================================================================
+
+  /**
+   * GET /api/conversations/sessions/:id/tts-prompt-preview
+   * Get full TTS prompt preview showing director's notes and all sections
+   * This lets users see exactly what will be sent to Gemini TTS
+   */
+  router.get('/sessions/:id/tts-prompt-preview', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const provider = (req.query.provider as TTSProvider) || 'gemini';
+
+      if (!id) {
+        res.status(400).json({ error: 'Session ID is required' });
+        return;
+      }
+
+      // Get the session
+      const session = await sessionRepo.findById(id);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      // Refine the script to get director's notes
+      const refiner = createConversationScriptRefiner(pool);
+      const script = await refiner.refine(id, provider as TTSProvider);
+
+      if (!script.geminiDirectorNotes) {
+        res.status(400).json({ error: 'Director notes only available for Gemini provider' });
+        return;
+      }
+
+      // Build segment previews
+      const segmentPreviews = script.segments.map((segment, index) => {
+        // Find the speaker direction for this segment
+        const speakerDirection = script.geminiDirectorNotes?.speakerDirections[segment.speakerName] || {
+          speakerId: segment.speakerName,
+          characterProfile: 'Podcast participant',
+          vocalStyle: 'Natural, conversational',
+          performanceNotes: 'Speak naturally',
+        };
+
+        // Build the four sections that make up the TTS prompt
+        const audioProfile = `${speakerDirection.characterProfile}\n${speakerDirection.vocalStyle}`;
+        const scene = script.geminiDirectorNotes?.sceneContext || '';
+        const directorsNotes = speakerDirection.performanceNotes;
+
+        // Extract injected tags from the content
+        const injectedTags: Array<{ tag: string; position: number; reason: string; type: string }> = [];
+        const tagRegex = /\[(excited|thoughtful|empathetic|sad|soft|firm|sigh|laughing|clears throat|hmm|uhm|gasps|short pause|medium pause|long pause|whisper|loud|slow|fast)\]/gi;
+        let match;
+        while ((match = tagRegex.exec(segment.content)) !== null) {
+          const tag = match[0];
+          const captured = match[1];
+          if (!captured) continue;
+          const tagName = captured.toLowerCase();
+
+          // Categorize the tag
+          let type: string;
+          if (['excited', 'thoughtful', 'empathetic', 'sad', 'soft', 'firm'].includes(tagName)) {
+            type = 'emotion';
+          } else if (['short pause', 'medium pause', 'long pause'].includes(tagName)) {
+            type = 'pause';
+          } else if (['whisper', 'loud', 'slow', 'fast'].includes(tagName)) {
+            type = 'modifier';
+          } else {
+            type = 'micro-expression';
+          }
+
+          injectedTags.push({
+            tag,
+            position: match.index,
+            reason: getTagReason(tagName),
+            type,
+          });
+        }
+
+        return {
+          segmentIndex: index,
+          speakerName: segment.speakerName,
+          speakerRole: segment.speakerRole,
+          sections: {
+            audioProfile,
+            scene,
+            directorsNotes,
+            transcript: {
+              original: segment.content.replace(tagRegex, '').trim(), // Remove tags for original
+              enhanced: segment.content,
+            },
+          },
+          injectedTags,
+          characterCounts: {
+            audioProfile: audioProfile.length,
+            scene: scene.length,
+            directorsNotes: directorsNotes.length,
+            transcript: segment.content.length,
+            total: audioProfile.length + scene.length + directorsNotes.length + segment.content.length,
+          },
+        };
+      });
+
+      res.json({
+        sessionId: id,
+        topic: session.topic,
+        showContext: script.geminiDirectorNotes.showContext,
+        sceneContext: script.geminiDirectorNotes.sceneContext,
+        pacingNotes: script.geminiDirectorNotes.pacingNotes,
+        speakerDirections: script.geminiDirectorNotes.speakerDirections,
+        segmentPreviews,
+        totalSegments: script.segments.length,
+      });
+    } catch (error) {
+      logger.error({ error, sessionId: req.params.id }, 'Failed to get TTS prompt preview');
+      next(error);
+    }
+  });
+
+  /**
+   * GET /api/conversations/sessions/:id/segments/:index/tts-prompt
+   * Get the full TTS prompt for a specific segment
+   */
+  router.get('/sessions/:id/segments/:index/tts-prompt', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id, index } = req.params;
+      const provider = (req.query.provider as TTSProvider) || 'gemini';
+
+      if (!id || !index) {
+        res.status(400).json({ error: 'Session ID and segment index are required' });
+        return;
+      }
+
+      const segmentIndex = parseInt(index, 10);
+
+      if (isNaN(segmentIndex) || segmentIndex < 0) {
+        res.status(400).json({ error: 'Valid segment index is required' });
+        return;
+      }
+
+      // Get the session
+      const session = await sessionRepo.findById(id);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      // Refine the script
+      const refiner = createConversationScriptRefiner(pool);
+      const script = await refiner.refine(id, provider as TTSProvider);
+
+      if (segmentIndex >= script.segments.length) {
+        res.status(404).json({ error: `Segment ${segmentIndex} not found. Script has ${script.segments.length} segments.` });
+        return;
+      }
+
+      const segment = script.segments[segmentIndex];
+      if (!segment) {
+        res.status(404).json({ error: 'Segment not found' });
+        return;
+      }
+
+      if (!script.geminiDirectorNotes) {
+        res.status(400).json({ error: 'Director notes only available for Gemini provider' });
+        return;
+      }
+
+      // Build the full prompt as it would be sent to Gemini TTS
+      const speakerDirection = script.geminiDirectorNotes.speakerDirections[segment.speakerName] || {
+        speakerId: segment.speakerName,
+        characterProfile: 'Podcast participant',
+        vocalStyle: 'Natural, conversational',
+        performanceNotes: 'Speak naturally',
+      };
+
+      // This matches the format in podcast-tts-adapter.ts prependGeminiDirectorNotes()
+      const fullPrompt = `# AUDIO PROFILE
+${speakerDirection.characterProfile}
+${speakerDirection.vocalStyle}
+
+## THE SCENE
+${script.geminiDirectorNotes.sceneContext}
+
+### DIRECTOR'S NOTES
+${speakerDirection.performanceNotes}
+${script.geminiDirectorNotes.pacingNotes}
+
+#### TRANSCRIPT
+${segment.content}`;
+
+      // Extract tags for display
+      const tagRegex = /\[(excited|thoughtful|empathetic|sad|soft|firm|sigh|laughing|clears throat|hmm|uhm|gasps|short pause|medium pause|long pause|whisper|loud|slow|fast)\]/gi;
+      const injectedTags: Array<{ tag: string; position: number; reason: string; type: string }> = [];
+      let match;
+      while ((match = tagRegex.exec(segment.content)) !== null) {
+        const tag = match[0];
+        const captured = match[1];
+        if (!captured) continue;
+        const tagName = captured.toLowerCase();
+        let type: string;
+        if (['excited', 'thoughtful', 'empathetic', 'sad', 'soft', 'firm'].includes(tagName)) {
+          type = 'emotion';
+        } else if (['short pause', 'medium pause', 'long pause'].includes(tagName)) {
+          type = 'pause';
+        } else if (['whisper', 'loud', 'slow', 'fast'].includes(tagName)) {
+          type = 'modifier';
+        } else {
+          type = 'micro-expression';
+        }
+        injectedTags.push({
+          tag,
+          position: match.index,
+          reason: getTagReason(tagName),
+          type,
+        });
+      }
+
+      res.json({
+        segmentIndex,
+        speakerName: segment.speakerName,
+        speakerRole: segment.speakerRole,
+        fullPrompt,
+        sections: {
+          audioProfile: `${speakerDirection.characterProfile}\n${speakerDirection.vocalStyle}`,
+          scene: script.geminiDirectorNotes.sceneContext,
+          directorsNotes: `${speakerDirection.performanceNotes}\n${script.geminiDirectorNotes.pacingNotes}`,
+          transcript: {
+            original: segment.content.replace(tagRegex, '').trim(),
+            enhanced: segment.content,
+          },
+        },
+        injectedTags,
+        characterCount: fullPrompt.length,
+      });
+    } catch (error) {
+      logger.error({ error, sessionId: req.params.id, segmentIndex: req.params.index }, 'Failed to get segment TTS prompt');
+      next(error);
+    }
+  });
+
+  // ============================================================================
   // Refined Script Management (for Script Review step)
   // ============================================================================
 
@@ -2160,6 +2481,44 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
   });
 
   return router;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Get a human-readable reason for why a TTS tag was injected
+ * Used for displaying in the TTS prompt preview UI
+ */
+function getTagReason(tagName: string): string {
+  const tagReasons: Record<string, string> = {
+    // Emotions
+    'excited': 'Enthusiastic or passionate content',
+    'thoughtful': 'Analytical or reflective content',
+    'empathetic': 'Acknowledging or understanding others\' points',
+    'sad': 'Concern, regret, or disappointment',
+    'soft': 'Gentle or intimate moment',
+    'firm': 'Strong assertion or important point',
+    // Micro-expressions
+    'sigh': 'Concession, heavy topic, or resignation',
+    'laughing': 'Humorous or ironic moment',
+    'clears throat': 'Before an important statement',
+    'hmm': 'Thoughtful pause, considering options',
+    'uhm': 'Hedging or uncertain language',
+    'gasps': 'Surprise or realization',
+    // Pauses
+    'short pause': 'After question or brief moment',
+    'medium pause': 'Before pivot (But, However)',
+    'long pause': 'Before conclusion or major transition',
+    // Modifiers
+    'whisper': 'Intimate or secretive tone',
+    'loud': 'Emphasis or strong emotion',
+    'slow': 'Important point requiring emphasis',
+    'fast': 'Excited or hurried speech',
+  };
+
+  return tagReasons[tagName] || 'Voice direction for natural speech';
 }
 
 /**

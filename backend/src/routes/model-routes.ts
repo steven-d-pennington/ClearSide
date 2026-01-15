@@ -7,7 +7,7 @@
 
 import express, { type Request, type Response } from 'express';
 import { createLogger } from '../utils/logger.js';
-import { getOpenRouterClient, createModelPairingService } from '../services/openrouter/index.js';
+import { getOpenRouterClient, createModelPairingService, CURATED_MODELS } from '../services/openrouter/index.js';
 import type { CostThreshold, ModelTier } from '../types/openrouter.js';
 
 const router = express.Router();
@@ -312,6 +312,101 @@ router.post('/validate', async (req: Request, res: Response) => {
     logger.error({ error }, 'Failed to validate model pairing');
     res.status(500).json({
       error: 'Failed to validate model pairing',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * GET /api/models/curated
+ *
+ * Get curated list of reliable models (latest 2 from each preferred provider)
+ */
+router.get('/curated', async (_req: Request, res: Response) => {
+  try {
+    const { openRouterClient } = getServices();
+
+    // Check if OpenRouter is configured
+    if (!openRouterClient.isConfigured()) {
+      res.status(503).json({
+        error: 'OpenRouter not configured',
+        message: 'OPENROUTER_API_KEY environment variable is not set',
+      });
+      return;
+    }
+
+    const curatedModels = await openRouterClient.getCuratedModels();
+
+    // Get unique providers for UI
+    const providers = [...new Set(curatedModels.map((m) => m.provider))].sort();
+
+    // Get tier counts
+    const tierCounts: Record<ModelTier, number> = {
+      frontier: curatedModels.filter((m) => m.tier === 'frontier').length,
+      mid_tier: curatedModels.filter((m) => m.tier === 'mid_tier').length,
+      budget: curatedModels.filter((m) => m.tier === 'budget').length,
+      free: curatedModels.filter((m) => m.tier === 'free').length,
+    };
+
+    res.json({
+      models: curatedModels.map((m) => ({
+        id: m.id,
+        name: m.name,
+        provider: m.provider,
+        tier: m.tier,
+        costPer1MTokens: m.costPer1MTokens,
+        contextLength: m.context_length,
+        description: m.description,
+        supportsReasoning: m.supportsReasoning,
+        curated: true,
+      })),
+      providers,
+      tierCounts,
+      totalCount: curatedModels.length,
+      curatedProviders: Object.keys(CURATED_MODELS),
+    });
+  } catch (error) {
+    logger.error({ error }, 'Failed to fetch curated models');
+    res.status(500).json({
+      error: 'Failed to fetch curated models',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * POST /api/models/:modelId/healthcheck
+ *
+ * Run a healthcheck on a specific model
+ * Sends a simple test prompt and validates the response
+ */
+router.post('/:modelId/healthcheck', async (req: Request, res: Response) => {
+  try {
+    const { openRouterClient } = getServices();
+    const modelIdParam = req.params.modelId;
+    if (!modelIdParam) {
+      res.status(400).json({ error: 'Model ID is required' });
+      return;
+    }
+    const modelId = decodeURIComponent(modelIdParam);
+
+    // Check if OpenRouter is configured
+    if (!openRouterClient.isConfigured()) {
+      res.status(503).json({
+        error: 'OpenRouter not configured',
+        message: 'OPENROUTER_API_KEY environment variable is not set',
+      });
+      return;
+    }
+
+    logger.info({ modelId }, 'Running model healthcheck');
+    const result = await openRouterClient.healthcheckModel(modelId);
+
+    res.json(result);
+  } catch (error) {
+    logger.error({ error, modelId: req.params.modelId }, 'Failed to run model healthcheck');
+    res.status(500).json({
+      error: 'Failed to run healthcheck',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

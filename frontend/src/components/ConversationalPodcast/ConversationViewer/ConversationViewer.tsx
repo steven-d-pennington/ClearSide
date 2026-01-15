@@ -720,7 +720,7 @@ function filterLatestModelsByProvider(models: ModelInfo[], currentModelId: strin
 
   // For each provider, select the latest model (by created timestamp or alphabetically)
   const latestModels: ModelInfo[] = [];
-  for (const [_provider, providerModels] of byProvider.entries()) {
+  for (const [, providerModels] of byProvider.entries()) {
     // Sort by created date (newest first) or by ID if no date
     const sorted = providerModels.sort((a, b) => {
       if (a.created && b.created) return b.created - a.created;

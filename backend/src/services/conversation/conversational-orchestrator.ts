@@ -481,6 +481,31 @@ export class ConversationalOrchestrator extends EventEmitter {
       const duration = Date.now() - this.startTime;
       await this.sessionRepo.complete(this.sessionId, duration);
 
+      if (process.env.AUTO_PUBLISH_ENABLED === 'true') {
+        try {
+          const { publishQueue } = await import('../queue/queue-manager.js');
+          const job = await publishQueue.add('auto-publish-conversation', {
+            sessionId: this.sessionId,
+            conversationMode: this.session!.rapidFire
+              ? 'rapid_fire'
+              : this.session!.minimalPersonaMode
+                ? 'model_debate'
+                : 'normal',
+          });
+
+          logger.info({
+            sessionId: this.sessionId,
+            jobId: job.id,
+          }, 'Auto-publish job queued');
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logger.error({
+            sessionId: this.sessionId,
+            errorMessage,
+          }, 'Failed to queue auto-publish job');
+        }
+      }
+
       this.broadcastEvent('conversation_completed', {
         sessionId: this.sessionId,
         turnCount: this.turnCount,

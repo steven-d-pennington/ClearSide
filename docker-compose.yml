@@ -24,6 +24,26 @@ services:
       - clearside-network
 
   # =============================================================================
+  # Redis (for BullMQ job queue)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: clearside-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - clearside-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - clearside-network
+
+  # =============================================================================
   # Backend API (Express/Node.js)
   # =============================================================================
   backend:
@@ -63,6 +83,12 @@ services:
       LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-30000}
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-3}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Redis (for BullMQ job queue)
+      REDIS_URL: redis://redis:6379
+      # Podcast automation
+      AUTO_PUBLISH_ENABLED: ${AUTO_PUBLISH_ENABLED:-false}
+      NOTIFICATION_EMAIL: ${NOTIFICATION_EMAIL:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       # Allow connections from frontend container
       FRONTEND_URL: http://localhost:5173
       # Polling for file watching on Windows
@@ -83,6 +109,8 @@ services:
       - ./backend/temp:/app/temp
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3001/health || exit 1"]
@@ -142,6 +170,8 @@ services:
 # =============================================================================
 volumes:
   clearside-db-data:
+    driver: local
+  clearside-redis-data:
     driver: local
   backend-node-modules:
     driver: local
