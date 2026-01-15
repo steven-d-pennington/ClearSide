@@ -3,6 +3,13 @@
  *
  * Prepares conversation transcripts for TTS export without converting to debate format.
  * Preserves the natural talk show format with host introductions, questions, and organic discussion flow.
+ *
+ * Enhanced for Gemini TTS with:
+ * - Proper bracket tag syntax ([sigh], [laughing], [excited], etc.)
+ * - Persona-based Director's Notes generation
+ * - Context-aware emotion detection
+ *
+ * @see https://ai.google.dev/gemini-api/docs/speech-generation
  */
 
 import pino from 'pino';
@@ -15,7 +22,12 @@ import type {
   ConversationParticipant,
   ConversationUtterance,
   VoiceCharacteristics,
+  PodcastPersona,
 } from '../../types/conversation.js';
+import type {
+  GeminiDirectorNotes,
+  GeminiSpeakerDirection,
+} from '../../types/podcast-export.js';
 
 const logger = pino({
   name: 'conversation-script-refiner',
@@ -86,6 +98,7 @@ export interface VoiceAssignment {
   personaId?: string;
   participantId?: string;
   voiceId?: string;
+  voiceName?: string;
   voiceSettings?: VoiceCharacteristics;
 }
 
@@ -103,6 +116,8 @@ export interface RefinedConversationScript {
   estimatedDurationMinutes: number;
   provider: TTSProvider;
   refinedAt: Date;
+  /** Gemini TTS director's notes for voice performance guidance */
+  geminiDirectorNotes?: GeminiDirectorNotes;
 }
 
 // ============================================================================
@@ -161,18 +176,31 @@ export class ConversationScriptRefiner {
       segments.push(segment);
     }
 
-    // Build voice assignments
-    const voiceAssignments = this.buildVoiceAssignments(session, participants);
+    // Build voice assignments with persona default voices
+    const voiceAssignments = this.buildVoiceAssignments(session, participants, provider);
 
     // Calculate totals
     const totalWords = segments.reduce((sum, s) => sum + s.content.split(/\s+/).length, 0);
     const estimatedDurationMinutes = Math.ceil(totalWords / 150); // ~150 words per minute
+
+    // Generate Gemini Director's Notes if using Gemini provider
+    let geminiDirectorNotes: GeminiDirectorNotes | undefined;
+    if (provider === 'gemini') {
+      geminiDirectorNotes = this.generateGeminiDirectorNotes(
+        session,
+        participants,
+        voiceAssignments
+      );
+      logger.debug({ sessionId, speakerCount: Object.keys(geminiDirectorNotes.speakerDirections).length },
+        'Generated Gemini director\'s notes');
+    }
 
     logger.info({
       sessionId,
       segmentCount: segments.length,
       totalWords,
       estimatedDurationMinutes,
+      hasDirectorNotes: !!geminiDirectorNotes,
     }, 'Conversation refined successfully');
 
     return {
@@ -186,6 +214,7 @@ export class ConversationScriptRefiner {
       estimatedDurationMinutes,
       provider,
       refinedAt: new Date(),
+      geminiDirectorNotes,
     };
   }
 
@@ -274,21 +303,286 @@ export class ConversationScriptRefiner {
   }
 
   /**
-   * Gemini audio cues (uses natural punctuation and text markers)
+   * Gemini TTS audio cues
+   *
+   * Uses the proper Gemini bracket tag syntax for:
+   * - Emotions: [angry], [excited], [empathetic], [thoughtful], [sad]
+   * - Micro-actions: [sigh], [laughing], [clears throat], [uhm], [hmm]
+   * - Pauses: [short pause], [medium pause], [long pause]
+   *
+   * Also detects context to insert appropriate emotional tags.
+   *
+   * @see https://ai.google.dev/gemini-api/docs/speech-generation
    */
   private addGeminiCues(content: string): string {
-    // Gemini uses natural speech patterns
-    // Add ellipses for thoughtful pauses
-    content = content.replace(/\.\s+(But|However|Well|Now)/g, '... $1');
+    // === MICRO-ACTIONS ===
+    // Convert written action words to proper Gemini bracket tags
+    content = content.replace(/\b(sigh|sighs)\b/gi, '[sigh]');
+    content = content.replace(/\b(laughs?|laughing)\b/gi, '[laughing]');
+    content = content.replace(/\b(chuckles?|chuckling)\b/gi, '[laughing]');
+    content = content.replace(/\b(clears?\s+throat)\b/gi, '[clears throat]');
+    content = content.replace(/\b(coughs?|coughing)\b/gi, '[coughs]');
+    content = content.replace(/\b(hmm+)\b/gi, '[hmm]');
+    content = content.replace(/\b(uh+m+|um+)\b/gi, '[uhm]');
+    content = content.replace(/\b(uh+)\b/gi, '[uh]');
 
-    // Add commas for natural breathing at filler phrases
-    content = content.replace(/\b(you know|I think|actually|honestly)\b/gi, ', $1,');
+    // === PAUSES ===
+    // Add pauses for natural rhythm at key transition points
+    // After questions (natural pause for reflection)
+    content = content.replace(/\?(\s)(?!\[)/g, '? [short pause]$1');
 
-    // Use asterisks for expression markers (Gemini interprets these)
-    content = content.replace(/\b(sigh|sighs)\b/gi, '*sigh*');
-    content = content.replace(/\b(laughs?)\b/gi, '*laughs*');
+    // Before transition words at sentence start
+    content = content.replace(/\.\s+(But|However|Yet)\b/g, '. [medium pause] $1');
+    content = content.replace(/\.\s+(Well|Now|So)\b/g, '. [short pause] $1');
+
+    // Before concluding phrases
+    content = content.replace(
+      /\.\s+(In conclusion|To summarize|Ultimately|Finally)\b/g,
+      '. [long pause] $1'
+    );
+
+    // Before direct addresses (podcast persona names)
+    content = content.replace(
+      /(,\s+)(Professor|Doctor|Dr\.|Mayor|Rabbi|Captain|Priya|Clara|Mike|Sarah|David|Zara|Luna|Marcus|Viktor|James|Yuki|Rosa)\b/g,
+      ', [short pause] $2'
+    );
+
+    // === CONTEXT-AWARE EMOTION TAGS ===
+    // Detect sentiment from content and add appropriate emotional coloring
+
+    // Excited/enthusiastic content (strong positive language)
+    if (/\b(amazing|incredible|fantastic|brilliant|wonderful|absolutely|definitely|exciting)\b/i.test(content)) {
+      // Add excited tag to the start if heavy positive content
+      const positiveCount = (content.match(/\b(amazing|incredible|fantastic|brilliant|wonderful|absolutely|definitely|exciting)\b/gi) || []).length;
+      if (positiveCount >= 2 && !content.startsWith('[')) {
+        content = '[excited] ' + content;
+      }
+    }
+
+    // Thoughtful/contemplative content (hedging, uncertainty)
+    if (/\b(perhaps|maybe|I wonder|consider|might|could be|it seems|I think)\b/i.test(content)) {
+      const thoughtfulCount = (content.match(/\b(perhaps|maybe|I wonder|consider|might|could be|it seems)\b/gi) || []).length;
+      if (thoughtfulCount >= 2 && !content.startsWith('[')) {
+        content = '[thoughtful] ' + content;
+      }
+    }
+
+    // Empathetic content (understanding, support)
+    if (/\b(understand|I hear you|that makes sense|I can see|valid point|appreciate|fair point)\b/i.test(content)) {
+      if (!content.startsWith('[')) {
+        content = '[empathetic] ' + content;
+      }
+    }
+
+    // Disagreement/pushback (but not angry - more assertive)
+    if (/\b(disagree|don't think|not sure about|challenge|pushback|but actually|respectfully)\b/i.test(content)) {
+      // Don't add angry - that's too strong. Let the natural language convey it.
+    }
+
+    // Sad/concerned content
+    if (/\b(unfortunately|sadly|concern|worried|troubling|problematic|tragic|devastating)\b/i.test(content)) {
+      if (!content.startsWith('[')) {
+        content = '[sad] ' + content;
+      }
+    }
+
+    // === FILLER WORDS (natural speech) ===
+    // Add subtle filler variations for more natural delivery
+    content = content.replace(/\b(you know)\b/gi, '[short pause] you know');
+    content = content.replace(/\b(I mean)\b/gi, '[short pause] I mean');
+
+    // Clean up any double pauses that might have been created
+    content = content.replace(/\[short pause\]\s*\[short pause\]/g, '[short pause]');
+    content = content.replace(/\[medium pause\]\s*\[short pause\]/g, '[medium pause]');
+    content = content.replace(/\[long pause\]\s*\[short pause\]/g, '[long pause]');
 
     return content;
+  }
+
+  /**
+   * Generate Gemini Director's Notes from persona voice characteristics
+   *
+   * Creates the structured prompt sections that guide Gemini TTS:
+   * - AUDIO PROFILE: Character identity
+   * - THE SCENE: Podcast context
+   * - DIRECTOR'S NOTES: Performance guidance
+   *
+   * @see https://ai.google.dev/gemini-api/docs/speech-generation
+   */
+  private generateGeminiDirectorNotes(
+    session: ConversationSession,
+    participants: ConversationParticipant[],
+    _voiceAssignments: VoiceAssignment[]
+  ): GeminiDirectorNotes {
+    // Build speaker directions from persona voice characteristics
+    const speakerDirections: Record<string, GeminiSpeakerDirection> = {};
+
+    // Host direction
+    speakerDirections[session.hostDisplayName || 'Host'] = {
+      speakerId: session.hostDisplayName || 'Host',
+      characterProfile: 'Professional podcast host, warm and engaging, guides the conversation with curiosity',
+      vocalStyle: 'Warm, inviting tone with measured pacing. Speaks clearly and engagingly.',
+      performanceNotes: 'Maintain an interested, encouraging demeanor. Use natural inflection to highlight key questions. Be conversational but professional.',
+    };
+
+    // Guest directions from persona data
+    for (const participant of participants) {
+      const persona = participant.persona;
+      if (!persona) continue;
+
+      const speakerName = participant.displayNameOverride || persona.name;
+      const voiceChars = persona.voiceCharacteristics || {};
+
+      speakerDirections[speakerName] = {
+        speakerId: speakerName,
+        characterProfile: this.buildCharacterProfile(persona),
+        vocalStyle: this.buildVocalStyle(voiceChars),
+        performanceNotes: this.buildPerformanceNotes(persona, voiceChars),
+      };
+    }
+
+    return {
+      showContext: `This is "${this.generateTitle(session.topic)}" - a conversational podcast featuring diverse expert perspectives on "${session.topic}". The format is a relaxed talk show with a host guiding discussion between ${participants.length} guests.`,
+      speakerDirections,
+      sceneContext: 'A thoughtful, engaging podcast conversation. The atmosphere is intellectual but accessible - think NPR meets TED Talk. Guests share their genuine perspectives while remaining respectful of differing views.',
+      pacingNotes: 'Maintain a conversational pace - not rushed, but energetic. Allow natural pauses for emphasis. Vary rhythm based on content: slower for complex ideas, slightly faster for enthusiastic points.',
+    };
+  }
+
+  /**
+   * Build character profile from persona data
+   */
+  private buildCharacterProfile(persona: PodcastPersona): string {
+    const parts: string[] = [];
+
+    parts.push(persona.name);
+
+    // Add key aspect from backstory (first sentence or key phrase)
+    if (persona.backstory) {
+      const firstSentence = persona.backstory.split('.')[0];
+      if (firstSentence && firstSentence.length < 150) {
+        parts.push(firstSentence);
+      }
+    }
+
+    // Add worldview hint
+    if (persona.worldview) {
+      const worldviewHint = persona.worldview.split('.')[0];
+      if (worldviewHint && worldviewHint.length < 100) {
+        parts.push(`Perspective: ${worldviewHint}`);
+      }
+    }
+
+    return parts.join('. ');
+  }
+
+  /**
+   * Build vocal style description from voice characteristics
+   */
+  private buildVocalStyle(voiceChars: VoiceCharacteristics): string {
+    const descriptors: string[] = [];
+
+    // Pitch
+    const pitchMap: Record<string, string> = {
+      'low': 'deep, resonant voice',
+      'medium-low': 'warm, grounded voice',
+      'medium': 'balanced, clear voice',
+      'medium-high': 'bright, expressive voice',
+      'high': 'light, energetic voice',
+    };
+    const pitch = voiceChars.pitch;
+    if (pitch && pitchMap[pitch]) {
+      descriptors.push(pitchMap[pitch]);
+    }
+
+    // Pace
+    const paceMap: Record<string, string> = {
+      'slow': 'speaks deliberately and thoughtfully',
+      'measured': 'speaks with careful, measured pacing',
+      'steady': 'speaks with consistent, comfortable pacing',
+      'quick': 'speaks with energetic, quick pacing',
+      'fast': 'speaks rapidly with enthusiasm',
+      'variable': 'varies pace based on content - slower for emphasis, faster when excited',
+    };
+    const pace = voiceChars.pace;
+    if (pace && paceMap[pace]) {
+      descriptors.push(paceMap[pace]);
+    }
+
+    // Energy
+    const energyMap: Record<string, string> = {
+      'low': 'calm and reserved energy',
+      'medium': 'moderate energy level',
+      'high': 'high energy and animated',
+      'bright': 'bright and upbeat energy',
+      'engaging': 'warmly engaging energy',
+      'fierce': 'intense, passionate energy',
+    };
+    const energy = voiceChars.energy;
+    if (energy && energyMap[energy]) {
+      descriptors.push(energyMap[energy]);
+    }
+
+    // Warmth
+    const warmthMap: Record<string, string> = {
+      'low': 'professional and objective tone',
+      'medium': 'balanced warmth',
+      'high': 'warm and approachable',
+      'very high': 'very warm and personable',
+    };
+    const warmth = voiceChars.warmth;
+    if (warmth && warmthMap[warmth]) {
+      descriptors.push(warmthMap[warmth]);
+    }
+
+    // Tone
+    if (voiceChars.tone) {
+      descriptors.push(`${voiceChars.tone} tone`);
+    }
+
+    // Accent
+    if (voiceChars.accent) {
+      descriptors.push(`${voiceChars.accent} accent`);
+    }
+
+    return descriptors.length > 0
+      ? descriptors.join(', ') + '.'
+      : 'Clear, professional speaking voice.';
+  }
+
+  /**
+   * Build performance notes from persona speaking style and quirks
+   */
+  private buildPerformanceNotes(persona: PodcastPersona, voiceChars: VoiceCharacteristics): string {
+    const notes: string[] = [];
+
+    // Speaking style
+    if (persona.speakingStyle) {
+      notes.push(persona.speakingStyle);
+    }
+
+    // Key quirks (limit to 2 for brevity)
+    if (persona.quirks && persona.quirks.length > 0) {
+      const topQuirks = persona.quirks.slice(0, 2);
+      notes.push(`Character quirks: ${topQuirks.join('; ')}`);
+    }
+
+    // Example phrases guidance
+    if (persona.examplePhrases && persona.examplePhrases.length > 0) {
+      notes.push(`Tends to use phrases like: "${persona.examplePhrases[0]}"`);
+    }
+
+    // Add energy-specific guidance
+    if (voiceChars.energy === 'fierce' || voiceChars.energy === 'high') {
+      notes.push('Can build intensity when making key points.');
+    }
+    if (voiceChars.pace === 'variable') {
+      notes.push('Naturally varies speaking speed based on emotional content.');
+    }
+
+    return notes.length > 0
+      ? notes.join(' ')
+      : 'Deliver lines naturally and authentically to the character.';
   }
 
   /**
@@ -416,10 +710,12 @@ export class ConversationScriptRefiner {
 
   /**
    * Build voice assignments for export
+   * Uses persona's default voice if it matches the requested provider
    */
   private buildVoiceAssignments(
     session: ConversationSession,
-    participants: ConversationParticipant[]
+    participants: ConversationParticipant[],
+    provider?: TTSProvider
   ): VoiceAssignment[] {
     const assignments: VoiceAssignment[] = [];
 
@@ -437,15 +733,46 @@ export class ConversationScriptRefiner {
       },
     });
 
-    // Add guest assignments
+    // Add guest assignments with persona default voices
     for (const p of participants) {
       const persona = p.persona;
+
+      // Check if persona has a default voice for the current provider
+      let voiceId: string | undefined;
+      let voiceName: string | undefined;
+      if (persona?.defaultVoiceId && persona?.defaultVoiceProvider) {
+        // Map provider names for comparison
+        // Frontend uses: 'gemini', 'google-cloud-long', 'elevenlabs'
+        // Backend TTSProvider uses: 'gemini', 'google_cloud', 'elevenlabs'
+        const providerMatches =
+          persona.defaultVoiceProvider === provider ||
+          (persona.defaultVoiceProvider === 'gemini' && provider === 'gemini') ||
+          (persona.defaultVoiceProvider === 'google-cloud-long' && provider === 'google_cloud');
+
+        if (providerMatches) {
+          voiceId = persona.defaultVoiceId;
+          // Use the voice ID as the name (Gemini voice IDs are descriptive names like "Sulafat", "Aoede")
+          voiceName = persona.defaultVoiceId;
+        }
+
+        logger.debug({
+          personaName: persona?.name,
+          defaultVoiceId: persona.defaultVoiceId,
+          defaultVoiceProvider: persona.defaultVoiceProvider,
+          requestedProvider: provider,
+          providerMatches,
+          assignedVoiceId: voiceId,
+        }, 'Voice assignment for persona');
+      }
+
       assignments.push({
         speakerName: p.displayNameOverride || persona?.name || 'Guest',
         speakerRole: 'guest',
         personaSlug: persona?.slug || null,
         personaId: p.personaId,
         participantId: p.id,
+        voiceId,
+        voiceName,
         voiceSettings: persona?.voiceCharacteristics || {},
       });
     }

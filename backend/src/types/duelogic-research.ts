@@ -26,6 +26,7 @@ export interface ResearchConfig {
     minTrendAlignment: number;           // 0-1, filter topics not aligned with trends
     searchQueries: string[];             // Custom research prompts
     excludeTopics: string[];             // Topics to avoid
+    viralMode: boolean;                  // Enable aggressive clickbait/engagement optimization
     createdAt: Date;
     updatedAt: Date;
 }
@@ -178,6 +179,7 @@ export const DEFAULT_RESEARCH_CONFIG: Partial<ResearchConfig> = {
     minControversyScore: 0.6,
     minTrendAlignment: 0.1,              // 10% minimum trend alignment (0 = disabled)
     enabled: true,
+    viralMode: false,                    // Set true for aggressive engagement optimization
     categories: [
         'technology_ethics',
         'climate_environment',

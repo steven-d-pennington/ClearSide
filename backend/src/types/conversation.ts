@@ -25,6 +25,16 @@ export type SignalUrgency = 'low' | 'medium' | 'high';
 export type SignalReason = 'respond' | 'disagree' | 'add_point' | 'question' | 'interrupt';
 
 // ============================================================================
+// Host Persona Constants
+// ============================================================================
+
+/** Fixed UUID for the host persona (Quinn) - used to load host memory */
+export const HOST_PERSONA_ID = '00000000-0000-0000-0000-000000000001';
+
+/** Host persona slug for database lookups */
+export const HOST_PERSONA_SLUG = 'quinn';
+
+// ============================================================================
 // Persona Definitions
 // ============================================================================
 
@@ -55,6 +65,10 @@ export interface PodcastPersona {
   voiceCharacteristics: VoiceCharacteristics;
   examplePhrases: string[];          // Sample phrases for consistency
   preferredTopics: string[];         // Topics they engage with most
+  // Default voice settings for consistent podcast generation
+  defaultVoiceProvider?: string;     // TTS provider (elevenlabs, gemini, google-cloud-long)
+  defaultVoiceId?: string;           // Voice ID for the provider
+  defaultVoiceSettings?: Record<string, unknown>; // Provider-specific settings
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,6 +88,9 @@ export interface PodcastPersonaRow {
   voice_characteristics: VoiceCharacteristics;
   example_phrases: string[];
   preferred_topics: string[];
+  default_voice_provider: string | null;
+  default_voice_id: string | null;
+  default_voice_settings: Record<string, unknown> | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -96,6 +113,7 @@ export interface ConversationSessionConfig {
   hostDisplayName?: string;
   rapidFire?: boolean;
   minimalPersonaMode?: boolean; // Model Debate mode: models speak without persona constraints
+  maxTurns?: number; // Maximum turns before closing sequence (5-100, default 30)
 }
 
 /**
@@ -122,6 +140,7 @@ export interface ConversationSession {
   paceDelayMs: number;
   rapidFire: boolean;
   minimalPersonaMode: boolean; // Model Debate mode: models speak without persona constraints
+  maxTurns: number; // Maximum turns before closing sequence (5-100, default 30)
   status: SessionStatus;
   currentSpeakerIndex: number;
   hostModelId?: string;
@@ -146,6 +165,7 @@ export interface ConversationSessionRow {
   pace_delay_ms: number;
   rapid_fire: boolean;
   minimal_persona_mode: boolean; // Model Debate mode: models speak without persona constraints
+  max_turns: number; // Maximum turns before closing sequence (5-100, default 30)
   status: string;
   current_speaker_index: number;
   host_model_id?: string;
@@ -518,6 +538,9 @@ export function mapPersonaRow(row: PodcastPersonaRow): PodcastPersona {
     voiceCharacteristics: row.voice_characteristics,
     examplePhrases: row.example_phrases,
     preferredTopics: row.preferred_topics,
+    defaultVoiceProvider: row.default_voice_provider ?? undefined,
+    defaultVoiceId: row.default_voice_id ?? undefined,
+    defaultVoiceSettings: row.default_voice_settings ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -537,6 +560,7 @@ export function mapSessionRow(row: ConversationSessionRow): ConversationSession 
     paceDelayMs: row.pace_delay_ms,
     rapidFire: row.rapid_fire,
     minimalPersonaMode: row.minimal_persona_mode,
+    maxTurns: row.max_turns,
     status: row.status as SessionStatus,
     currentSpeakerIndex: row.current_speaker_index,
     hostModelId: row.host_model_id,

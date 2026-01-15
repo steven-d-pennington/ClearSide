@@ -1,9 +1,48 @@
 # ClearSide Kanban Board - Live Debate Theater
 
-> Last Updated: 2026-01-12
-> Version: 10.0.0 - Phase 9 Podcast Automation Pipeline Added
+> Last Updated: 2026-01-13
+> Version: 10.5.0 - Phase 10 Persona Memory Integration Complete
 
-## 🔧 Recent Changes (2026-01-12)
+## 🔧 Recent Changes (2026-01-13)
+
+**Phase 10 - Persona Memory System (All Core Tasks Complete):**
+- **Memory Extraction Service**: Haiku-based extraction from utterances during conversations
+  - `PersonaMemoryService` class extracts topics, stances, and key arguments
+  - Real-time extraction hooked into orchestrator after each participant turn
+  - Post-session batch processing updates persona opinions and relationship scores
+  - Agreement/disagreement tracking from context board claims
+- **Admin UI Dashboard**: Full memory management at `/admin/personas/:id/memory`
+  - Core Values tab: Add, edit, delete, reorder immutable personality anchors
+  - Opinions tab: Manage stances with strength, arguments, evolution history
+  - Relationships tab: Define inter-persona dynamics with rapport scores
+  - Memory button added to persona cards in Admin Config page
+- **Prompt Integration**: Memory context now injected into persona system prompts
+- Modified `buildPersonaSystemPrompt()` to accept optional `PersonaMemoryContext`
+- Added `buildMemorySection()` helper for formatting core values, opinions, relationships
+- Updated `PersonaAgent` and `PersonaAgentOptions` to support memory context
+- Updated `createPersonaAgents()` factory to accept memory context map
+- Orchestrator now fetches memory contexts at session start and passes to agents
+- Added `extractTopicKeys()` helper for topic-based opinion filtering
+- Memory sections include: core values, established positions, relationships, personality notes
+- Persistent personality memory for podcast personas across daily episodes
+- Core values (immutable personality anchors) that define what personas never compromise on
+- Opinions (malleable stances) that can evolve based on conversations with evidence tracking
+- Inter-persona relationships with rapport scores and dynamic types
+- Full admin control: seed, edit, prioritize, lock, and curate persona memories
+- Database migration `030_add_persona_memory.sql` with 4 tables
+- TypeScript types and repository in `backend/src/types/persona-memory.ts`
+- Complete Admin API routes in `backend/src/routes/persona-memory-routes.ts`
+- See [Plan File](../.claude/plans/wondrous-swinging-canyon.md) for full specification
+
+**Phase 9 Update - Admin Configuration (AUTO-007):**
+- Admin UI for configuring automation pipeline settings
+- Persona-to-voice mapping: Assign specific Gemini TTS voices to each persona
+- Configurable turn limits per conversation mode
+- Default to "Rapid Fire" mode (shorter segments, more reliable with Gemini TTS)
+- Database tables: `automation_config` and `persona_voice_mappings`
+- 7 comprehensive task files in `tasks/phase9/automation/`
+
+## 🔧 Previous Changes (2026-01-12)
 
 **NEW: Phase 9 - Podcast Automation Pipeline:**
 - Fully automatic podcast publishing from conversation completion to Spotify
@@ -731,15 +770,15 @@ Homegrown JWT-based authentication with username/password login, multi-tenant or
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AUTH-001 | Database Schema & Types | P0 | S | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-001.md) |
-| AUTH-002 | Password & JWT Utilities | P0 | S | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-002.md) |
-| AUTH-003 | Repositories & Auth Middleware | P0 | M | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-003.md) |
+| AUTH-001 | Database Schema & Types | P0 | S | ✅ Done | [View Task](../tasks/phase8/authentication/AUTH-001.md) |
+| AUTH-002 | Password & JWT Utilities | P0 | S | ✅ Done | [View Task](../tasks/phase8/authentication/AUTH-002.md) |
+| AUTH-003 | Repositories & Auth Middleware | P0 | M | ✅ Done | [View Task](../tasks/phase8/authentication/AUTH-003.md) |
 
 ### 🔌 Backend API
 
 | Task ID | Task Name | Priority | Estimate | Status | Task File |
 |---------|-----------|----------|----------|--------|-----------|
-| AUTH-004 | API Routes for Authentication | P0 | M | 🟢 Ready | [View Task](../tasks/phase8/authentication/AUTH-004.md) |
+| AUTH-004 | API Routes for Authentication | P0 | M | ✅ Done | [View Task](../tasks/phase8/authentication/AUTH-004.md) |
 
 ### 🎨 Frontend
 
@@ -767,7 +806,7 @@ Homegrown JWT-based authentication with username/password login, multi-tenant or
 
 **Critical Path:** AUTH-001 → AUTH-002 → AUTH-003 → AUTH-004 → AUTH-005 → AUTH-006
 
-**Start Here:** AUTH-001 (Database Schema & Types) - Foundation for entire authentication system.
+**Start Here:** AUTH-005 (Frontend Authentication Implementation) - Next step in the pipeline.
 
 ---
 
@@ -796,6 +835,12 @@ Fully automatic podcast publishing triggered when conversations complete. Zero m
 | AUTO-005 | Notification Service | P1 | S | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-005.md) |
 | AUTO-006 | Hook Orchestrator & Admin Tools | P0 | M | ✅ Done | [View Task](../tasks/phase9/automation/AUTO-006.md) |
 
+### ⚙️ Admin Configuration
+
+| Task ID | Task Name | Priority | Estimate | Status | Task File |
+|---------|-----------|----------|----------|--------|-----------|
+| AUTO-007 | Admin Configuration UI (Voice Mapping, Turn Limits, Defaults) | P0 | M | 🟢 Ready | [View Task](../tasks/phase9/automation/AUTO-007.md) |
+
 **Key Features:**
 - **BullMQ Job Queue**: Redis-based queue with automatic retries and exponential backoff
 - **RSS 2.0 Feed**: iTunes/Podcast 2.0 namespaces for Spotify and Apple Podcasts compatibility
@@ -803,6 +848,9 @@ Fully automatic podcast publishing triggered when conversations complete. Zero m
 - **Email Notifications**: Resend integration for episode published alerts
 - **Admin Dashboard**: Bull Board UI for queue monitoring and manual controls
 - **Cost Effective**: ~$0.65 per episode (TTS + metadata + infrastructure)
+- **Persona Voice Mapping**: Assign specific Gemini TTS voices to each podcast persona (consistent voices)
+- **Configurable Turn Limits**: Control conversation length per mode (Rapid Fire default: 8 turns)
+- **Default Rapid Fire Mode**: Shorter segments for reliable Gemini TTS generation
 
 **Automation Flow:**
 ```
@@ -818,14 +866,90 @@ Conversation Completes → Script Refinement → TTS Audio Generation
 - AUTO-004 depends on AUTO-001, AUTO-002, AUTO-003
 - AUTO-005 can start immediately (parallel track)
 - AUTO-006 depends on AUTO-001, AUTO-004
+- AUTO-007 depends on AUTO-001, AUTO-006 (admin config builds on infrastructure)
 
-**Critical Path:** AUTO-001 → AUTO-003 → AUTO-004 → AUTO-006
+**Critical Path:** AUTO-001 → AUTO-003 → AUTO-004 → AUTO-006 → AUTO-007
 
 **Parallel Track:** AUTO-002, AUTO-005 (no blockers)
 
 **Start Here:** AUTO-001 (Job Queue & Database Schema) or AUTO-002 (Metadata Generation) - Both can start immediately.
 
+**Recommended Order for Full Implementation:**
+1. AUTO-001 (infrastructure) + AUTO-002 (metadata) in parallel
+2. AUTO-003 (RSS feed)
+3. AUTO-004 (publish worker)
+4. AUTO-005 (notifications) + AUTO-006 (orchestrator hook) in parallel
+5. AUTO-007 (admin config UI)
+
 **No Spotify API:** Spotify doesn't provide upload API - they poll your RSS feed every 1-6 hours. This actually simplifies the architecture to just robust RSS feed generation.
+
+---
+
+## 📋 PHASE 10: PERSONA MEMORY SYSTEM
+
+Persistent personality memory for podcast personas that captures stances and personality patterns across daily episodes, with nuanced evolution where core values stay fixed but specific opinions can shift.
+
+### 🗄️ Database & Types
+
+| Task ID | Task Name | Priority | Estimate | Status | Notes |
+|---------|-----------|----------|----------|--------|-------|
+| MEMORY-001 | Database Schema & Types | P0 | S | ✅ Done | Migration 030, types, repository |
+
+### 🔌 Admin API & UI
+
+| Task ID | Task Name | Priority | Estimate | Status | Notes |
+|---------|-----------|----------|----------|--------|-------|
+| MEMORY-005 | Admin API Routes | P0 | M | ✅ Done | Full CRUD for values, opinions, relationships |
+| MEMORY-006 | Admin UI Dashboard | P0 | L | ✅ Done | Core values, opinions, relationships editors |
+
+### 🧠 Memory Integration
+
+| Task ID | Task Name | Priority | Estimate | Status | Notes |
+|---------|-----------|----------|----------|--------|-------|
+| MEMORY-003 | Prompt Integration | P0 | M | ✅ Done | Inject memory context into persona prompts |
+| MEMORY-002 | Memory Extraction Service | P0 | M | ✅ Done | Haiku-based extraction from utterances |
+| MEMORY-004 | Post-Session Processing | P0 | S | ✅ Done | Batch updates after conversation completion |
+
+### 🔍 Vector Enhancement (Queued)
+
+| Task ID | Task Name | Priority | Estimate | Status | Notes |
+|---------|-----------|----------|----------|--------|-------|
+| MEMORY-007 | Vector Indexing for Opinions | P1 | M | 🔵 Queued | Semantic search for relevant opinions via Pinecone |
+
+**Why vectorize?** With hundreds of opinions per persona and varied topics, keyword matching misses semantic relationships. Vectors find "AI governance" when searching for "tech regulation".
+
+**Key Features:**
+- **Core Values**: Immutable personality anchors (beliefs, principles, red lines, passions)
+- **Opinions**: Malleable stances on topics with evolution tracking (supports, opposes, neutral, mixed, evolving)
+- **Relationships**: Inter-persona dynamics with rapport scores and friction points
+- **Evolution Tracking**: History of stance changes with reasons and session IDs
+- **Admin Control**: Full CRUD for seeding, editing, locking, and prioritizing memories
+- **Performance**: O(1) lookup for topic-based stances, bounded context injection (5 opinions, 500 tokens)
+
+**Architecture:**
+```
+Session Start → Build Memory Context (core values + relevant opinions + relationships)
+  → Inject into System Prompt → Generate Utterance
+  → Extract Topics & Stances (Haiku) → Upsert Opinions
+  → Session End → Batch Process & Update Relationships
+```
+
+**Dependencies:**
+- MEMORY-001 can start immediately (no blockers) ✅
+- MEMORY-005 depends on MEMORY-001 ✅
+- MEMORY-006 depends on MEMORY-005
+- MEMORY-003 depends on MEMORY-001 ✅
+- MEMORY-002 depends on MEMORY-001
+- MEMORY-004 depends on MEMORY-002
+- MEMORY-007 depends on MEMORY-002 (needs opinions to vectorize)
+
+**Critical Path:** MEMORY-001 → MEMORY-005 → MEMORY-006 (Admin UI for seeding)
+**Integration Path:** MEMORY-001 → MEMORY-003 → MEMORY-002 → MEMORY-004 → MEMORY-007
+
+**Start Here:** MEMORY-001 ✅ Done → MEMORY-005 ✅ Done → MEMORY-003 ✅ Done → MEMORY-006 ✅ Done → MEMORY-002 ✅ Done → MEMORY-004 ✅ Done → Next: MEMORY-007 (Vector Indexing)
+**Vector Enhancement:** MEMORY-007 ready now that core extraction pipeline is complete
+
+**Plan File:** See [wondrous-swinging-canyon.md](../.claude/plans/wondrous-swinging-canyon.md) for full specification.
 
 ---
 

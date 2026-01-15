@@ -51,6 +51,7 @@ export function ConversationConfigModal({
   ]);
   const [flowMode, setFlowMode] = useState<FlowMode>('manual');
   const [paceDelayMs, setPaceDelayMs] = useState(3000);
+  const [maxTurns, setMaxTurns] = useState(30);
   const [rapidFire, setRapidFire] = useState(false);
   const [minimalPersonaMode, setMinimalPersonaMode] = useState(false);
 
@@ -164,6 +165,7 @@ export function ConversationConfigModal({
           episodeProposalId,
           flowMode,
           paceDelayMs,
+          maxTurns,
           rapidFire,
           minimalPersonaMode,
           participants: participants.map(p => ({
@@ -256,6 +258,34 @@ export function ConversationConfigModal({
               onPaceChange={setPaceDelayMs}
               disabled={isCreating}
             />
+
+            <div className={styles.divider} />
+
+            <div className={styles.turnLimitSection}>
+              <label className={styles.turnLimitLabel}>
+                <span>Conversation Length</span>
+                <div className={styles.turnLimitInput}>
+                  <input
+                    type="number"
+                    min={5}
+                    max={100}
+                    value={maxTurns}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value)) {
+                        setMaxTurns(Math.min(100, Math.max(5, value)));
+                      }
+                    }}
+                    disabled={isCreating}
+                    className={styles.turnLimitNumber}
+                  />
+                  <span className={styles.turnLimitUnit}>turns</span>
+                </div>
+              </label>
+              <p className={styles.turnLimitDescription}>
+                Each turn is one participant speaking. {maxTurns} turns ≈ {Math.round(maxTurns / 2)}-{Math.round(maxTurns * 0.75)} minute conversation.
+              </p>
+            </div>
 
             <div className={styles.divider} />
 

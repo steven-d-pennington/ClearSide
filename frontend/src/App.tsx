@@ -5,7 +5,7 @@
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { HomePage, HistoryPage, ConversationHistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage, AdminEventsPage, AdminTestingPage, AdminDuelogicResearchPage, AdminDuelogicProposalsPage, AdminDuelogicProposalDetailPage } from './pages';
+import { HomePage, HistoryPage, ConversationHistoryPage, DebateViewPage, AdminDashboardPage, AdminDebatesPage, AdminExportsPage, AdminSystemPage, AdminConfigPage, AdminEventsPage, AdminTestingPage, AdminDuelogicResearchPage, AdminDuelogicProposalsPage, AdminDuelogicProposalDetailPage, AdminPersonaMemoryPage } from './pages';
 import { ConversationViewer } from './components/ConversationalPodcast';
 import './styles/tokens.css';
 import './App.css';
@@ -35,6 +35,7 @@ function App() {
             <Route path="/admin/duelogic/research" element={<AdminDuelogicResearchPage />} />
             <Route path="/admin/duelogic/proposals" element={<AdminDuelogicProposalsPage />} />
             <Route path="/admin/duelogic/proposals/:id" element={<AdminDuelogicProposalDetailPage />} />
+            <Route path="/admin/personas/:personaId/memory" element={<AdminPersonaMemoryPage />} />
             <Route path="/conversation/:sessionId" element={<ConversationViewer />} />
           </Routes>
         </main>

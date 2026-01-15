@@ -176,6 +176,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_debates_updated_at ON debates;
 CREATE TRIGGER update_debates_updated_at
   BEFORE UPDATE ON debates
   FOR EACH ROW

@@ -45,9 +45,9 @@ export class ConversationSessionRepository {
       INSERT INTO conversation_sessions (
         topic, topic_context, episode_proposal_id,
         participant_count, flow_mode, pace_delay_ms, rapid_fire, minimal_persona_mode,
-        host_model_id, host_display_name, status
+        max_turns, host_model_id, host_display_name, status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'configuring')
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'configuring')
       RETURNING *
     `, [
       config.topic,
@@ -58,6 +58,7 @@ export class ConversationSessionRepository {
       config.paceDelayMs || 3000,
       config.rapidFire || false,
       config.minimalPersonaMode || false,
+      config.maxTurns || 30,
       config.hostModelId || null,
       config.hostDisplayName || 'Host',
     ]);

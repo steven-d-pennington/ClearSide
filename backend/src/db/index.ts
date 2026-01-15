@@ -46,3 +46,50 @@ export type {
   VoiceAssignment,
   ElevenLabsVoiceSettings,
 } from '../types/podcast-export.js';
+
+// Authentication repositories
+export { UserRepository, createUserRepository } from './repositories/user-repository.js';
+export { OrganizationRepository, createOrganizationRepository } from './repositories/organization-repository.js';
+
+// Authentication seed
+export { ensureSuperUser } from './seedSuperUser.js';
+
+// Authentication types
+export type {
+  User,
+  UserPublic,
+  Organization,
+  UserRole,
+  JwtPayload,
+  CreateUserInput,
+  UpdateUserInput,
+  CreateOrganizationInput,
+  UpdateOrganizationInput,
+} from '../types/auth.js';
+
+// Persona Memory repository
+export { PersonaMemoryRepository, createPersonaMemoryRepository } from './repositories/persona-memory-repository.js';
+
+// Persona Memory types
+export type {
+  PersonaCoreValue,
+  PersonaOpinion,
+  PersonaRelationship,
+  PersonaMemoryConfig,
+  PersonaMemoryContext,
+  PersonaRelationshipWithNames,
+  CoreValueType,
+  OpinionStance,
+  RelationshipDynamicType,
+  CreateCoreValueInput,
+  UpdateCoreValueInput,
+  CreateOpinionInput,
+  UpdateOpinionInput,
+  EvolveOpinionInput,
+  CreateRelationshipInput,
+  UpdateRelationshipInput,
+  UpdateMemoryConfigInput,
+  OpinionEvolutionEntry,
+  MemoryExtractionResult,
+  ExtractedTopic,
+} from '../types/persona-memory.js';

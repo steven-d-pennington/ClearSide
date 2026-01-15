@@ -12,14 +12,15 @@ CREATE TABLE IF NOT EXISTS organizations (
 );
 
 -- Create updated_at trigger (uses existing function from migration 001)
+DROP TRIGGER IF EXISTS update_organizations_updated_at ON organizations;
 CREATE TRIGGER update_organizations_updated_at
   BEFORE UPDATE ON organizations
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
 -- Create indexes for performance
-CREATE INDEX idx_organizations_name ON organizations(name);
-CREATE INDEX idx_organizations_is_active ON organizations(is_active);
+CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations(name);
+CREATE INDEX IF NOT EXISTS idx_organizations_is_active ON organizations(is_active);
 
 -- Insert default organization with known UUID
 INSERT INTO organizations (id, name, description, is_active)

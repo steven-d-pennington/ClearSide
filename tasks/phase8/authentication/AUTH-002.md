@@ -6,7 +6,8 @@
 **Priority:** P0
 **Estimated Effort:** S (2-3 hours)
 **Dependencies:** AUTH-001 (types)
-**Status:** Ready
+**Status:** Completed
+**Completed Date:** 2026-01-13
 
 ---
 

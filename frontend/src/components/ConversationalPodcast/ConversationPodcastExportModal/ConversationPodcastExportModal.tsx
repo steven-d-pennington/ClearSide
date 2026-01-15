@@ -54,6 +54,46 @@ interface AvailableVoice {
 }
 
 /**
+ * Gemini TTS voices
+ * Full list of 30 voices from Google Gemini 2.5 TTS API (as of Jan 2026)
+ * @see https://ai.google.dev/gemini-api/docs/speech-generation
+ */
+const GEMINI_VOICES: AvailableVoice[] = [
+  // Original 8 voices
+  { voice_id: 'Aoede', name: 'Aoede (Breezy)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Charon', name: 'Charon (Informative)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Fenrir', name: 'Fenrir (Excitable)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Kore', name: 'Kore (Firm)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Leda', name: 'Leda (Youthful)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Orus', name: 'Orus (Firm)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Puck', name: 'Puck (Upbeat)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Zephyr', name: 'Zephyr (Bright)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  // Additional 22 voices (sorted alphabetically)
+  { voice_id: 'Achernar', name: 'Achernar (Soft)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Achird', name: 'Achird (Friendly)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Algenib', name: 'Algenib (Gravelly)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Algieba', name: 'Algieba (Smooth)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Alnilam', name: 'Alnilam (Firm)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Autonoe', name: 'Autonoe (Bright)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Callirrhoe', name: 'Callirrhoe (Easy-going)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Despina', name: 'Despina (Smooth)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Enceladus', name: 'Enceladus (Breathy)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Erinome', name: 'Erinome (Clear)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Gacrux', name: 'Gacrux (Mature)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Iapetus', name: 'Iapetus (Clear)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Laomedeia', name: 'Laomedeia (Upbeat)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Pulcherrima', name: 'Pulcherrima (Forward)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Rasalgethi', name: 'Rasalgethi (Informative)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Sadachbia', name: 'Sadachbia (Lively)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Sadaltager', name: 'Sadaltager (Knowledgeable)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Schedar', name: 'Schedar (Even)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Sulafat', name: 'Sulafat (Warm)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Umbriel', name: 'Umbriel (Easy-going)', category: 'Gemini', gender: 'male', tier: 'standard' },
+  { voice_id: 'Vindemiatrix', name: 'Vindemiatrix (Gentle)', category: 'Gemini', gender: 'female', tier: 'standard' },
+  { voice_id: 'Zubenelgenubi', name: 'Zubenelgenubi (Casual)', category: 'Gemini', gender: 'male', tier: 'standard' },
+];
+
+/**
  * Google Cloud TTS voice options organized by tier
  * Only includes voices that support SSML for pauses and emphasis.
  *
@@ -113,9 +153,9 @@ const getTierLabel = (tier?: string): string => {
  */
 const getGenderLabel = (gender?: string): string => {
   switch (gender) {
-    case 'male': return '(M)';
-    case 'female': return '(F)';
-    case 'neutral': return '(N)';
+    case 'male': return '♂';
+    case 'female': return '♀';
+    case 'neutral': return '⚥';
     default: return '';
   }
 };
@@ -372,6 +412,9 @@ export function ConversationPodcastExportModal({
   const getVoicesForProvider = (): AvailableVoice[] => {
     if (selectedProvider === 'google-cloud-long') {
       return GOOGLE_CLOUD_VOICES;
+    }
+    if (selectedProvider === 'gemini') {
+      return GEMINI_VOICES;
     }
     return availableVoices;
   };

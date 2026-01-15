@@ -35,6 +35,16 @@ import {
   PodcastPersonaRepository,
   createPodcastPersonaRepository,
 } from '../../db/repositories/podcast-persona-repository.js';
+import {
+  PersonaMemoryRepository,
+  createPersonaMemoryRepository,
+} from '../../db/repositories/persona-memory-repository.js';
+import {
+  PersonaMemoryService,
+  createPersonaMemoryService,
+  type SessionExtractions,
+  type PostSessionInput,
+} from '../persona-memory-service.js';
 import type {
   ConversationSession,
   ConversationParticipant,
@@ -43,6 +53,8 @@ import type {
   PodcastPersona,
   SegmentType,
 } from '../../types/conversation.js';
+import { HOST_PERSONA_SLUG } from '../../types/conversation.js';
+import type { PersonaMemoryContext } from '../../types/persona-memory.js';
 
 const logger = pino({
   name: 'conversational-orchestrator',
@@ -82,6 +94,11 @@ export class ConversationalOrchestrator extends EventEmitter {
   private participantRepo: ConversationParticipantRepository;
   private utteranceRepo: ConversationUtteranceRepository;
   private personaRepo: PodcastPersonaRepository;
+  private memoryRepo: PersonaMemoryRepository;
+
+  // Memory service
+  private memoryService: PersonaMemoryService;
+  private sessionExtractions: Map<string, SessionExtractions> = new Map();
 
   // Session state
   private session: ConversationSession | null = null;
@@ -90,6 +107,7 @@ export class ConversationalOrchestrator extends EventEmitter {
 
   // Agents
   private hostAgent: PodcastHostAgent | null = null;
+  private hostPersona: PodcastPersona | undefined;
   private personaAgents: Map<string, PersonaAgent> = new Map();
   private contextBoard: ContextBoardService | null = null;
 
@@ -113,6 +131,8 @@ export class ConversationalOrchestrator extends EventEmitter {
     this.participantRepo = createConversationParticipantRepository(this.pool);
     this.utteranceRepo = createConversationUtteranceRepository(this.pool);
     this.personaRepo = createPodcastPersonaRepository(this.pool);
+    this.memoryRepo = createPersonaMemoryRepository(this.pool);
+    this.memoryService = createPersonaMemoryService(this.pool);
 
     logger.info({ sessionId: this.sessionId }, 'ConversationalOrchestrator created');
   }
@@ -133,6 +153,11 @@ export class ConversationalOrchestrator extends EventEmitter {
       this.session = await this.sessionRepo.findById(this.sessionId);
     if (!this.session) {
       throw new Error(`Session not found: ${this.sessionId}`);
+    }
+
+    // Use session's maxTurns if available, otherwise use constructor value
+    if (this.session.maxTurns) {
+      this.maxTurns = this.session.maxTurns;
     }
 
     // Load participants
@@ -163,29 +188,115 @@ export class ConversationalOrchestrator extends EventEmitter {
       participantNames
     );
 
-    // Create host agent
+    // Create guest info list
     const guestInfos = this.participants.map(p => ({
       participant: p,
       persona: this.personas.get(p.personaId)!,
     })).filter(g => g.persona); // Filter out any with missing personas
 
+    // Load host persona (Quinn) from database
+    try {
+      const loadedHostPersona = await this.personaRepo.findBySlug(HOST_PERSONA_SLUG);
+      this.hostPersona = loadedHostPersona || undefined;
+      if (this.hostPersona) {
+        logger.info({
+          sessionId: this.sessionId,
+          hostPersonaId: this.hostPersona.id,
+          hostName: this.hostPersona.name,
+        }, 'Loaded host persona');
+        // Update participant names map with Quinn's name
+        participantNames.set('host', this.hostPersona.name);
+      }
+    } catch (error) {
+      logger.warn({
+        sessionId: this.sessionId,
+        hostSlug: HOST_PERSONA_SLUG,
+        error,
+      }, 'Failed to load host persona, continuing with default');
+    }
+
+    // Fetch memory contexts for all personas AND host (if memory system is enabled)
+    const memoryContexts = new Map<string, PersonaMemoryContext>();
+    const topicKeys = this.extractTopicKeys(this.session.topic);
+    const participantPersonaIds = guestInfos.map(g => g.persona.id);
+
+    // Include host persona ID in the list for relationship lookups
+    const allPersonaIds = this.hostPersona
+      ? [...participantPersonaIds, this.hostPersona.id]
+      : participantPersonaIds;
+
+    // Load host memory context first
+    let hostMemoryContext: PersonaMemoryContext | undefined;
+    if (this.hostPersona) {
+      try {
+        hostMemoryContext = await this.memoryRepo.buildMemoryContext(
+          this.hostPersona.id,
+          topicKeys,
+          participantPersonaIds // Host's relationships are with guests
+        );
+        logger.info({
+          sessionId: this.sessionId,
+          hostName: this.hostPersona.name,
+          coreValuesCount: hostMemoryContext.coreValues.length,
+          opinionsCount: hostMemoryContext.relevantOpinions.length,
+        }, 'Loaded host memory context');
+      } catch (error) {
+        logger.warn({
+          sessionId: this.sessionId,
+          hostPersonaId: this.hostPersona.id,
+          error,
+        }, 'Failed to load host memory context, continuing without memory');
+      }
+    }
+
+    // Load guest memory contexts
+    for (const { persona } of guestInfos) {
+      try {
+        const memoryContext = await this.memoryRepo.buildMemoryContext(
+          persona.id,
+          topicKeys,
+          allPersonaIds.filter(id => id !== persona.id) // Other participants including host
+        );
+        memoryContexts.set(persona.id, memoryContext);
+      } catch (error) {
+        // Memory context is optional - log warning and continue without it
+        logger.warn({
+          sessionId: this.sessionId,
+          personaId: persona.id,
+          personaSlug: persona.slug,
+          error,
+        }, 'Failed to load memory context for persona, continuing without memory');
+      }
+    }
+
+    logger.info({
+      sessionId: this.sessionId,
+      memoryContextsLoaded: memoryContexts.size,
+      hostHasMemory: !!hostMemoryContext,
+      topicKeys,
+    }, 'Loaded memory contexts for personas');
+
+    // Create host agent with persona and memory
     this.hostAgent = createPodcastHostAgent(
       this.sessionId,
       this.session.topic,
       guestInfos,
       this.session.topicContext || undefined,
       this.sseManager,
-      this.session.rapidFire
+      this.session.rapidFire,
+      this.hostPersona,
+      hostMemoryContext
     );
 
-    // Create persona agents
+    // Create persona agents with memory contexts
     this.personaAgents = createPersonaAgents(
       this.sessionId,
       this.session.topic,
       guestInfos,
       this.sseManager,
       this.session.rapidFire,
-      this.session.minimalPersonaMode
+      this.session.minimalPersonaMode,
+      memoryContexts
     );
 
     console.log('ORCHESTRATOR: Initialization complete', {
@@ -362,6 +473,10 @@ export class ConversationalOrchestrator extends EventEmitter {
         await this.runClosingPhase();
       }
 
+      // Phase 4: Post-session memory processing
+      // Process accumulated memory extractions to update persona opinions/relationships
+      await this.processPostSessionMemory();
+
       // Mark complete
       const duration = Date.now() - this.startTime;
       await this.sessionRepo.complete(this.sessionId, duration);
@@ -479,10 +594,15 @@ export class ConversationalOrchestrator extends EventEmitter {
       startTimestampMs
     );
 
-    this.broadcastUtterance('Host', 'host', opening, true, 'introduction');
+    const hostName = this.hostAgent!.name;
+    const hostSlug = this.hostPersona?.slug || 'host';
+    this.broadcastUtterance(hostName, hostSlug, opening, true, 'introduction');
 
     // Process for context board
     await this.contextBoard!.processUtterance(utterance);
+
+    // Extract memory from host utterance
+    await this.extractMemoryFromHostUtterance(opening);
 
     this.lastSpeakerId = 'host';
 
@@ -543,11 +663,11 @@ export class ConversationalOrchestrator extends EventEmitter {
 
       // Broadcast speaker change
       const speakerName = decision.participantId === 'host'
-        ? 'Host'
+        ? (this.hostAgent?.name || 'Host')
         : this.getParticipantName(decision.participantId);
 
       const personaSlug = decision.participantId === 'host'
-        ? 'host'
+        ? (this.hostPersona?.slug || 'host')
         : this.getPersonaSlug(decision.participantId);
 
       this.broadcastEvent('conversation_speaker_changed', {
@@ -587,31 +707,121 @@ export class ConversationalOrchestrator extends EventEmitter {
   }
 
   /**
-   * Closing phase - host summarizes
+   * Closing phase - graceful closing sequence
+   *
+   * 1. Host announces wrap-up creatively
+   * 2. Each participant gets a final statement
+   * 3. Host provides synthesis/summary
    */
   private async runClosingPhase(): Promise<void> {
-    logger.info({ sessionId: this.sessionId }, 'Running closing phase');
+    logger.info({ sessionId: this.sessionId }, 'Running closing sequence');
 
-    // Record timestamp at START of generation
-    const startTimestampMs = Date.now() - this.startTime;
+    const hostName = this.hostAgent!.name;
+    const hostSlug = this.hostPersona?.slug || 'host';
 
-    const closing = await this.hostAgent!.generateClosing(
-      this.contextBoard!
-    );
+    // Step 1: Host announces we're wrapping up
+    const wrapUpTimestampMs = Date.now() - this.startTime;
+    const wrapUpAnnouncement = await this.hostAgent!.generateWrapUpAnnouncement();
 
-    // Save and broadcast (use start timestamp)
-    const utterance = await this.saveUtteranceWithTimestamp(
+    const wrapUpUtterance = await this.saveUtteranceWithTimestamp(
       undefined,
-      closing,
+      wrapUpAnnouncement,
       true,
       'closing',
-      startTimestampMs
+      wrapUpTimestampMs
     );
 
-    this.broadcastUtterance('Host', 'host', closing, true, 'closing');
+    this.broadcastUtterance(hostName, hostSlug, wrapUpAnnouncement, true, 'closing');
+    await this.contextBoard!.processUtterance(wrapUpUtterance);
+    await this.extractMemoryFromHostUtterance(wrapUpAnnouncement);
 
-    // Process for context board
-    await this.contextBoard!.processUtterance(utterance);
+    // Brief delay before final statements
+    await this.delay(this.session?.rapidFire ? 300 : 500);
+
+    // Step 2: Each participant gets a final statement
+    const recentTranscript = await this.getRecentTranscript(5);
+    const guests = this.hostAgent!.getGuests();
+
+    for (const guest of guests) {
+      const agent = this.personaAgents.get(guest.participantId);
+      if (!agent) {
+        logger.warn({ participantId: guest.participantId }, 'Agent not found for final statement');
+        continue;
+      }
+
+      // Host prompts this guest for final thoughts
+      const promptTimestampMs = Date.now() - this.startTime;
+      const closingPrompt = await this.hostAgent!.generateClosingThoughtPrompt(guest);
+
+      const promptUtterance = await this.saveUtteranceWithTimestamp(
+        undefined,
+        closingPrompt,
+        true,
+        'closing',
+        promptTimestampMs
+      );
+
+      this.broadcastUtterance(hostName, hostSlug, closingPrompt, true, 'closing');
+      await this.contextBoard!.processUtterance(promptUtterance);
+
+      // Brief delay for natural pacing
+      await this.delay(this.session?.rapidFire ? 200 : 400);
+
+      // Guest gives final thought
+      const finalThoughtTimestampMs = Date.now() - this.startTime;
+      const finalThought = await agent.generateFinalThought(recentTranscript);
+
+      const finalThoughtUtterance = await this.saveUtteranceWithTimestamp(
+        guest.participantId,
+        finalThought,
+        false,
+        'closing',
+        finalThoughtTimestampMs
+      );
+
+      this.broadcastUtterance(
+        agent.name,
+        agent.personaSlug,
+        finalThought,
+        false,
+        'closing',
+        guest.participantId
+      );
+
+      await this.contextBoard!.processUtterance(finalThoughtUtterance);
+
+      // Extract memory from the final thought
+      this.extractMemoryFromUtterance(guest.participantId, finalThought).catch(err => {
+        logger.warn({ err, sessionId: this.sessionId }, 'Memory extraction failed for final thought');
+      });
+
+      // Add to host's context
+      this.hostAgent!.addParticipantMessage(agent.name, finalThought);
+
+      // Brief delay before next participant
+      await this.delay(this.session?.rapidFire ? 200 : 400);
+    }
+
+    // Step 3: Host synthesis/summary
+    const synthesisTimestampMs = Date.now() - this.startTime;
+    const synthesis = await this.hostAgent!.generateClosing(this.contextBoard!);
+
+    const synthesisUtterance = await this.saveUtteranceWithTimestamp(
+      undefined,
+      synthesis,
+      true,
+      'closing',
+      synthesisTimestampMs
+    );
+
+    this.broadcastUtterance(hostName, hostSlug, synthesis, true, 'closing');
+    await this.contextBoard!.processUtterance(synthesisUtterance);
+    await this.extractMemoryFromHostUtterance(synthesis);
+
+    logger.info({
+      sessionId: this.sessionId,
+      participantsWithFinalStatements: guests.length,
+    }, 'Closing sequence completed');
   }
 
   // =========================================================================
@@ -668,13 +878,18 @@ export class ConversationalOrchestrator extends EventEmitter {
       startTimestampMs
     );
 
-    this.broadcastUtterance('Host', 'host', content, true, 'host_question');
+    const hostName = this.hostAgent!.name;
+    const hostSlug = this.hostPersona?.slug || 'host';
+    this.broadcastUtterance(hostName, hostSlug, content, true, 'host_question');
 
     await this.contextBoard!.processUtterance(utterance);
     this.lastSpeakerId = 'host';
 
     // Add to host's context
     this.hostAgent!.addContext(content);
+
+    // Extract memory from host utterance
+    await this.extractMemoryFromHostUtterance(content);
   }
 
   /**
@@ -804,6 +1019,12 @@ export class ConversationalOrchestrator extends EventEmitter {
 
     // Process for context board
     await this.contextBoard!.processUtterance(utterance);
+
+    // Extract memory data from this utterance (async, non-blocking)
+    // Fire and forget - don't await to avoid slowing conversation
+    this.extractMemoryFromUtterance(decision.participantId, content).catch(err => {
+      logger.warn({ err, sessionId: this.sessionId }, 'Memory extraction failed (async)');
+    });
 
     this.lastSpeakerId = decision.participantId;
   }
@@ -1044,8 +1265,244 @@ export class ConversationalOrchestrator extends EventEmitter {
     this.sseManager.broadcastToDebate(this.sessionId, type as any, data);
   }
 
+  /**
+   * Extract topic keys from session topic for memory opinion filtering
+   * Converts topic text into normalized keys for database lookup
+   */
+  private extractTopicKeys(topic: string): string[] {
+    const keys: string[] = [];
+
+    // Normalize the topic text
+    const normalized = topic
+      .toLowerCase()
+      .replace(/[^\w\s]/g, ' ')  // Remove punctuation
+      .replace(/\s+/g, ' ')      // Collapse whitespace
+      .trim();
+
+    // Add the full topic as a key (snake_case)
+    const fullKey = normalized.replace(/\s/g, '_').substring(0, 100);
+    if (fullKey) {
+      keys.push(fullKey);
+    }
+
+    // Extract individual significant words (4+ chars, not common stop words)
+    const stopWords = new Set([
+      'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had',
+      'her', 'was', 'one', 'our', 'out', 'has', 'have', 'been', 'would',
+      'could', 'should', 'their', 'will', 'with', 'this', 'that', 'from',
+      'they', 'what', 'which', 'about', 'into', 'when', 'where', 'there',
+    ]);
+
+    const words = normalized.split(' ');
+    for (const word of words) {
+      if (word.length >= 4 && !stopWords.has(word)) {
+        keys.push(word);
+      }
+    }
+
+    // Return unique keys
+    return [...new Set(keys)];
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // =========================================================================
+  // PERSONA MEMORY INTEGRATION
+  // =========================================================================
+
+  /**
+   * Extract memory data from a participant utterance
+   * Called after each non-host utterance during conversation
+   */
+  private async extractMemoryFromUtterance(
+    participantId: string,
+    content: string
+  ): Promise<void> {
+    const participant = this.participants.find(p => p.id === participantId);
+    if (!participant) return;
+
+    const persona = this.personas.get(participant.personaId);
+    if (!persona) return;
+
+    try {
+      // Check if extraction is enabled
+      const isEnabled = await this.memoryService.isExtractionEnabled();
+      if (!isEnabled) return;
+
+      // Extract memory data from the utterance
+      const extraction = await this.memoryService.extractFromUtterance({
+        personaId: persona.id,
+        personaName: persona.name,
+        content,
+        sessionTopic: this.session?.topic || '',
+        sessionId: this.sessionId,
+      });
+
+      // If substantive, accumulate in session extractions
+      if (extraction.isSubstantive && extraction.topics.length > 0) {
+        let sessionData = this.sessionExtractions.get(persona.id);
+        if (!sessionData) {
+          sessionData = {
+            personaId: persona.id,
+            personaName: persona.name,
+            extractions: [],
+            sessionId: this.sessionId,
+          };
+          this.sessionExtractions.set(persona.id, sessionData);
+        }
+
+        sessionData.extractions.push(...extraction.topics);
+
+        logger.debug({
+          sessionId: this.sessionId,
+          personaId: persona.id,
+          personaSlug: persona.slug,
+          topicCount: extraction.topics.length,
+          totalExtractions: sessionData.extractions.length,
+        }, 'Accumulated memory extraction from utterance');
+      }
+    } catch (error) {
+      // Memory extraction is non-blocking - log and continue
+      logger.warn({
+        error,
+        sessionId: this.sessionId,
+        participantId,
+        personaSlug: persona.slug,
+      }, 'Failed to extract memory from utterance, continuing without');
+    }
+  }
+
+  /**
+   * Extract memory data from a host utterance
+   * Called after each host utterance during conversation
+   */
+  private async extractMemoryFromHostUtterance(content: string): Promise<void> {
+    // Skip if no host persona is loaded
+    if (!this.hostPersona) return;
+
+    try {
+      // Check if extraction is enabled
+      const isEnabled = await this.memoryService.isExtractionEnabled();
+      if (!isEnabled) return;
+
+      // Extract memory data from the host utterance
+      const extraction = await this.memoryService.extractFromUtterance({
+        personaId: this.hostPersona.id,
+        personaName: this.hostPersona.name,
+        content,
+        sessionTopic: this.session?.topic || '',
+        sessionId: this.sessionId,
+      });
+
+      // If substantive, accumulate in session extractions
+      if (extraction.isSubstantive && extraction.topics.length > 0) {
+        let sessionData = this.sessionExtractions.get(this.hostPersona.id);
+        if (!sessionData) {
+          sessionData = {
+            personaId: this.hostPersona.id,
+            personaName: this.hostPersona.name,
+            extractions: [],
+            sessionId: this.sessionId,
+          };
+          this.sessionExtractions.set(this.hostPersona.id, sessionData);
+        }
+
+        sessionData.extractions.push(...extraction.topics);
+
+        logger.debug({
+          sessionId: this.sessionId,
+          personaId: this.hostPersona.id,
+          personaSlug: this.hostPersona.slug,
+          topicCount: extraction.topics.length,
+          totalExtractions: sessionData.extractions.length,
+        }, 'Accumulated memory extraction from host utterance');
+      }
+    } catch (error) {
+      // Memory extraction is non-blocking - log and continue
+      logger.warn({
+        error,
+        sessionId: this.sessionId,
+        personaSlug: this.hostPersona.slug,
+      }, 'Failed to extract memory from host utterance, continuing without');
+    }
+  }
+
+  /**
+   * Process accumulated memory data after session completes
+   * Updates persona opinions and relationship scores
+   */
+  private async processPostSessionMemory(): Promise<void> {
+    if (this.sessionExtractions.size === 0) {
+      logger.info({ sessionId: this.sessionId }, 'No memory extractions to process');
+      return;
+    }
+
+    try {
+      // Build agreement/disagreement pairs from context board
+      const agreementPairs: Array<{ personaId1: string; personaId2: string }> = [];
+      const disagreementPairs: Array<{ personaId1: string; personaId2: string }> = [];
+
+      // Get agreement data from context board if available
+      const contextState = this.contextBoard?.getState();
+      if (contextState) {
+        // Extract persona IDs from participants
+        const participantToPersona = new Map<string, string>();
+        for (const p of this.participants) {
+          participantToPersona.set(p.id, p.personaId);
+        }
+
+        // Track agreements and disagreements from claims
+        // Claims have participantId and supportedBy/challengedBy arrays
+        for (const claim of contextState.claims) {
+          const sourcePersonaId = participantToPersona.get(claim.participantId);
+          if (!sourcePersonaId) continue;
+
+          // Track agreements (supportedBy)
+          for (const supporterId of claim.supportedBy) {
+            const supporterPersonaId = participantToPersona.get(supporterId);
+            if (supporterPersonaId && supporterPersonaId !== sourcePersonaId) {
+              agreementPairs.push({ personaId1: sourcePersonaId, personaId2: supporterPersonaId });
+            }
+          }
+
+          // Track disagreements (challengedBy)
+          for (const challengerId of claim.challengedBy) {
+            const challengerPersonaId = participantToPersona.get(challengerId);
+            if (challengerPersonaId && challengerPersonaId !== sourcePersonaId) {
+              disagreementPairs.push({ personaId1: sourcePersonaId, personaId2: challengerPersonaId });
+            }
+          }
+        }
+      }
+
+      // Create post-session input
+      const postSessionInput: PostSessionInput = {
+        sessionId: this.sessionId,
+        sessionTopic: this.session?.topic || '',
+        participantExtractions: this.sessionExtractions,
+        agreementPairs,
+        disagreementPairs,
+      };
+
+      // Process the accumulated extractions
+      await this.memoryService.processSessionMemory(postSessionInput);
+
+      logger.info({
+        sessionId: this.sessionId,
+        participantCount: this.sessionExtractions.size,
+        totalExtractions: Array.from(this.sessionExtractions.values())
+          .reduce((sum, s) => sum + s.extractions.length, 0),
+      }, 'Completed post-session memory processing');
+
+    } catch (error) {
+      // Memory processing is non-blocking - log and continue
+      logger.error({
+        error,
+        sessionId: this.sessionId,
+      }, 'Failed to process post-session memory, continuing without');
+    }
   }
 }
 

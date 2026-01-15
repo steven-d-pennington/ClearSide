@@ -56,6 +56,7 @@ export function AdminDuelogicResearchPage() {
     categories: ['technology_ethics', 'ai_automation'] as ResearchCategory[],
     maxTopicsPerRun: 10,
     minControversyScore: 0.6,
+    viralMode: false,
   });
 
   // Research job streaming state
@@ -348,6 +349,7 @@ export function AdminDuelogicResearchPage() {
           perplexityModel: 'perplexity/sonar-pro',
           maxTopicsPerRun: newConfig.maxTopicsPerRun,
           minControversyScore: newConfig.minControversyScore,
+          viralMode: newConfig.viralMode,
         }),
       });
 
@@ -359,6 +361,7 @@ export function AdminDuelogicResearchPage() {
           categories: ['technology_ethics', 'ai_automation'],
           maxTopicsPerRun: 10,
           minControversyScore: 0.6,
+          viralMode: false,
         });
         fetchDashboard();
       } else {
@@ -585,6 +588,22 @@ export function AdminDuelogicResearchPage() {
               </div>
             </div>
 
+            <div className={styles.formGroup}>
+              <label className={styles.viralModeCheckbox}>
+                <input
+                  type="checkbox"
+                  checked={newConfig.viralMode}
+                  onChange={e => setNewConfig(prev => ({ ...prev, viralMode: e.target.checked }))}
+                />
+                <span className={styles.viralModeLabel}>
+                  🔥 Viral Mode
+                  <span className={styles.viralModeDescription}>
+                    Optimize for maximum engagement - find trending, controversial topics with clickbait-worthy titles
+                  </span>
+                </span>
+              </label>
+            </div>
+
             <Button type="submit" variant="primary" loading={creatingConfig}>
               Create Configuration
             </Button>
@@ -596,7 +615,10 @@ export function AdminDuelogicResearchPage() {
             {configs.map(config => (
               <div key={config.id} className={styles.configCard}>
                 <div className={styles.configInfo}>
-                  <h3 className={styles.configName}>{config.name}</h3>
+                  <h3 className={styles.configName}>
+                    {config.name}
+                    {config.viralMode && <span className={styles.viralBadge}>🔥 Viral</span>}
+                  </h3>
                   <p className={styles.configMeta}>
                     {config.categories.length} categories · Max {config.maxTopicsPerRun} topics ·
                     Min controversy: {config.minControversyScore}

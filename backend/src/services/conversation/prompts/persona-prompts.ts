@@ -6,6 +6,93 @@
  */
 
 import type { PodcastPersona } from '../../../types/conversation.js';
+import type { PersonaMemoryContext } from '../../../types/persona-memory.js';
+
+/**
+ * Detect if a persona has a naturally verbose speaking style
+ * (storytellers, anecdote-tellers, etc.)
+ */
+function isVerbosePersona(persona: PodcastPersona): boolean {
+  const verboseIndicators = [
+    'storyteller',
+    'story',
+    'anecdote',
+    'elaborate',
+    'detailed',
+    'verbose',
+    'let me tell you',
+    'grounds abstract issues in real people',
+    'uses examples',
+    'illustrates with',
+  ];
+
+  const styleText = (persona.speakingStyle + ' ' + persona.quirks.join(' ')).toLowerCase();
+  return verboseIndicators.some(indicator => styleText.includes(indicator));
+}
+
+/**
+ * Build the memory injection section for the system prompt
+ * Exported for use by both PersonaAgent and PodcastHostAgent
+ */
+export function buildMemorySection(memoryContext: PersonaMemoryContext): string {
+  const sections: string[] = [];
+
+  // Core values section (immutable personality anchors)
+  if (memoryContext.coreValues.length > 0) {
+    const values = memoryContext.coreValues
+      .slice(0, 5) // Limit to top 5 by priority
+      .map(v => `- ${v.description}`)
+      .join('\n');
+    sections.push(`YOUR CORE VALUES (Never compromise these):
+${values}`);
+  }
+
+  // Relevant opinions section (malleable stances)
+  if (memoryContext.relevantOpinions.length > 0) {
+    const opinions = memoryContext.relevantOpinions
+      .map(o => {
+        const stanceDescription = {
+          supports: 'support',
+          opposes: 'oppose',
+          neutral: 'are neutral on',
+          mixed: 'have mixed feelings about',
+          evolving: 'are still forming your view on',
+        }[o.stance] || o.stance;
+        return `- ${o.topicDisplay || o.topicKey}: You ${stanceDescription} this. ${o.summary}`;
+      })
+      .join('\n');
+    sections.push(`YOUR ESTABLISHED POSITIONS:
+${opinions}`);
+  }
+
+  // Relationships section (inter-persona dynamics)
+  if (memoryContext.relationships.length > 0) {
+    const relationships = memoryContext.relationships
+      .map(r => {
+        const dynamicDesc = r.dynamicType
+          ? ` (${r.dynamicType.replace('_', ' ')})`
+          : '';
+        const frictionNote = r.frictionPoints && r.frictionPoints.length > 0
+          ? ` You tend to clash on: ${r.frictionPoints.slice(0, 2).join(', ')}.`
+          : '';
+        const commonNote = r.commonGround && r.commonGround.length > 0
+          ? ` You tend to agree on: ${r.commonGround.slice(0, 2).join(', ')}.`
+          : '';
+        return `- ${r.otherPersonaName}${dynamicDesc}:${frictionNote}${commonNote}`;
+      })
+      .join('\n');
+    sections.push(`YOUR RELATIONSHIPS WITH TODAY'S GUESTS:
+${relationships}`);
+  }
+
+  // Personality notes section (admin-curated guidance)
+  if (memoryContext.personalityNotes) {
+    sections.push(`PERSONALITY NOTES:
+${memoryContext.personalityNotes}`);
+  }
+
+  return sections.join('\n\n');
+}
 
 /**
  * Build system prompt for a persona agent
@@ -15,7 +102,8 @@ export function buildPersonaSystemPrompt(
   topic: string,
   otherParticipantNames: string[],
   rapidFire: boolean = false,
-  minimalPersonaMode: boolean = false
+  minimalPersonaMode: boolean = false,
+  memoryContext?: PersonaMemoryContext
 ): string {
   // MINIMAL PERSONA MODE: Model speaks naturally without character constraints
   if (minimalPersonaMode) {
@@ -59,14 +147,28 @@ Speak authentically as an AI - no need to pretend otherwise.`;
     ? `\n\nYOUR PREFERRED TOPICS: ${persona.preferredTopics.join(', ')}`
     : '';
 
+  // Memory context injection (persistent personality memories)
+  const memorySection = memoryContext
+    ? `\n\n${buildMemorySection(memoryContext)}`
+    : '';
+
   // Response length guideline changes based on rapid fire mode
+  // Verbose personas (storytellers) get extra guidance to condense their style
+  const verboseOverride = rapidFire && isVerbosePersona(persona)
+    ? `
+   - YOUR STYLE ADAPTS: You're naturally a storyteller, but in rapid-fire mode, give us the TAKEAWAY, not the story
+   - Skip the setup - jump straight to your point
+   - Instead of "Let me tell you about my neighbor..." just say "In my neighborhood, we see X"
+   - Save the full anecdotes for longer formats - here, distill to essence`
+    : '';
+
   const lengthGuideline = rapidFire
     ? `6. RAPID FIRE MODE - This is a fast-paced, focused exchange:
    - Keep responses to 2-4 sentences typically
    - Be focused and avoid repetition - make each sentence count
    - Cut unnecessary throat-clearing and preambles
    - Get to your core point quickly and clearly
-   - Build naturally on what others say without rehashing`
+   - Build naturally on what others say without rehashing${verboseOverride}`
     : '6. Keep responses concise (2-4 paragraphs typically, unless asked for more detail)';
 
   return `You are ${persona.name}, a participant in a podcast conversation.
@@ -82,6 +184,7 @@ ${persona.worldview}
 ${quirksText}
 ${examplesText}
 ${topicsText}
+${memorySection}
 
 TODAY'S TOPIC: ${topic}
 
@@ -138,8 +241,13 @@ ${conversationContext}
   }
 
   // Length instruction changes based on rapid fire mode
+  // Verbose personas get extra reminder to condense
+  const verboseReminder = rapidFire && isVerbosePersona(persona)
+    ? ' Give us the takeaway, not the full story - distill to essence!'
+    : '';
+
   const lengthInstruction = rapidFire
-    ? 'RAPID FIRE: 2-4 sentences typically. Be focused and avoid repetition - make every sentence count!'
+    ? `RAPID FIRE: 2-4 sentences typically. Be focused and avoid repetition - make every sentence count!${verboseReminder}`
     : 'Keep your response focused and conversational (2-4 paragraphs unless more detail is explicitly requested).';
 
   prompt += `

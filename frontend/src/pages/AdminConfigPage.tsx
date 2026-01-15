@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { Alert, Button } from '../components/ui';
 import styles from './AdminConfigPage.module.css';
 import type { ModelDefaults, DebatePreset, Persona, PersonaArchetype, BrevityLevel } from '../types/configuration';
+import type { PodcastPersona } from '../types/conversation';
 
 interface TTSProvider {
   id: string;
@@ -18,18 +19,70 @@ interface TTSProvider {
   envVar?: string;
 }
 
+// Gemini TTS voice metadata with gender information (30 voices as of Jan 2026)
+// Gender info from Google Cloud TTS documentation
+interface GeminiVoiceInfo {
+  name: string;
+  description: string;
+  gender: 'male' | 'female' | 'neutral';
+}
+
+const GEMINI_VOICES: Record<string, GeminiVoiceInfo> = {
+  // Original 8 voices
+  'Aoede': { name: 'Aoede', description: 'Breezy', gender: 'female' },
+  'Charon': { name: 'Charon', description: 'Informative', gender: 'male' },
+  'Fenrir': { name: 'Fenrir', description: 'Excitable', gender: 'male' },
+  'Kore': { name: 'Kore', description: 'Firm', gender: 'female' },
+  'Leda': { name: 'Leda', description: 'Youthful', gender: 'female' },
+  'Orus': { name: 'Orus', description: 'Firm', gender: 'male' },
+  'Puck': { name: 'Puck', description: 'Upbeat', gender: 'male' },
+  'Zephyr': { name: 'Zephyr', description: 'Bright', gender: 'male' },
+  // Additional 22 voices
+  'Achernar': { name: 'Achernar', description: 'Soft', gender: 'female' },
+  'Achird': { name: 'Achird', description: 'Friendly', gender: 'male' },
+  'Algenib': { name: 'Algenib', description: 'Gravelly', gender: 'male' },
+  'Algieba': { name: 'Algieba', description: 'Smooth', gender: 'male' },
+  'Alnilam': { name: 'Alnilam', description: 'Firm', gender: 'male' },
+  'Autonoe': { name: 'Autonoe', description: 'Bright', gender: 'female' },
+  'Callirrhoe': { name: 'Callirrhoe', description: 'Easy-going', gender: 'female' },
+  'Despina': { name: 'Despina', description: 'Smooth', gender: 'female' },
+  'Enceladus': { name: 'Enceladus', description: 'Breathy', gender: 'male' },
+  'Erinome': { name: 'Erinome', description: 'Clear', gender: 'female' },
+  'Gacrux': { name: 'Gacrux', description: 'Mature', gender: 'male' },
+  'Iapetus': { name: 'Iapetus', description: 'Clear', gender: 'male' },
+  'Laomedeia': { name: 'Laomedeia', description: 'Upbeat', gender: 'female' },
+  'Pulcherrima': { name: 'Pulcherrima', description: 'Forward', gender: 'female' },
+  'Rasalgethi': { name: 'Rasalgethi', description: 'Informative', gender: 'male' },
+  'Sadachbia': { name: 'Sadachbia', description: 'Lively', gender: 'male' },
+  'Sadaltager': { name: 'Sadaltager', description: 'Knowledgeable', gender: 'male' },
+  'Schedar': { name: 'Schedar', description: 'Even', gender: 'female' },
+  'Sulafat': { name: 'Sulafat', description: 'Warm', gender: 'male' },
+  'Umbriel': { name: 'Umbriel', description: 'Easy-going', gender: 'male' },
+  'Vindemiatrix': { name: 'Vindemiatrix', description: 'Gentle', gender: 'female' },
+  'Zubenelgenubi': { name: 'Zubenelgenubi', description: 'Casual', gender: 'male' },
+};
+
+// Helper to format voice display with gender
+function formatVoiceDisplay(voiceId: string): string {
+  const voice = GEMINI_VOICES[voiceId];
+  if (!voice) return voiceId;
+  const genderIcon = voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '⚥';
+  return `${voice.name} - ${voice.description} ${genderIcon}`;
+}
+
 interface ModelInfo {
   id: string;
   name: string;
   provider: string;
 }
 
-type TabType = 'presets' | 'personas' | 'providers' | 'modelDefaults';
+type TabType = 'presets' | 'personas' | 'podcastPersonas' | 'providers' | 'modelDefaults';
 
 export function AdminConfigPage() {
   const [activeTab, setActiveTab] = useState<TabType>('presets');
   const [presets, setPresets] = useState<DebatePreset[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [podcastPersonas, setPodcastPersonas] = useState<PodcastPersona[]>([]);
   const [providers, setProviders] = useState<TTSProvider[]>([]);
   const [modelDefaults, setModelDefaults] = useState<ModelDefaults>({
     proModelId: null,
@@ -67,6 +120,17 @@ export function AdminConfigPage() {
       setPersonas(data.personas || []);
     } catch (err) {
       console.error('Error fetching personas:', err);
+    }
+  }, [API_BASE_URL]);
+
+  const fetchPodcastPersonas = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/conversations/personas`);
+      if (!response.ok) throw new Error('Failed to fetch podcast personas');
+      const data = await response.json();
+      setPodcastPersonas(data.personas || []);
+    } catch (err) {
+      console.error('Error fetching podcast personas:', err);
     }
   }, [API_BASE_URL]);
 
@@ -110,6 +174,7 @@ export function AdminConfigPage() {
         await Promise.all([
           fetchPresets(),
           fetchPersonas(),
+          fetchPodcastPersonas(),
           fetchProviders(),
           fetchModelDefaults(),
           fetchAvailableModels(),
@@ -122,7 +187,7 @@ export function AdminConfigPage() {
       }
     };
     fetchAll();
-  }, [fetchPresets, fetchPersonas, fetchProviders, fetchModelDefaults, fetchAvailableModels]);
+  }, [fetchPresets, fetchPersonas, fetchPodcastPersonas, fetchProviders, fetchModelDefaults, fetchAvailableModels]);
 
   const handleSavePreset = async () => {
     if (!editingPreset) return;
@@ -261,7 +326,13 @@ export function AdminConfigPage() {
           className={`${styles.tab} ${activeTab === 'personas' ? styles.active : ''}`}
           onClick={() => setActiveTab('personas')}
         >
-          Personas ({personas.length})
+          Debate Personas ({personas.length})
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'podcastPersonas' ? styles.active : ''}`}
+          onClick={() => setActiveTab('podcastPersonas')}
+        >
+          Podcast Personas ({podcastPersonas.length})
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'modelDefaults' ? styles.active : ''}`}
@@ -645,6 +716,76 @@ export function AdminConfigPage() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Podcast Personas Tab */}
+      {activeTab === 'podcastPersonas' && (
+        <div className={styles.tabContent}>
+          <div className={styles.tabHeader}>
+            <h2>Podcast Personas</h2>
+            <p className={styles.tabDescription}>
+              Characters for conversational podcasts. Manage their persistent memory (core values, opinions, relationships).
+            </p>
+          </div>
+
+          {podcastPersonas.length === 0 ? (
+            <div className={styles.noData}>No podcast personas configured</div>
+          ) : (
+            <div className={styles.cardGrid}>
+              {podcastPersonas.map((persona) => (
+                <div
+                  key={persona.id}
+                  className={styles.personaCard}
+                >
+                  <div className={styles.personaHeader}>
+                    <h3 className={styles.personaName}>
+                      <span className={styles.emoji}>{persona.avatarEmoji}</span>
+                      {persona.name}
+                    </h3>
+                    <Link
+                      to={`/admin/personas/${persona.id}/memory`}
+                      className={styles.memoryButton}
+                      title="Manage persona memory"
+                    >
+                      🧠 Memory
+                    </Link>
+                  </div>
+                  <p className={styles.personaDescription}>{persona.backstory}</p>
+                  <div className={styles.personaDetails}>
+                    <div className={styles.personaDetail}>
+                      <span className={styles.detailLabel}>Speaking Style</span>
+                      <span className={styles.detailValue}>{persona.speakingStyle.substring(0, 50)}...</span>
+                    </div>
+                    <div className={styles.personaDetail}>
+                      <span className={styles.detailLabel}>Worldview</span>
+                      <span className={styles.detailValue}>{persona.worldview.substring(0, 50)}...</span>
+                    </div>
+                  </div>
+                  {persona.quirks && persona.quirks.length > 0 && (
+                    <div className={styles.quirks}>
+                      {persona.quirks.slice(0, 2).map((quirk, i) => (
+                        <span key={i} className={styles.quirkBadge}>{quirk}</span>
+                      ))}
+                      {persona.quirks.length > 2 && (
+                        <span className={styles.quirkBadge}>+{persona.quirks.length - 2} more</span>
+                      )}
+                    </div>
+                  )}
+                  {/* Voice Assignment Display */}
+                  <div className={styles.voiceAssignment}>
+                    {persona.defaultVoiceId ? (
+                      <span className={styles.voiceBadge}>
+                        🎙️ {formatVoiceDisplay(persona.defaultVoiceId)}
+                      </span>
+                    ) : (
+                      <span className={styles.noVoiceBadge}>🔇 No voice assigned</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
