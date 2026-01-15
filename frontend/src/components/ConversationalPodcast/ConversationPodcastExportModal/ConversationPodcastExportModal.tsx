@@ -30,6 +30,23 @@ interface RefinedSegment {
   isTruncated?: boolean;
 }
 
+/**
+ * Gemini Director's Notes for TTS voice guidance
+ */
+interface GeminiSpeakerDirection {
+  speakerId: string;
+  characterProfile: string;
+  vocalStyle: string;
+  performanceNotes: string;
+}
+
+interface GeminiDirectorNotes {
+  showContext: string;
+  speakerDirections: Record<string, GeminiSpeakerDirection>;
+  sceneContext: string;
+  pacingNotes: string;
+}
+
 interface RefinedConversationScript {
   sessionId: string;
   title: string;
@@ -41,6 +58,7 @@ interface RefinedConversationScript {
   estimatedDurationMinutes: number;
   provider: string;
   refinedAt: string;
+  geminiDirectorNotes?: GeminiDirectorNotes;
 }
 
 interface AvailableVoice {
@@ -224,6 +242,9 @@ export function ConversationPodcastExportModal({
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
+  // Director's notes state
+  const [showDirectorNotes, setShowDirectorNotes] = useState(false);
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -247,6 +268,8 @@ export function ConversationPodcastExportModal({
       setPreviewAudioRef(null);
       setPlayingIndex(null);
       setPreviewError(null);
+      // Reset director's notes state
+      setShowDirectorNotes(false);
     }
   }, [isOpen]);
 
@@ -862,6 +885,79 @@ export function ConversationPodcastExportModal({
                 </Button>
               )}
             </div>
+
+            {/* Director's Notes Toggle (only show for Gemini) */}
+            {refinedScript.geminiDirectorNotes && (
+              <div className={styles.directorNotesContainer}>
+                <button
+                  type="button"
+                  className={styles.directorNotesToggle}
+                  onClick={() => setShowDirectorNotes(!showDirectorNotes)}
+                  aria-expanded={showDirectorNotes}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className={`${styles.toggleIcon} ${showDirectorNotes ? styles.expanded : ''}`}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                  <span className={styles.toggleLabel}>
+                    Gemini Director's Notes
+                  </span>
+                  <span className={styles.geminiLabel}>TTS Guidance</span>
+                </button>
+                {showDirectorNotes && (
+                  <div className={styles.directorNotesPanel}>
+                    {/* Show Context */}
+                    <div className={styles.notesSection}>
+                      <h5 className={styles.notesSectionTitle}>Show Context</h5>
+                      <p className={styles.notesSectionContent}>{refinedScript.geminiDirectorNotes.showContext}</p>
+                    </div>
+
+                    {/* Scene Context */}
+                    <div className={styles.notesSection}>
+                      <h5 className={styles.notesSectionTitle}>Scene Context</h5>
+                      <p className={styles.notesSectionContent}>{refinedScript.geminiDirectorNotes.sceneContext}</p>
+                    </div>
+
+                    {/* Pacing Notes */}
+                    <div className={styles.notesSection}>
+                      <h5 className={styles.notesSectionTitle}>Pacing Notes</h5>
+                      <p className={styles.notesSectionContent}>{refinedScript.geminiDirectorNotes.pacingNotes}</p>
+                    </div>
+
+                    {/* Speaker Directions */}
+                    <div className={styles.notesSection}>
+                      <h5 className={styles.notesSectionTitle}>Speaker Directions</h5>
+                      <div className={styles.speakerDirections}>
+                        {Object.entries(refinedScript.geminiDirectorNotes.speakerDirections).map(([speakerId, direction]) => (
+                          <div key={speakerId} className={styles.speakerDirection}>
+                            <div className={styles.speakerDirectionHeader}>{direction.speakerId}</div>
+                            <div className={styles.speakerDirectionItem}>
+                              <span className={styles.directionLabel}>Character:</span>
+                              <span className={styles.directionValue}>{direction.characterProfile}</span>
+                            </div>
+                            <div className={styles.speakerDirectionItem}>
+                              <span className={styles.directionLabel}>Voice Style:</span>
+                              <span className={styles.directionValue}>{direction.vocalStyle}</span>
+                            </div>
+                            <div className={styles.speakerDirectionItem}>
+                              <span className={styles.directionLabel}>Performance:</span>
+                              <span className={styles.directionValue}>{direction.performanceNotes}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Preview error */}
             {previewError && (
