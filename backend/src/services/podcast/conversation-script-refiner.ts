@@ -17,6 +17,7 @@ import type { Pool } from 'pg';
 import { ConversationSessionRepository } from '../../db/repositories/conversation-session-repository.js';
 import { ConversationParticipantRepository } from '../../db/repositories/conversation-participant-repository.js';
 import { ConversationUtteranceRepository } from '../../db/repositories/conversation-utterance-repository.js';
+import { OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
 import type {
   ConversationSession,
   ConversationParticipant,
@@ -132,11 +133,13 @@ export class ConversationScriptRefiner {
   private sessionRepo: ConversationSessionRepository;
   private participantRepo: ConversationParticipantRepository;
   private utteranceRepo: ConversationUtteranceRepository;
+  private llmClient: OpenRouterLLMClient | null = null;
 
-  constructor(pool: Pool) {
+  constructor(pool: Pool, llmClient?: OpenRouterLLMClient) {
     this.sessionRepo = new ConversationSessionRepository(pool);
     this.participantRepo = new ConversationParticipantRepository(pool);
     this.utteranceRepo = new ConversationUtteranceRepository(pool);
+    this.llmClient = llmClient || null;
   }
 
   /**
@@ -827,6 +830,146 @@ export class ConversationScriptRefiner {
 
     return chunks;
   }
+
+  // ============================================================================
+  // LLM-Enhanced Voice Direction
+  // ============================================================================
+
+  /**
+   * Enhance segment content with emotional tags using LLM
+   * This provides much better contextual understanding than rule-based injection
+   */
+  async enhanceWithEmotionalTags(content: string, speakerName: string): Promise<string> {
+    if (!this.llmClient) {
+      logger.debug('No LLM client available, skipping emotional tag enhancement');
+      return content;
+    }
+
+    const systemPrompt = `You are a voice direction expert for Gemini TTS. Your job is to inject bracket tags into podcast dialogue to make the audio expressive and natural.
+
+## AVAILABLE GEMINI TTS TAGS
+
+Emotions (prefix - put at start of content when tone matches):
+- [excited] - enthusiastic, passionate content
+- [thoughtful] - contemplative, analytical content
+- [empathetic] - understanding, supportive content
+- [sad] - concerned, worried, somber content
+- [soft] - gentle, quiet content
+- [firm] - assertive, confident content
+
+Micro-expressions (inject inline at natural points):
+- [sigh] - before concessions, heavy topics, frustration
+- [laughing] - for humor, irony, amusement
+- [clears throat] - before important statements
+- [hmm] - thinking, considering
+- [uhm] - brief hesitation
+- [gasps] - surprise
+
+Pauses (inject inline):
+- [short pause] - after questions, before names
+- [medium pause] - before "But", "However", pivots
+- [long pause] - before conclusions, major transitions
+
+## INJECTION RULES
+
+1. START with emotion tag if content has clear emotional tone (but only ONE prefix tag)
+2. Add [sigh] before "To be honest", "Unfortunately", concessions
+3. Add [hmm] or [uhm] before "Well...", "I think...", hedging
+4. Add [laughing] for genuinely humorous or ironic moments
+5. Add [short pause] after rhetorical questions
+6. Add [medium pause] before "But", "However", "On the other hand"
+7. Add [long pause] before "In conclusion", "Finally", major transitions
+8. DON'T over-tag - 2-4 tags per segment is usually enough
+9. DON'T add tags that don't fit the content emotionally
+10. Keep the original text intact - only add tags
+
+## EXAMPLES
+
+Input: "Well, I think that's a great point. But we should also consider the economic impact."
+Output: "[thoughtful] [hmm] Well, I think that's a great point. [medium pause] But we should also consider the economic impact."
+
+Input: "This is absolutely incredible! The data shows a 200% improvement in just six months."
+Output: "[excited] This is absolutely incredible! The data shows a 200% improvement in just six months."
+
+Input: "Unfortunately, we've seen these patterns before. The consequences were devastating."
+Output: "[sad] [sigh] Unfortunately, we've seen these patterns before. [short pause] The consequences were devastating."
+
+Input: "I hear what you're saying, and that's a valid concern. Let me address that directly."
+Output: "[empathetic] I hear what you're saying, and that's a valid concern. [short pause] Let me address that directly."`;
+
+    const userPrompt = `Enhance this dialogue from ${speakerName} with appropriate Gemini TTS bracket tags:
+
+"${content}"
+
+Return ONLY the enhanced text with tags injected. Do not add any explanation.`;
+
+    try {
+      const response = await this.llmClient.complete({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        maxTokens: Math.max(500, content.length * 2),
+      });
+
+      // Clean up the response - remove any quotes the model might have added
+      let enhanced = response.content.trim();
+      if (enhanced.startsWith('"') && enhanced.endsWith('"')) {
+        enhanced = enhanced.slice(1, -1);
+      }
+
+      logger.debug({
+        speakerName,
+        originalLength: content.length,
+        enhancedLength: enhanced.length,
+      }, 'Enhanced segment with emotional tags');
+
+      return enhanced;
+    } catch (error) {
+      logger.error({ error, speakerName }, 'Failed to enhance segment with emotional tags');
+      return content; // Fall back to original content
+    }
+  }
+
+  /**
+   * Refine with LLM enhancement for emotional tags
+   * This is the premium path that uses LLM for better tag placement
+   */
+  async refineWithLLMEnhancement(
+    sessionId: string,
+    provider: TTSProvider = 'gemini'
+  ): Promise<RefinedConversationScript> {
+    // First do the standard refinement
+    const script = await this.refine(sessionId, provider);
+
+    // If no LLM client or not using Gemini, return as-is
+    if (!this.llmClient || provider !== 'gemini') {
+      return script;
+    }
+
+    logger.info({ sessionId, segmentCount: script.segments.length }, 'Enhancing segments with LLM emotional tags');
+
+    // Enhance each segment with LLM
+    const enhancedSegments: RefinedSegment[] = [];
+    for (const segment of script.segments) {
+      const enhancedContent = await this.enhanceWithEmotionalTags(
+        segment.content,
+        segment.speakerName
+      );
+      enhancedSegments.push({
+        ...segment,
+        content: enhancedContent,
+      });
+    }
+
+    logger.info({ sessionId, enhancedCount: enhancedSegments.length }, 'LLM enhancement complete');
+
+    return {
+      ...script,
+      segments: enhancedSegments,
+    };
+  }
 }
 
 // ============================================================================
@@ -835,9 +978,14 @@ export class ConversationScriptRefiner {
 
 /**
  * Create a new ConversationScriptRefiner instance
+ * @param pool - Database connection pool
+ * @param llmClient - Optional LLM client for enhanced emotional tag injection
  */
-export function createConversationScriptRefiner(pool: Pool): ConversationScriptRefiner {
-  return new ConversationScriptRefiner(pool);
+export function createConversationScriptRefiner(
+  pool: Pool,
+  llmClient?: OpenRouterLLMClient
+): ConversationScriptRefiner {
+  return new ConversationScriptRefiner(pool, llmClient);
 }
 
 export default ConversationScriptRefiner;

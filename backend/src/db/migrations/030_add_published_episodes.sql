@@ -31,13 +31,14 @@ CREATE TABLE IF NOT EXISTS published_episodes (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Create indexes for performance
-CREATE INDEX idx_published_episodes_podcast_job ON published_episodes(podcast_job_id);
-CREATE INDEX idx_published_episodes_conversation ON published_episodes(conversation_session_id);
-CREATE INDEX idx_published_episodes_pub_date ON published_episodes(pub_date DESC);
-CREATE INDEX idx_published_episodes_guid ON published_episodes(guid);
+-- Create indexes for performance (idempotent)
+CREATE INDEX IF NOT EXISTS idx_published_episodes_podcast_job ON published_episodes(podcast_job_id);
+CREATE INDEX IF NOT EXISTS idx_published_episodes_conversation ON published_episodes(conversation_session_id);
+CREATE INDEX IF NOT EXISTS idx_published_episodes_pub_date ON published_episodes(pub_date DESC);
+CREATE INDEX IF NOT EXISTS idx_published_episodes_guid ON published_episodes(guid);
 
--- Create updated_at trigger
+-- Create updated_at trigger (idempotent)
+DROP TRIGGER IF EXISTS update_published_episodes_updated_at ON published_episodes;
 CREATE TRIGGER update_published_episodes_updated_at
   BEFORE UPDATE ON published_episodes
   FOR EACH ROW

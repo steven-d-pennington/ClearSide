@@ -49,6 +49,44 @@ const TRUSTED_PROVIDERS = new Set([
 ]);
 
 /**
+ * Curated list of latest 2 models from each preferred provider
+ * These are verified to work reliably with OpenRouter
+ * Updated: 2025-01
+ */
+export const CURATED_MODELS: Record<string, string[]> = {
+  'anthropic': [
+    'anthropic/claude-sonnet-4.5',      // Latest Sonnet - fast & capable
+    'anthropic/claude-opus-4.5',        // Latest Opus - flagship
+    'anthropic/claude-haiku-4.5',       // Latest Haiku - fast & affordable
+  ],
+  'openai': [
+    'openai/gpt-4.1',                   // Latest stable GPT
+    'openai/o4-mini',                   // Latest reasoning model
+  ],
+  'google': [
+    'google/gemini-2.5-pro',            // Latest Pro - flagship
+    'google/gemini-2.5-flash',          // Latest Flash - fast
+  ],
+  'x-ai': [
+    'x-ai/grok-4',                      // Latest Grok flagship
+    'x-ai/grok-4.1-fast',               // Latest Grok fast
+  ],
+  'deepseek': [
+    'deepseek/deepseek-v3.2',           // Latest chat model
+    'deepseek/deepseek-r1-0528',        // Latest reasoning model
+  ],
+  'qwen': [
+    'qwen/qwen3-235b-a22b',             // Latest flagship MoE
+    'qwen/qwen3-coder',                 // Latest coder model
+  ],
+};
+
+/**
+ * Flat list of all curated model IDs
+ */
+export const CURATED_MODEL_IDS = Object.values(CURATED_MODELS).flat();
+
+/**
  * Models known to support extended thinking/reasoning
  * Based on OpenRouter documentation and model capabilities
  */
@@ -240,6 +278,92 @@ export class OpenRouterClient {
     this.modelCache = null;
     this.cacheTimestamp = 0;
     logger.debug('Model cache cleared');
+  }
+
+  /**
+   * Get only curated models (latest 2 from preferred providers)
+   * These are verified to work reliably
+   */
+  async getCuratedModels(): Promise<TieredModel[]> {
+    const allModels = await this.fetchModels();
+    return allModels.filter((m) => CURATED_MODEL_IDS.includes(m.id));
+  }
+
+  /**
+   * Healthcheck a model by sending a simple test prompt
+   * Returns success/failure with latency
+   */
+  async healthcheckModel(modelId: string): Promise<{
+    modelId: string;
+    healthy: boolean;
+    latencyMs: number | null;
+    error: string | null;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://clearside.app',
+          'X-Title': 'ClearSide Healthcheck',
+        },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: 'user', content: 'Say "OK" and nothing else.' }],
+          max_tokens: 10,
+          temperature: 0,
+        }),
+      });
+
+      const latencyMs = Date.now() - startTime;
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
+        const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+        logger.warn({ modelId, error: errorMessage, latencyMs }, 'Model healthcheck failed');
+        return {
+          modelId,
+          healthy: false,
+          latencyMs,
+          error: errorMessage,
+        };
+      }
+
+      const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+      const content = data.choices?.[0]?.message?.content || '';
+
+      // Check if we got a valid response (not empty)
+      if (!content || content.trim().length === 0) {
+        logger.warn({ modelId, latencyMs }, 'Model healthcheck returned empty response');
+        return {
+          modelId,
+          healthy: false,
+          latencyMs,
+          error: 'Empty response from model',
+        };
+      }
+
+      logger.info({ modelId, latencyMs, response: content.substring(0, 20) }, 'Model healthcheck passed');
+      return {
+        modelId,
+        healthy: true,
+        latencyMs,
+        error: null,
+      };
+    } catch (error) {
+      const latencyMs = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error({ modelId, error: errorMessage, latencyMs }, 'Model healthcheck error');
+      return {
+        modelId,
+        healthy: false,
+        latencyMs,
+        error: errorMessage,
+      };
+    }
   }
 
   /**

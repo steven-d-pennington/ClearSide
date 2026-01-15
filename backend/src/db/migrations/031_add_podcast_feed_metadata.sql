@@ -16,10 +16,11 @@ CREATE TABLE IF NOT EXISTS podcast_feed_metadata (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Single row constraint (only one podcast feed config allowed)
-CREATE UNIQUE INDEX idx_single_feed_metadata ON podcast_feed_metadata((true));
+-- Single row constraint (only one podcast feed config allowed) - idempotent
+CREATE UNIQUE INDEX IF NOT EXISTS idx_single_feed_metadata ON podcast_feed_metadata((true));
 
--- Create updated_at trigger
+-- Create updated_at trigger (idempotent)
+DROP TRIGGER IF EXISTS update_podcast_feed_metadata_updated_at ON podcast_feed_metadata;
 CREATE TRIGGER update_podcast_feed_metadata_updated_at
   BEFORE UPDATE ON podcast_feed_metadata
   FOR EACH ROW

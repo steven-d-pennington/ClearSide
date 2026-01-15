@@ -824,6 +824,12 @@ function RelationshipsTab({ relationships, personas, onAdd, onEdit, onDelete }: 
 // Voice Tab Component
 // ============================================================================
 
+interface VoiceAssignment {
+  personaId: string;
+  personaName: string;
+  avatarEmoji: string;
+}
+
 interface VoiceTabProps {
   persona: PodcastPersona | null;
   selectedVoiceId: string | undefined;
@@ -838,6 +844,109 @@ function VoiceTab({ persona, selectedVoiceId, onVoiceChange, onSave, onClear, is
   const selectedVoice = GEMINI_VOICES.find((v) => v.id === selectedVoiceId);
   const hasChanges = selectedVoiceId !== persona?.defaultVoiceId;
 
+  // Voice assignments state
+  const [voiceAssignments, setVoiceAssignments] = useState<Record<string, VoiceAssignment>>({});
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
+
+  // Preview state
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
+  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
+
+  // Fetch voice assignments on mount
+  useEffect(() => {
+    const fetchVoiceAssignments = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/conversations/personas/voice-assignments`);
+        if (res.ok) {
+          const data = await res.json();
+          setVoiceAssignments(data.voiceAssignments || {});
+        }
+      } catch (err) {
+        console.error('Failed to fetch voice assignments:', err);
+      } finally {
+        setLoadingAssignments(false);
+      }
+    };
+    fetchVoiceAssignments();
+  }, []);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef) {
+        audioRef.pause();
+        audioRef.src = '';
+      }
+    };
+  }, [audioRef]);
+
+  const handlePreview = async (voiceId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent voice selection
+
+    // If already playing this voice, stop it
+    if (previewingVoiceId === voiceId && audioRef) {
+      audioRef.pause();
+      audioRef.src = '';
+      setPreviewingVoiceId(null);
+      return;
+    }
+
+    // Stop any currently playing audio
+    if (audioRef) {
+      audioRef.pause();
+      audioRef.src = '';
+    }
+
+    setPreviewingVoiceId(voiceId);
+
+    try {
+      const previewText = `Hi, I'm ${persona?.name || 'your podcast persona'}. Nice to meet you!`;
+
+      const res = await fetch(`${API_BASE_URL}/api/conversations/voice/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voiceId,
+          text: previewText,
+          provider: 'gemini',
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to generate preview');
+      }
+
+      const data = await res.json();
+
+      // Create audio element and play
+      const audio = new Audio(`data:audio/mpeg;base64,${data.audio}`);
+      setAudioRef(audio);
+
+      audio.onended = () => {
+        setPreviewingVoiceId(null);
+      };
+
+      audio.onerror = () => {
+        setPreviewingVoiceId(null);
+        console.error('Audio playback error');
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error('Preview failed:', err);
+      setPreviewingVoiceId(null);
+    }
+  };
+
+  const getAssignmentInfo = (voiceId: string): { assignment: VoiceAssignment | null; isSelf: boolean } => {
+    const assignment = voiceAssignments[voiceId];
+    if (!assignment) return { assignment: null, isSelf: false };
+    return {
+      assignment,
+      isSelf: assignment.personaId === persona?.id,
+    };
+  };
+
   return (
     <>
       <div className={styles.tabHeader}>
@@ -846,6 +955,7 @@ function VoiceTab({ persona, selectedVoiceId, onVoiceChange, onSave, onClear, is
           <p className={styles.tabDescription}>
             Assign a Gemini TTS voice to this persona for consistent podcast generation.
             This voice will be used by default when generating audio for this persona.
+            Click the play button to preview each voice.
           </p>
         </div>
       </div>
@@ -872,20 +982,45 @@ function VoiceTab({ persona, selectedVoiceId, onVoiceChange, onSave, onClear, is
 
         {/* Voice Selection */}
         <div className={styles.voiceSelection}>
-          <h3>Select Voice</h3>
+          <h3>Select Voice {loadingAssignments && <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)' }}>(loading...)</span>}</h3>
           <div className={styles.voiceGrid}>
-            {GEMINI_VOICES.map((voice) => (
-              <button
-                key={voice.id}
-                type="button"
-                className={`${styles.voiceOption} ${selectedVoiceId === voice.id ? styles.voiceOptionSelected : ''}`}
-                onClick={() => onVoiceChange(voice.id)}
-              >
-                <span className={styles.voiceName}>{voice.name}</span>
-                <span className={styles.voiceDescription}>{voice.description}</span>
-                <span className={styles.voiceGender}>{getGenderIcon(voice.gender)}</span>
-              </button>
-            ))}
+            {GEMINI_VOICES.map((voice) => {
+              const { assignment, isSelf } = getAssignmentInfo(voice.id);
+              const isAssignedToOther = assignment && !isSelf;
+
+              return (
+                <button
+                  key={voice.id}
+                  type="button"
+                  className={`${styles.voiceOption} ${selectedVoiceId === voice.id ? styles.voiceOptionSelected : ''} ${isAssignedToOther ? styles.voiceOptionDisabled : ''}`}
+                  onClick={() => !isAssignedToOther && onVoiceChange(voice.id)}
+                  disabled={!!isAssignedToOther}
+                >
+                  <div className={styles.voiceOptionHeader}>
+                    <span className={styles.voiceName}>{voice.name}</span>
+                    <div className={styles.voiceOptionActions}>
+                      <button
+                        type="button"
+                        className={`${styles.voicePreviewBtn} ${previewingVoiceId === voice.id ? styles.voicePreviewBtnPlaying : ''}`}
+                        onClick={(e) => handlePreview(voice.id, e)}
+                        disabled={previewingVoiceId !== null && previewingVoiceId !== voice.id}
+                        title={previewingVoiceId === voice.id ? 'Stop preview' : 'Preview voice'}
+                      >
+                        {previewingVoiceId === voice.id ? '⏹' : '▶'}
+                      </button>
+                      <span className={styles.voiceGender}>{getGenderIcon(voice.gender)}</span>
+                    </div>
+                  </div>
+                  <span className={styles.voiceDescription}>{voice.description}</span>
+                  {assignment && (
+                    <div className={`${styles.voiceAssignmentBadge} ${isSelf ? styles.voiceAssignmentSelf : ''}`}>
+                      <span className={styles.voiceAssignmentEmoji}>{assignment.avatarEmoji}</span>
+                      <span>{isSelf ? 'Current persona' : assignment.personaName}</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 

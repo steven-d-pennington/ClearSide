@@ -17,6 +17,15 @@ import type { ModelInfo } from '../../../types/configuration';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
+type HealthcheckStatus = 'idle' | 'checking' | 'healthy' | 'unhealthy';
+
+interface HealthcheckResult {
+  modelId: string;
+  healthy: boolean;
+  latencyMs: number | null;
+  error: string | null;
+}
+
 interface ParticipantConfig {
   personaId: string | null;
   modelId: string;
@@ -60,6 +69,10 @@ export function ConversationConfigModal({
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Healthcheck states
+  const [healthcheckStatus, setHealthcheckStatus] = useState<Record<string, HealthcheckStatus>>({});
+  const [healthcheckErrors, setHealthcheckErrors] = useState<Record<string, string>>({});
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -80,7 +93,7 @@ export function ConversationConfigModal({
       try {
         const [personasRes, modelsRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/conversations/personas`),
-          fetch(`${API_BASE_URL}/api/models`),
+          fetch(`${API_BASE_URL}/api/models/curated`),  // Use curated models for reliability
         ]);
 
         if (!personasRes.ok) throw new Error('Failed to load personas');
@@ -106,6 +119,35 @@ export function ConversationConfigModal({
 
     loadData();
   }, [isOpen]);
+
+  // Healthcheck a model on-demand
+  const runHealthcheck = useCallback(async (modelId: string) => {
+    setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'checking' }));
+    setHealthcheckErrors(prev => {
+      const next = { ...prev };
+      delete next[modelId];
+      return next;
+    });
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/${encodeURIComponent(modelId)}/healthcheck`,
+        { method: 'POST' }
+      );
+      const result: HealthcheckResult = await response.json();
+
+      if (result.healthy) {
+        setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'healthy' }));
+      } else {
+        setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'unhealthy' }));
+        setHealthcheckErrors(prev => ({ ...prev, [modelId]: result.error || 'Unknown error' }));
+      }
+    } catch (err) {
+      console.error('Healthcheck failed:', err);
+      setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'unhealthy' }));
+      setHealthcheckErrors(prev => ({ ...prev, [modelId]: 'Network error' }));
+    }
+  }, []);
 
   // Update participant
   const updateParticipant = useCallback((index: number, updates: Partial<ParticipantConfig>) => {
@@ -168,11 +210,16 @@ export function ConversationConfigModal({
           maxTurns,
           rapidFire,
           minimalPersonaMode,
-          participants: participants.map(p => ({
-            personaId: p.personaId,
-            modelId: p.modelId,
-            displayNameOverride: p.displayNameOverride || undefined,
-          })),
+          participants: participants.map(p => {
+            const model = models.find(m => m.id === p.modelId);
+            return {
+              personaId: p.personaId,
+              modelId: p.modelId,
+              modelDisplayName: model?.name,
+              providerName: model?.provider,
+              displayNameOverride: p.displayNameOverride || undefined,
+            };
+          }),
         }),
       });
 
@@ -247,6 +294,9 @@ export function ConversationConfigModal({
               onAddParticipant={addParticipant}
               onRemoveParticipant={removeParticipant}
               disabled={isCreating}
+              healthcheckStatus={healthcheckStatus}
+              healthcheckErrors={healthcheckErrors}
+              onHealthcheck={runHealthcheck}
             />
 
             <div className={styles.divider} />

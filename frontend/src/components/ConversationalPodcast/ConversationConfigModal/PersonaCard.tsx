@@ -8,6 +8,8 @@ import styles from './ConversationConfigModal.module.css';
 import type { PodcastPersona } from '../../../types/conversation';
 import type { ModelInfo } from '../../../types/configuration';
 
+type HealthcheckStatus = 'idle' | 'checking' | 'healthy' | 'unhealthy';
+
 interface ParticipantConfig {
   personaId: string | null;
   modelId: string;
@@ -23,6 +25,9 @@ interface PersonaCardProps {
   onUpdate: (updates: Partial<ParticipantConfig>) => void;
   onRemove?: () => void;
   disabled?: boolean;
+  healthcheckStatus?: Record<string, HealthcheckStatus>;
+  healthcheckErrors?: Record<string, string>;
+  onHealthcheck?: (modelId: string) => void;
 }
 
 export default function PersonaCard({
@@ -34,6 +39,9 @@ export default function PersonaCard({
   onUpdate,
   onRemove,
   disabled,
+  healthcheckStatus = {},
+  healthcheckErrors = {},
+  onHealthcheck,
 }: PersonaCardProps) {
   const selectedPersona = personas.find(p => p.id === participant.personaId);
 
@@ -92,22 +100,55 @@ export default function PersonaCard({
 
         <div className={styles.selectGroup}>
           <label className={styles.selectLabel}>Model</label>
-          <select
-            className={styles.select}
-            value={participant.modelId}
-            onChange={e => onUpdate({ modelId: e.target.value })}
-            disabled={disabled}
-          >
-            {Object.entries(modelsByProvider).map(([provider, providerModels]) => (
-              <optgroup key={provider} label={provider}>
-                {providerModels.map(model => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <div className={styles.modelSelectRow}>
+            <select
+              className={`${styles.select} ${participant.modelId && healthcheckStatus[participant.modelId] === 'unhealthy' ? styles.unhealthySelect : ''}`}
+              value={participant.modelId}
+              onChange={e => onUpdate({ modelId: e.target.value })}
+              disabled={disabled}
+            >
+              {Object.entries(modelsByProvider).map(([provider, providerModels]) => (
+                <optgroup key={provider} label={provider}>
+                  {providerModels.map(model => {
+                    const status = healthcheckStatus[model.id];
+                    const statusIcon = status === 'unhealthy' ? '⚠️ ' : status === 'healthy' ? '✓ ' : '';
+                    return (
+                      <option key={model.id} value={model.id}>
+                        {statusIcon}{model.name}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              ))}
+            </select>
+            {participant.modelId && onHealthcheck && (
+              <button
+                type="button"
+                className={`${styles.healthcheckBtn} ${
+                  healthcheckStatus[participant.modelId] === 'checking' ? styles.checking :
+                  healthcheckStatus[participant.modelId] === 'healthy' ? styles.healthyBtn :
+                  healthcheckStatus[participant.modelId] === 'unhealthy' ? styles.unhealthyBtn : ''
+                }`}
+                onClick={() => onHealthcheck(participant.modelId)}
+                disabled={disabled || healthcheckStatus[participant.modelId] === 'checking'}
+                title={
+                  healthcheckErrors[participant.modelId] ||
+                  (healthcheckStatus[participant.modelId] === 'healthy' ? 'Model is responding' :
+                   healthcheckStatus[participant.modelId] === 'unhealthy' ? 'Model is not responding' :
+                   'Test model availability')
+                }
+              >
+                {healthcheckStatus[participant.modelId] === 'checking' ? '⏳' :
+                 healthcheckStatus[participant.modelId] === 'healthy' ? '✓' :
+                 healthcheckStatus[participant.modelId] === 'unhealthy' ? '⚠' : '🔍'}
+              </button>
+            )}
+          </div>
+          {participant.modelId && healthcheckStatus[participant.modelId] === 'unhealthy' && healthcheckErrors[participant.modelId] && (
+            <span className={styles.healthcheckError}>
+              {healthcheckErrors[participant.modelId]}
+            </span>
+          )}
         </div>
 
         <div className={styles.selectGroup}>

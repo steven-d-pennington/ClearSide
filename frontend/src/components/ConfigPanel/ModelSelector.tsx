@@ -43,6 +43,15 @@ interface OpenRouterStatus {
   message: string;
 }
 
+interface HealthcheckResult {
+  modelId: string;
+  healthy: boolean;
+  latencyMs: number | null;
+  error: string | null;
+}
+
+type HealthcheckStatus = 'idle' | 'checking' | 'healthy' | 'unhealthy';
+
 export const ModelSelector: React.FC<ModelSelectorProps> = ({
   selection,
   onChange,
@@ -56,6 +65,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [defaultsLoaded, setDefaultsLoaded] = useState(false);
+  const [healthcheckStatus, setHealthcheckStatus] = useState<Record<string, HealthcheckStatus>>({});
+  const [healthcheckErrors, setHealthcheckErrors] = useState<Record<string, string>>({});
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -110,13 +121,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     checkStatus();
   }, [API_BASE_URL]);
 
-  // Fetch models when configured
+  // Fetch curated models when configured
   useEffect(() => {
     if (!isConfigured) return;
 
     async function loadModels() {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/models`);
+        // Use curated models endpoint for reliable, vetted models
+        const response = await fetch(`${API_BASE_URL}/api/models/curated`);
         if (!response.ok) throw new Error('Failed to load models');
         const data = await response.json();
         setModels(data.models || []);
@@ -129,6 +141,35 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
     loadModels();
   }, [isConfigured, API_BASE_URL]);
+
+  // Healthcheck a model on-demand
+  const runHealthcheck = useCallback(async (modelId: string) => {
+    setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'checking' }));
+    setHealthcheckErrors(prev => {
+      const next = { ...prev };
+      delete next[modelId];
+      return next;
+    });
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/models/${encodeURIComponent(modelId)}/healthcheck`,
+        { method: 'POST' }
+      );
+      const result: HealthcheckResult = await response.json();
+
+      if (result.healthy) {
+        setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'healthy' }));
+      } else {
+        setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'unhealthy' }));
+        setHealthcheckErrors(prev => ({ ...prev, [modelId]: result.error || 'Unknown error' }));
+      }
+    } catch (err) {
+      console.error('Healthcheck failed:', err);
+      setHealthcheckStatus(prev => ({ ...prev, [modelId]: 'unhealthy' }));
+      setHealthcheckErrors(prev => ({ ...prev, [modelId]: 'Network error' }));
+    }
+  }, [API_BASE_URL]);
 
   // Fetch preview pairing when in auto mode
   useEffect(() => {
@@ -399,15 +440,26 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-pro)' }} />
                 Pro Advocate
               </label>
-              <select
-                value={selection.proModelId || ''}
-                onChange={(e) => handleModelChange('pro', e.target.value)}
-                disabled={disabled}
-                className={styles.select}
-              >
-                <option value="">Select a model...</option>
-                <ModelOptionsByProvider models={models} />
-              </select>
+              <div className={styles.selectWithHealthcheck}>
+                <select
+                  value={selection.proModelId || ''}
+                  onChange={(e) => handleModelChange('pro', e.target.value)}
+                  disabled={disabled}
+                  className={`${styles.select} ${selection.proModelId && healthcheckStatus[selection.proModelId] === 'unhealthy' ? styles.unhealthy : ''}`}
+                >
+                  <option value="">Select a model...</option>
+                  <ModelOptionsByProvider models={models} healthcheckStatus={healthcheckStatus} />
+                </select>
+                {selection.proModelId && (
+                  <HealthcheckButton
+                    modelId={selection.proModelId}
+                    status={healthcheckStatus[selection.proModelId] || 'idle'}
+                    error={healthcheckErrors[selection.proModelId]}
+                    onCheck={runHealthcheck}
+                    disabled={disabled}
+                  />
+                )}
+              </div>
             </div>
           )}
 
@@ -418,15 +470,26 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-con)' }} />
                 Con Advocate
               </label>
-              <select
-                value={selection.conModelId || ''}
-                onChange={(e) => handleModelChange('con', e.target.value)}
-                disabled={disabled}
-                className={styles.select}
-              >
-                <option value="">Select a model...</option>
-                <ModelOptionsByProvider models={models} />
-              </select>
+              <div className={styles.selectWithHealthcheck}>
+                <select
+                  value={selection.conModelId || ''}
+                  onChange={(e) => handleModelChange('con', e.target.value)}
+                  disabled={disabled}
+                  className={`${styles.select} ${selection.conModelId && healthcheckStatus[selection.conModelId] === 'unhealthy' ? styles.unhealthy : ''}`}
+                >
+                  <option value="">Select a model...</option>
+                  <ModelOptionsByProvider models={models} healthcheckStatus={healthcheckStatus} />
+                </select>
+                {selection.conModelId && (
+                  <HealthcheckButton
+                    modelId={selection.conModelId}
+                    status={healthcheckStatus[selection.conModelId] || 'idle'}
+                    error={healthcheckErrors[selection.conModelId]}
+                    onCheck={runHealthcheck}
+                    disabled={disabled}
+                  />
+                )}
+              </div>
             </div>
           )}
 
@@ -436,15 +499,26 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
               <span className={styles.roleIndicator} style={{ backgroundColor: 'var(--color-moderator, #8b5cf6)' }} />
               Moderator
             </label>
-            <select
-              value={selection.moderatorModelId || ''}
-              onChange={(e) => handleModelChange('moderator', e.target.value)}
-              disabled={disabled}
-              className={styles.select}
-            >
-              <option value="">Select a model...</option>
-              <ModelOptionsByProvider models={models} />
-            </select>
+            <div className={styles.selectWithHealthcheck}>
+              <select
+                value={selection.moderatorModelId || ''}
+                onChange={(e) => handleModelChange('moderator', e.target.value)}
+                disabled={disabled}
+                className={`${styles.select} ${selection.moderatorModelId && healthcheckStatus[selection.moderatorModelId] === 'unhealthy' ? styles.unhealthy : ''}`}
+              >
+                <option value="">Select a model...</option>
+                <ModelOptionsByProvider models={models} healthcheckStatus={healthcheckStatus} />
+              </select>
+              {selection.moderatorModelId && (
+                <HealthcheckButton
+                  modelId={selection.moderatorModelId}
+                  status={healthcheckStatus[selection.moderatorModelId] || 'idle'}
+                  error={healthcheckErrors[selection.moderatorModelId]}
+                  onCheck={runHealthcheck}
+                  disabled={disabled}
+                />
+              )}
+            </div>
           </div>
 
           {/* Tier mismatch warning - only when both AI models are selected */}
@@ -485,8 +559,65 @@ const TierWarning: React.FC<{
   );
 };
 
+// Sub-component for healthcheck button
+const HealthcheckButton: React.FC<{
+  modelId: string;
+  status: HealthcheckStatus;
+  error?: string;
+  onCheck: (modelId: string) => void;
+  disabled?: boolean;
+}> = ({ modelId, status, error, onCheck, disabled }) => {
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'checking':
+        return '⏳';
+      case 'healthy':
+        return '✓';
+      case 'unhealthy':
+        return '⚠';
+      default:
+        return '🔍';
+    }
+  };
+
+  const getStatusClass = () => {
+    switch (status) {
+      case 'checking':
+        return styles.checking;
+      case 'healthy':
+        return styles.healthy;
+      case 'unhealthy':
+        return styles.unhealthyBtn;
+      default:
+        return '';
+    }
+  };
+
+  return (
+    <div className={styles.healthcheckContainer}>
+      <button
+        type="button"
+        className={`${styles.healthcheckBtn} ${getStatusClass()}`}
+        onClick={() => onCheck(modelId)}
+        disabled={disabled || status === 'checking'}
+        title={error || (status === 'healthy' ? 'Model is responding' : status === 'unhealthy' ? 'Model is not responding' : 'Test model availability')}
+      >
+        {getStatusIcon()}
+      </button>
+      {status === 'unhealthy' && error && (
+        <span className={styles.healthcheckError} title={error}>
+          {error.length > 25 ? error.substring(0, 25) + '...' : error}
+        </span>
+      )}
+    </div>
+  );
+};
+
 // Sub-component to render models grouped by provider with reasoning indicator
-const ModelOptionsByProvider: React.FC<{ models: ModelInfo[] }> = ({ models }) => {
+const ModelOptionsByProvider: React.FC<{
+  models: ModelInfo[];
+  healthcheckStatus?: Record<string, HealthcheckStatus>;
+}> = ({ models, healthcheckStatus = {} }) => {
   // Group models by provider (models are already sorted alphabetically from backend)
   const groupedByProvider = models.reduce<Record<string, ModelInfo[]>>((acc, model) => {
     if (!acc[model.provider]) {
@@ -504,13 +635,21 @@ const ModelOptionsByProvider: React.FC<{ models: ModelInfo[] }> = ({ models }) =
     return provider.charAt(0).toUpperCase() + provider.slice(1);
   };
 
+  // Get status indicator for model
+  const getStatusIndicator = (modelId: string): string => {
+    const status = healthcheckStatus[modelId];
+    if (status === 'unhealthy') return '⚠️ ';
+    if (status === 'healthy') return '✓ ';
+    return '';
+  };
+
   return (
     <>
       {sortedProviders.map((provider) => (
         <optgroup key={provider} label={formatProviderName(provider)}>
           {groupedByProvider[provider].map((model) => (
             <option key={model.id} value={model.id}>
-              {model.supportsReasoning ? '🧠 ' : ''}{model.name} - ${model.costPer1MTokens.toFixed(2)}/1M
+              {getStatusIndicator(model.id)}{model.supportsReasoning ? '🧠 ' : ''}{model.name} - ${model.costPer1MTokens.toFixed(2)}/1M
             </option>
           ))}
         </optgroup>

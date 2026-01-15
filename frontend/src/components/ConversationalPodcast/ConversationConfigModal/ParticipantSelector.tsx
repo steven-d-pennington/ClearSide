@@ -9,6 +9,8 @@ import styles from './ConversationConfigModal.module.css';
 import type { PodcastPersona } from '../../../types/conversation';
 import type { ModelInfo } from '../../../types/configuration';
 
+type HealthcheckStatus = 'idle' | 'checking' | 'healthy' | 'unhealthy';
+
 interface ParticipantConfig {
   personaId: string | null;
   modelId: string;
@@ -23,6 +25,9 @@ interface ParticipantSelectorProps {
   onAddParticipant: () => void;
   onRemoveParticipant: (index: number) => void;
   disabled?: boolean;
+  healthcheckStatus?: Record<string, HealthcheckStatus>;
+  healthcheckErrors?: Record<string, string>;
+  onHealthcheck?: (modelId: string) => void;
 }
 
 export default function ParticipantSelector({
@@ -33,6 +38,9 @@ export default function ParticipantSelector({
   onAddParticipant,
   onRemoveParticipant,
   disabled,
+  healthcheckStatus,
+  healthcheckErrors,
+  onHealthcheck,
 }: ParticipantSelectorProps) {
   const selectedPersonaIds = participants.map(p => p.personaId).filter(Boolean);
   const availablePersonas = personas.filter(p => !selectedPersonaIds.includes(p.id));
@@ -64,6 +72,9 @@ export default function ParticipantSelector({
             onUpdate={updates => onUpdateParticipant(index, updates)}
             onRemove={participants.length > 2 ? () => onRemoveParticipant(index) : undefined}
             disabled={disabled}
+            healthcheckStatus={healthcheckStatus}
+            healthcheckErrors={healthcheckErrors}
+            onHealthcheck={onHealthcheck}
           />
         ))}
       </div>
