@@ -660,8 +660,10 @@ export class ConversationScriptRefiner {
     content = content.replace(/\([^)]*(?:pause|sigh|laugh|nod|smile|lean|gesture|adjust|clear|look|turn|shake)[^)]*\)/gi, '');
 
     // Remove square bracket stage directions like [pauses], [sighs]
-    // But NOT ElevenLabs tags like [pause], [loudly] which are intentional
-    if (provider !== 'elevenlabs') {
+    // But NOT for ElevenLabs or Gemini which use bracket tags for emotional direction
+    // ElevenLabs V3 uses tags like [sigh], [laughing], [excited]
+    // Gemini TTS uses natural language bracket tags for voice direction
+    if (provider !== 'elevenlabs' && provider !== 'gemini') {
       content = content.replace(/\[[^\]]*(?:pause|sigh|laugh|nod|smile|lean|gesture|adjust|clear|look|turn|shake)[^\]]*\]/gi, '');
     }
 
