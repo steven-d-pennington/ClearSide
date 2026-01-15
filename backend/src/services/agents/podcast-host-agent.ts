@@ -38,7 +38,7 @@ const HOST_MODEL = 'anthropic/claude-sonnet-4';
 function formatModelIdAsDisplayName(modelId: string): string {
   // Extract model name from provider/model format
   const parts = modelId.split('/');
-  const modelName = parts.length > 1 ? parts[parts.length - 1] : modelId;
+  const modelName = (parts.length > 1 ? parts[parts.length - 1] : modelId) ?? modelId;
 
   // Common model name transformations
   return modelName
