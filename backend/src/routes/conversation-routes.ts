@@ -169,7 +169,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
       const { createOpenRouterClient } = await import('../services/llm/openrouter-adapter.js');
 
       console.log('Testing LLM client...');
-      const client = createOpenRouterClient('anthropic/claude-3-haiku');
+      const client = createOpenRouterClient('anthropic/claude-3.5-haiku');
 
       const response = await client.complete({
         messages: [{ role: 'user', content: 'Say "Hello, I am working!" in exactly 5 words.' }],
@@ -1514,28 +1514,43 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
       // Create LLM client for Gemini emotional tag enhancement
       // Uses a fast model (Haiku) for efficient tag injection
       const llmClient = provider === 'gemini'
-        ? createOpenRouterClient('anthropic/claude-3-haiku')
+        ? createOpenRouterClient('anthropic/claude-3.5-haiku')
         : undefined;
 
       if (savedScript && savedScript.segments.length > 0) {
         // Use saved edits
         usedSavedEdits = true;
 
-        // Refine to get voice assignments and metadata, but use saved segments
+        // Refine to get voice assignments and metadata
         const refiner = createConversationScriptRefiner(pool, llmClient);
-        const freshScript = provider === 'gemini'
-          ? await refiner.refineWithLLMEnhancement(id, provider as TTSProvider)
-          : await refiner.refine(id, provider as TTSProvider);
+        const freshScript = await refiner.refine(id, provider as TTSProvider);
+
+        // For Gemini, re-enhance saved segments with emotional tags
+        let enhancedSegments = savedScript.segments;
+        if (provider === 'gemini' && llmClient) {
+          logger.info({ sessionId: id, segmentCount: savedScript.segments.length }, 'Re-enhancing saved segments with LLM emotional tags');
+          enhancedSegments = [];
+          for (const segment of savedScript.segments) {
+            const enhancedContent = await refiner.enhanceWithEmotionalTags(
+              segment.content,
+              segment.speakerName
+            );
+            enhancedSegments.push({
+              ...segment,
+              content: enhancedContent,
+            });
+          }
+        }
 
         script = {
           ...freshScript,
-          segments: savedScript.segments,
-          totalSegments: savedScript.segments.length,
-          totalWords: savedScript.totalWords || savedScript.segments.reduce(
+          segments: enhancedSegments,
+          totalSegments: enhancedSegments.length,
+          totalWords: savedScript.totalWords || enhancedSegments.reduce(
             (sum, s) => sum + s.content.split(/\s+/).length, 0
           ),
           estimatedDurationMinutes: savedScript.estimatedDurationMinutes || Math.ceil(
-            savedScript.segments.reduce((sum, s) => sum + s.content.split(/\s+/).length, 0) / 150
+            enhancedSegments.reduce((sum, s) => sum + s.content.split(/\s+/).length, 0) / 150
           ),
         };
 
@@ -1625,7 +1640,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
 
       // Create LLM client for Gemini emotional tag enhancement
       const llmClient = provider === 'gemini'
-        ? createOpenRouterClient('anthropic/claude-3-haiku')
+        ? createOpenRouterClient('anthropic/claude-3.5-haiku')
         : undefined;
 
       const refiner = createConversationScriptRefiner(pool, llmClient);
@@ -1801,7 +1816,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
       }
 
       // Refine the script to get director's notes with LLM emotional enhancement
-      const llmClient = createOpenRouterClient('anthropic/claude-3-haiku');
+      const llmClient = createOpenRouterClient('anthropic/claude-3.5-haiku');
       const refiner = createConversationScriptRefiner(pool, llmClient);
       const script = await refiner.refineWithLLMEnhancement(id, provider as TTSProvider);
 
@@ -1925,7 +1940,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
 
       // Refine the script with LLM emotional enhancement for Gemini
       const llmClient = provider === 'gemini'
-        ? createOpenRouterClient('anthropic/claude-3-haiku')
+        ? createOpenRouterClient('anthropic/claude-3.5-haiku')
         : undefined;
       const refiner = createConversationScriptRefiner(pool, llmClient);
       const script = provider === 'gemini'
