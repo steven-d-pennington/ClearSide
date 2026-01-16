@@ -55,71 +55,63 @@ export class AudioTagConverter {
   }
 
   /**
-   * Convert ElevenLabs V3 tags to Gemini-compatible text
+   * Gemini TTS supported bracket tags (as of Gemini 2.5)
+   * These are preserved and passed through to the TTS API.
+   * @see https://ai.google.dev/gemini-api/docs/speech-generation
+   */
+  private static readonly GEMINI_SUPPORTED_TAGS = new Set([
+    // Emotions (prefix tags)
+    'excited', 'thoughtful', 'empathetic', 'sad', 'soft', 'firm',
+    'angry', 'curious', 'nervous', 'confident',
+    // Micro-expressions (inline)
+    'sigh', 'laughing', 'laughs', 'clears throat', 'hmm', 'uhm', 'uh',
+    'gasps', 'coughs', 'cough', 'chuckles', 'snickers',
+    // Pauses
+    'short pause', 'medium pause', 'long pause', 'pause',
+    // Delivery modifiers
+    'whispers', 'whisper', 'loudly', 'softly', 'slowly', 'quickly',
+  ]);
+
+  /**
+   * Convert ElevenLabs V3 tags to Gemini-compatible format
    *
-   * Gemini doesn't support inline emotion tags - it uses voice selection
-   * and natural text pacing instead.
+   * Gemini 2.5 TTS supports bracket tags for voice direction.
+   * We preserve supported tags and convert/remove unsupported ones.
    */
   private convertForGemini(text: string): string {
     let result = text;
 
-    // Convert [pause] to ellipsis (natural pause in speech)
-    result = result.replace(/\[pause\]/gi, '...');
+    // Normalize some tag variations to Gemini's expected format
+    result = result.replace(/\[sighing\]/gi, '[sigh]');
+    result = result.replace(/\[coughing\]/gi, '[coughs]');
+    result = result.replace(/\[chuckling\]/gi, '[chuckles]');
 
-    // Convert [long pause] to longer ellipsis
-    result = result.replace(/\[long pause\]/gi, '... ...');
+    // Convert ElevenLabs-specific tags that don't exist in Gemini
+    result = result.replace(/\[stammers\]/gi, '[uhm]');
+    result = result.replace(/\[hesitates\]/gi, '[short pause]');
+    result = result.replace(/\[gulps\]/gi, '');
+    result = result.replace(/\[breathes\]/gi, '');
 
-    // Convert [short pause] to single ellipsis
-    result = result.replace(/\[short pause\]/gi, '...');
-
-    // Convert reaction sounds to text descriptions (Gemini reads these naturally)
-    result = result.replace(/\[sigh\]/gi, '*sigh*');
-    result = result.replace(/\[sighing\]/gi, '*sighing*');
-    result = result.replace(/\[laughs\]/gi, '*laughs*');
-    result = result.replace(/\[gasps\]/gi, '*gasps*');
-    result = result.replace(/\[clears throat\]/gi, '*clears throat*');
-    result = result.replace(/\[stammers\]/gi, '');  // Just remove, natural hesitation from text
-    result = result.replace(/\[hesitates\]/gi, '...');
-
-    // Remove delivery style tags (Gemini handles via voice)
-    result = result.replace(/\[whispers\]/gi, '');
-    result = result.replace(/\[loudly\]/gi, '');
-    result = result.replace(/\[shouts\]/gi, '');
+    // Remove ElevenLabs-only style tags (Gemini handles via director's notes)
     result = result.replace(/\[deadpan\]/gi, '');
     result = result.replace(/\[playfully\]/gi, '');
     result = result.replace(/\[flatly\]/gi, '');
     result = result.replace(/\[timidly\]/gi, '');
-
-    // Remove emotional tags (Gemini handles via voice selection)
-    result = result.replace(/\[excited\]/gi, '');
-    result = result.replace(/\[curious\]/gi, '');
-    result = result.replace(/\[sarcastic\]/gi, '');
     result = result.replace(/\[mischievously\]/gi, '');
     result = result.replace(/\[cheerfully\]/gi, '');
-
-    // Remove pacing tags (except pauses handled above)
+    result = result.replace(/\[sarcastic\]/gi, '');
     result = result.replace(/\[rushed\]/gi, '');
-    result = result.replace(/\[slows down\]/gi, '');
-    result = result.replace(/\[drawn out\]/gi, '');
-
-    // Remove descriptive tone tags
+    result = result.replace(/\[slows down\]/gi, '[slowly]');
+    result = result.replace(/\[drawn out\]/gi, '[slowly]');
     result = result.replace(/\[dramatic tone\]/gi, '');
-    result = result.replace(/\[serious tone\]/gi, '');
-
-    // Remove any other unrecognized bracket tags
-    result = result.replace(/\[[\w\s]+\]/gi, '');
+    result = result.replace(/\[serious tone\]/gi, '[firm]');
+    result = result.replace(/\[shouts\]/gi, '[loudly]');
 
     // Remove any SSML break tags that might have slipped through
-    result = result.replace(/<break[^>]*>/gi, '...');
-
-    // Clean up multiple consecutive ellipses
-    result = result.replace(/\.{4,}/g, '...');
+    result = result.replace(/<break[^>]*>/gi, '[short pause]');
 
     // Clean up multiple consecutive spaces
     result = result.replace(/\s{2,}/g, ' ');
-
-    // Clean up ellipsis spacing
-    result = result.replace(/\s*\.\.\.\s*/g, '... ');
 
     // Clean up leading/trailing whitespace
     result = result.trim();
@@ -159,12 +151,11 @@ PACING: [pause], [stammers], [rushed], [slows down], [drawn out]
 Note: Use [pause] for all pauses. Use ellipsis ... for longer pauses or trailing off.`;
   }
 
-  // Gemini guidance - focus on natural text
-  return `## Audio Delivery Guidelines for Gemini TTS:
-- Do NOT use any bracket tags like [pause], [sigh], [loudly], etc.
-- Use ellipsis (...) for natural pauses and trailing off
-- Use *asterisks* for actions like *sigh* or *laughs* (will be read naturally)
-- Write in a natural, conversational style
-- Gemini TTS selects tone from the voice itself, not inline tags
-- Focus on clear, expressive text without markup`;
+  // Gemini 2.5 TTS supports bracket tags for voice direction
+  return `## Gemini TTS Bracket Tags Available:
+EMOTIONS (prefix): [excited], [thoughtful], [empathetic], [sad], [soft], [firm], [angry], [curious], [nervous], [confident]
+MICRO-ACTIONS (inline): [sigh], [laughing], [clears throat], [hmm], [uhm], [gasps], [coughs], [chuckles]
+PAUSES (inline): [short pause], [medium pause], [long pause]
+DELIVERY (inline): [whispers], [loudly], [softly], [slowly], [quickly]
+Note: Bracket tags guide voice performance. Director's notes provide character context.`;
 }

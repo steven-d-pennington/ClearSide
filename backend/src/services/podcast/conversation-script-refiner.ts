@@ -863,9 +863,11 @@ Micro-expressions (inject inline at natural points):
 - [sigh] - before concessions, heavy topics, frustration
 - [laughing] - for humor, irony, amusement
 - [clears throat] - before important statements
+- [coughs] - nervous cough, clearing airway
 - [hmm] - thinking, considering
 - [uhm] - brief hesitation
 - [gasps] - surprise
+- [chuckles] - light amusement, wry humor
 
 Pauses (inject inline):
 - [short pause] - after questions, before names
