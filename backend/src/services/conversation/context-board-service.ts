@@ -22,6 +22,10 @@ import type {
   DisagreementEntry,
   SpeakerSignal,
   ConversationUtterance,
+  EmotionalBeatState,
+  EmotionalTemperature,
+  MomentumMetrics,
+  EmotionalIndicators,
 } from '../../types/conversation.js';
 
 const logger = pino({
@@ -47,6 +51,7 @@ interface ExtractionResult {
   disagreementsWith: string[];
   isKeyPoint: boolean;
   topicMarker?: string;
+  emotionalIndicators?: EmotionalIndicators;
 }
 
 /**
@@ -89,6 +94,23 @@ export class ContextBoardService {
       currentThread: undefined,
       speakerQueue: [],
       updatedAt: new Date(),
+      // Flow control tracking
+      recentSpeakerHistory: [],
+      consecutiveHostTurns: 0,
+      // Emotional tracking
+      emotionalBeat: {
+        currentTemperature: 'neutral',
+        recentAgreements: 0,
+        recentDisagreements: 0,
+        energyLevel: 'medium',
+      },
+      momentum: {
+        signalFrequency: 0,
+        hostGuestRatio: 0.3,
+        topicDepth: 0,
+        engagementScore: 50,
+        balanceHealth: 'good',
+      },
     };
 
     logger.info({ sessionId, participantCount: participantNames.size }, 'ContextBoardService initialized');
@@ -234,6 +256,12 @@ export class ContextBoardService {
         await this.updateCurrentThread(extraction.topicMarker);
       }
 
+      // Update emotional beat with extracted indicators
+      this.updateEmotionalBeat(extraction.emotionalIndicators);
+
+      // Calculate momentum metrics
+      this.calculateMomentum();
+
       this.state.updatedAt = new Date();
 
       logger.debug({
@@ -241,6 +269,7 @@ export class ContextBoardService {
         newTopics: extraction.newTopics.length,
         newClaims: extraction.claims.length,
         isKeyPoint: extraction.isKeyPoint,
+        emotionalTemperature: this.state.emotionalBeat?.currentTemperature,
       }, 'Context board updated');
     } catch (error) {
       logger.error({ error, sessionId: this.sessionId }, 'Failed to process utterance');
@@ -458,6 +487,245 @@ export class ContextBoardService {
   }
 
   // =========================================================================
+  // SPEAKER HISTORY & FLOW CONTROL
+  // =========================================================================
+
+  /**
+   * Add a speaker to the history and update consecutive host turn tracking
+   */
+  addToSpeakerHistory(speakerId: string): void {
+    // Add to history, keeping last 5
+    this.state.recentSpeakerHistory.push(speakerId);
+    if (this.state.recentSpeakerHistory.length > 5) {
+      this.state.recentSpeakerHistory.shift();
+    }
+
+    // Track consecutive host turns
+    if (speakerId === 'host') {
+      this.state.consecutiveHostTurns++;
+    } else {
+      this.state.consecutiveHostTurns = 0;
+    }
+
+    logger.debug({
+      sessionId: this.sessionId,
+      speakerId,
+      consecutiveHostTurns: this.state.consecutiveHostTurns,
+      recentSpeakers: this.state.recentSpeakerHistory,
+    }, 'Speaker history updated');
+  }
+
+  /**
+   * Get consecutive host turn count
+   */
+  getConsecutiveHostTurns(): number {
+    return this.state.consecutiveHostTurns;
+  }
+
+  /**
+   * Get recent speaker history
+   */
+  getRecentSpeakerHistory(): string[] {
+    return [...this.state.recentSpeakerHistory];
+  }
+
+  // =========================================================================
+  // EMOTIONAL BEAT TRACKING
+  // =========================================================================
+
+  /**
+   * Update emotional beat state based on recent utterance indicators
+   */
+  updateEmotionalBeat(indicators?: EmotionalIndicators): void {
+    if (!this.state.emotionalBeat) {
+      this.state.emotionalBeat = {
+        currentTemperature: 'neutral',
+        recentAgreements: 0,
+        recentDisagreements: 0,
+        energyLevel: 'medium',
+      };
+    }
+
+    // Update counters from indicators
+    if (indicators) {
+      if (indicators.showsAgreement || indicators.showsConcession) {
+        this.state.emotionalBeat.recentAgreements++;
+      }
+      if (indicators.showsFrustration) {
+        this.state.emotionalBeat.recentDisagreements++;
+      }
+    }
+
+    // Also count recent agreements/disagreements from state
+    const recentAgreementCount = this.state.agreements.filter(
+      a => Date.now() - a.timestampMs < 300000 // last 5 minutes
+    ).length;
+    const recentDisagreementCount = this.state.disagreements.filter(
+      d => Date.now() - d.timestampMs < 300000
+    ).length;
+
+    // Calculate temperature
+    this.state.emotionalBeat.currentTemperature = this.calculateTemperature(
+      recentAgreementCount + (this.state.emotionalBeat.recentAgreements || 0),
+      recentDisagreementCount + (this.state.emotionalBeat.recentDisagreements || 0),
+      indicators
+    );
+
+    // Calculate energy level
+    this.state.emotionalBeat.energyLevel = this.calculateEnergyLevel(indicators);
+
+    logger.debug({
+      sessionId: this.sessionId,
+      temperature: this.state.emotionalBeat.currentTemperature,
+      energyLevel: this.state.emotionalBeat.energyLevel,
+      recentAgreements: this.state.emotionalBeat.recentAgreements,
+      recentDisagreements: this.state.emotionalBeat.recentDisagreements,
+    }, 'Emotional beat updated');
+  }
+
+  /**
+   * Calculate emotional temperature from agreement/disagreement patterns
+   */
+  private calculateTemperature(
+    agreements: number,
+    disagreements: number,
+    indicators?: EmotionalIndicators
+  ): EmotionalTemperature {
+    // Check for breakthrough (concession after disagreement)
+    if (indicators?.showsConcession && disagreements > 0) {
+      return 'breakthrough';
+    }
+
+    // Rising tension: more disagreements than agreements recently
+    if (disagreements > agreements && disagreements >= 2) {
+      return 'rising_tension';
+    }
+
+    // Agreement forming: multiple agreements, few disagreements
+    if (agreements > disagreements && agreements >= 2) {
+      return 'agreement_forming';
+    }
+
+    // Declining energy: few interactions overall
+    const totalInteractions = agreements + disagreements;
+    if (totalInteractions < 1 && this.state.claims.length > 5) {
+      return 'declining_energy';
+    }
+
+    return 'neutral';
+  }
+
+  /**
+   * Calculate energy level from emotional indicators
+   */
+  private calculateEnergyLevel(indicators?: EmotionalIndicators): 'high' | 'medium' | 'low' {
+    if (!indicators) return 'medium';
+
+    // High energy: excitement or frustration
+    if (indicators.showsExcitement || indicators.showsFrustration) {
+      return 'high';
+    }
+
+    // Lower energy when there's agreement/concession without excitement
+    if (indicators.showsAgreement || indicators.showsConcession) {
+      return 'medium';
+    }
+
+    return 'medium';
+  }
+
+  /**
+   * Get current emotional beat state
+   */
+  getEmotionalBeat(): EmotionalBeatState | undefined {
+    return this.state.emotionalBeat;
+  }
+
+  // =========================================================================
+  // MOMENTUM TRACKING
+  // =========================================================================
+
+  /**
+   * Calculate and update momentum metrics
+   */
+  calculateMomentum(): MomentumMetrics {
+    const totalTurns = this.state.recentSpeakerHistory.length;
+    const hostTurns = this.state.recentSpeakerHistory.filter(s => s === 'host').length;
+
+    // Calculate host-guest ratio (ideal ~0.3)
+    const hostGuestRatio = totalTurns > 0 ? hostTurns / totalTurns : 0.3;
+
+    // Calculate signal frequency (how often speakers signal desire to speak)
+    const recentSignals = this.state.speakerQueue.length;
+    const signalFrequency = Math.min(1, recentSignals / 3); // Normalize to 0-1
+
+    // Topic depth: how many turns on current topic
+    const topicDepth = this.state.currentThread
+      ? this.state.claims.filter(c => c.timestampMs > Date.now() - 180000).length
+      : 0;
+
+    // Engagement score: composite of various factors
+    const engagementScore = this.calculateEngagementScore(
+      signalFrequency,
+      hostGuestRatio,
+      topicDepth
+    );
+
+    // Balance health assessment
+    let balanceHealth: 'good' | 'host_heavy' | 'guest_heavy' = 'good';
+    if (hostGuestRatio > 0.5) {
+      balanceHealth = 'host_heavy';
+    } else if (hostGuestRatio < 0.15 && totalTurns > 3) {
+      balanceHealth = 'guest_heavy';
+    }
+
+    const momentum: MomentumMetrics = {
+      signalFrequency,
+      hostGuestRatio,
+      topicDepth,
+      engagementScore,
+      balanceHealth,
+    };
+
+    this.state.momentum = momentum;
+
+    logger.debug({
+      sessionId: this.sessionId,
+      momentum,
+    }, 'Momentum calculated');
+
+    return momentum;
+  }
+
+  /**
+   * Calculate engagement score (0-100)
+   */
+  private calculateEngagementScore(
+    signalFrequency: number,
+    hostGuestRatio: number,
+    topicDepth: number
+  ): number {
+    // Signal frequency contributes 30%
+    const signalScore = signalFrequency * 30;
+
+    // Balance contributes 40% (optimal around 0.3)
+    const balanceDeviation = Math.abs(hostGuestRatio - 0.3);
+    const balanceScore = Math.max(0, 40 - balanceDeviation * 80);
+
+    // Topic depth contributes 30% (deeper is better, up to a point)
+    const depthScore = Math.min(30, topicDepth * 5);
+
+    return Math.round(signalScore + balanceScore + depthScore);
+  }
+
+  /**
+   * Get current momentum metrics
+   */
+  getMomentum(): MomentumMetrics | undefined {
+    return this.state.momentum;
+  }
+
+  // =========================================================================
   // THREAD TRACKING
   // =========================================================================
 
@@ -495,7 +763,13 @@ Extract the following (respond in JSON format only, no other text):
   "agreementsWith": ["participant name"],
   "disagreementsWith": ["participant name"],
   "isKeyPoint": true,
-  "topicMarker": "current topic being discussed"
+  "topicMarker": "current topic being discussed",
+  "emotionalIndicators": {
+    "showsAgreement": false,
+    "showsConcession": false,
+    "showsExcitement": false,
+    "showsFrustration": false
+  }
 }
 
 Guidelines:
@@ -504,6 +778,11 @@ Guidelines:
 - agreementsWith/disagreementsWith: Names of other participants they explicitly agree or disagree with
 - isKeyPoint: True if this is a particularly insightful, important, or quotable point
 - topicMarker: The main topic currently under discussion
+- emotionalIndicators: Detect emotional signals in the utterance
+  - showsAgreement: Speaker explicitly agrees ("I agree", "You're right", "That's fair")
+  - showsConcession: Speaker changes position or yields ground ("I'll grant you", "Actually you have a point")
+  - showsExcitement: High energy, enthusiasm, emphasis ("This is exactly it!", uses exclamations)
+  - showsFrustration: Impatience, tension, pushback ("That's not what I said", "You're missing...")
 
 Return only valid JSON.`;
 
@@ -521,6 +800,16 @@ Return only valid JSON.`;
 
       const parsed = JSON.parse(jsonMatch[0]);
 
+      // Parse emotional indicators
+      const emotionalIndicators: EmotionalIndicators | undefined = parsed.emotionalIndicators
+        ? {
+            showsAgreement: Boolean(parsed.emotionalIndicators.showsAgreement),
+            showsConcession: Boolean(parsed.emotionalIndicators.showsConcession),
+            showsExcitement: Boolean(parsed.emotionalIndicators.showsExcitement),
+            showsFrustration: Boolean(parsed.emotionalIndicators.showsFrustration),
+          }
+        : undefined;
+
       return {
         newTopics: Array.isArray(parsed.newTopics) ? parsed.newTopics : [],
         claims: Array.isArray(parsed.claims) ? parsed.claims.map((c: any) => ({
@@ -531,6 +820,7 @@ Return only valid JSON.`;
         disagreementsWith: Array.isArray(parsed.disagreementsWith) ? parsed.disagreementsWith : [],
         isKeyPoint: Boolean(parsed.isKeyPoint),
         topicMarker: typeof parsed.topicMarker === 'string' ? parsed.topicMarker : undefined,
+        emotionalIndicators,
       };
     } catch (error) {
       logger.warn({ error }, 'Failed to extract from utterance');

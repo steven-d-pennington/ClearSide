@@ -55,28 +55,16 @@ export class AudioTagConverter {
   }
 
   /**
-   * Gemini TTS supported bracket tags (as of Gemini 2.5)
-   * These are preserved and passed through to the TTS API.
-   * @see https://ai.google.dev/gemini-api/docs/speech-generation
-   */
-  private static readonly GEMINI_SUPPORTED_TAGS = new Set([
-    // Emotions (prefix tags)
-    'excited', 'thoughtful', 'empathetic', 'sad', 'soft', 'firm',
-    'angry', 'curious', 'nervous', 'confident',
-    // Micro-expressions (inline)
-    'sigh', 'laughing', 'laughs', 'clears throat', 'hmm', 'uhm', 'uh',
-    'gasps', 'coughs', 'cough', 'chuckles', 'snickers',
-    // Pauses
-    'short pause', 'medium pause', 'long pause', 'pause',
-    // Delivery modifiers
-    'whispers', 'whisper', 'loudly', 'softly', 'slowly', 'quickly',
-  ]);
-
-  /**
    * Convert ElevenLabs V3 tags to Gemini-compatible format
    *
-   * Gemini 2.5 TTS supports bracket tags for voice direction.
+   * Gemini 2.5 TTS supported bracket tags:
+   * - Emotions (prefix): excited, thoughtful, empathetic, sad, soft, firm, angry, curious, nervous, confident
+   * - Micro-expressions: sigh, laughing, laughs, clears throat, hmm, uhm, uh, gasps, coughs, chuckles, snickers
+   * - Pauses: short pause, medium pause, long pause, pause
+   * - Delivery: whispers, loudly, softly, slowly, quickly
+   *
    * We preserve supported tags and convert/remove unsupported ones.
+   * @see https://ai.google.dev/gemini-api/docs/speech-generation
    */
   private convertForGemini(text: string): string {
     let result = text;

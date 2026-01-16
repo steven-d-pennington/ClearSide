@@ -601,6 +601,9 @@ export class ConversationalOrchestrator extends EventEmitter {
     // Process for context board
     await this.contextBoard!.processUtterance(utterance);
 
+    // Update speaker history for flow tracking
+    this.contextBoard!.addToSpeakerHistory('host');
+
     // Extract memory from host utterance
     await this.extractMemoryFromHostUtterance(opening);
 
@@ -658,6 +661,29 @@ export class ConversationalOrchestrator extends EventEmitter {
             reason: 'Interjecting to maintain flow',
             addressDirectly: false,
           };
+        }
+      }
+
+      // Prevent host from speaking more than 2 consecutive turns
+      if (decision.participantId === 'host') {
+        const consecutiveHostTurns = this.contextBoard!.getConsecutiveHostTurns();
+        if (consecutiveHostTurns >= 2) {
+          logger.info({
+            sessionId: this.sessionId,
+            consecutiveHostTurns,
+          }, 'Host has spoken 2+ consecutive turns, forcing guest selection');
+
+          // Force guest selection - pick least spoken guest
+          const guests = this.hostAgent!.getGuests()
+            .sort((a, b) => a.turnCount - b.turnCount);
+
+          if (guests.length > 0) {
+            decision = {
+              participantId: guests[0]!.participantId,
+              reason: 'Host yielding after 2 consecutive turns',
+              addressDirectly: true,
+            };
+          }
         }
       }
 
@@ -885,6 +911,9 @@ export class ConversationalOrchestrator extends EventEmitter {
     await this.contextBoard!.processUtterance(utterance);
     this.lastSpeakerId = 'host';
 
+    // Update speaker history for flow tracking
+    this.contextBoard!.addToSpeakerHistory('host');
+
     // Add to host's context
     this.hostAgent!.addContext(content);
 
@@ -910,6 +939,12 @@ export class ConversationalOrchestrator extends EventEmitter {
 
     // Get recent context
     const recentTranscript = await this.getRecentTranscript(5);
+
+    // Set emotional context for the agent before generating
+    const emotionalBeat = this.contextBoard!.getEmotionalBeat();
+    if (emotionalBeat) {
+      agent.setEmotionalContext(emotionalBeat);
+    }
 
     // Add recent messages to agent context
     const recentUtterances = await this.utteranceRepo.findRecent(this.sessionId, 3);
@@ -1019,6 +1054,9 @@ export class ConversationalOrchestrator extends EventEmitter {
 
     // Process for context board
     await this.contextBoard!.processUtterance(utterance);
+
+    // Update speaker history for flow tracking
+    this.contextBoard!.addToSpeakerHistory(decision.participantId);
 
     // Extract memory data from this utterance (async, non-blocking)
     // Fire and forget - don't await to avoid slowing conversation

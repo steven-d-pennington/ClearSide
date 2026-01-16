@@ -5,7 +5,7 @@
  * Unlike chair-prompts which argue positions, these embody character personas.
  */
 
-import type { PodcastPersona } from '../../../types/conversation.js';
+import type { PodcastPersona, EmotionalBeatState } from '../../../types/conversation.js';
 import type { PersonaMemoryContext } from '../../../types/persona-memory.js';
 
 /**
@@ -207,7 +207,58 @@ CRITICAL - VARIETY IS ESSENTIAL:
 - VARY your catchphrases! Use them sparingly (once or twice max in a conversation), not in every response
 - Each response should feel fresh - avoid formulaic structures you've used before
 - If you notice yourself repeating a pattern, consciously break it
-- Don't start every response the same way - mix up your approach`;
+- Don't start every response the same way - mix up your approach
+
+ENGAGE DIRECTLY WITH OTHER GUESTS:
+- Ask other guests questions directly: "${otherParticipantNames[0] || 'fellow guest'}, what do you make of...?"
+- Challenge their points: "I'd push back on what you said about..."
+- Build on their ideas: "That's interesting because it connects to..."
+- Don't always wait for the host to direct traffic - jump into the conversation naturally
+- A great podcast has guests talking TO each other, not just AT the host`;
+}
+
+/**
+ * Build acknowledgment guidance for natural conversational responses
+ */
+function buildAcknowledgmentGuidance(): string {
+  return `
+CONVERSATIONAL NATURALNESS:
+- When responding to a strong point, consider a brief acknowledgment first:
+  "That's interesting...", "I hear you...", "Fair point...", "That's a good point..."
+- Before changing your position or conceding, add a thinking pause: "..." or "[short pause]"
+- If agreeing unexpectedly: "Actually, you know what...", "I hadn't thought of it that way..."
+- Before a complex response, a brief pause signals you're considering: "Hmm...", "[short pause]"
+- Use these naturally - max 1-2 per response, not every time`;
+}
+
+/**
+ * Build emotional context guidance based on conversation dynamics
+ */
+function buildEmotionalGuidance(emotionalBeat: EmotionalBeatState): string {
+  let guidance = `
+CONVERSATION DYNAMICS:
+- Temperature: ${emotionalBeat.currentTemperature}
+- Energy: ${emotionalBeat.energyLevel}`;
+
+  if (emotionalBeat.currentTemperature === 'rising_tension') {
+    guidance += `
+- Consider finding common ground or acknowledging valid points in the other perspective
+- You don't have to agree, but show you're listening and engaging thoughtfully`;
+  } else if (emotionalBeat.currentTemperature === 'agreement_forming') {
+    guidance += `
+- Add your unique perspective rather than just echoing agreement
+- Find the nuance or "yes, and..." that moves the conversation forward`;
+  } else if (emotionalBeat.currentTemperature === 'breakthrough') {
+    guidance += `
+- Someone just made a concession or shifted position - acknowledge this meaningfully
+- Build on this moment of progress without gloating`;
+  } else if (emotionalBeat.currentTemperature === 'declining_energy') {
+    guidance += `
+- The conversation energy is dropping - bring some spark or new angle
+- Ask a probing question or introduce a fresh perspective`;
+  }
+
+  return guidance;
 }
 
 /**
@@ -219,7 +270,8 @@ export function buildResponsePrompt(
   addressedTo?: string,
   previousSpeaker?: string,
   participantNames?: string[],
-  rapidFire: boolean = false
+  rapidFire: boolean = false,
+  emotionalBeat?: EmotionalBeatState
 ): string {
   let prompt = `RECENT CONVERSATION:
 ${conversationContext}
@@ -237,7 +289,7 @@ ${conversationContext}
   prompt += `As ${persona.name}, share your perspective on what's being discussed. `;
 
   if (participantNames && participantNames.length > 0) {
-    prompt += `You may address ${participantNames.join(' or ')} directly if relevant. `;
+    prompt += `You may address ${participantNames.join(' or ')} directly - ask them questions, challenge their points, or build on their ideas. Great conversations happen when guests talk TO each other, not just respond to the host. `;
   }
 
   // Length instruction changes based on rapid fire mode
@@ -249,6 +301,14 @@ ${conversationContext}
   const lengthInstruction = rapidFire
     ? `RAPID FIRE: 2-4 sentences typically. Be focused and avoid repetition - make every sentence count!${verboseReminder}`
     : 'Keep your response focused and conversational (2-4 paragraphs unless more detail is explicitly requested).';
+
+  // Add acknowledgment guidance for natural conversation flow
+  prompt += buildAcknowledgmentGuidance();
+
+  // Add emotional context guidance if available
+  if (emotionalBeat) {
+    prompt += buildEmotionalGuidance(emotionalBeat);
+  }
 
   prompt += `
 

@@ -16,6 +16,7 @@ import type { ContextBoardService } from '../conversation/context-board-service.
 import type {
   PodcastPersona,
   ConversationParticipant,
+  EmotionalBeatState,
 } from '../../types/conversation.js';
 import type { PersonaMemoryContext } from '../../types/persona-memory.js';
 import { createOpenRouterClient, OpenRouterLLMClient } from '../llm/openrouter-adapter.js';
@@ -359,6 +360,23 @@ ${this.rapidFire ? 'Keep it FAST - this is rapid fire mode!' : 'Be conversationa
 Be more aggressive about host interjections to maintain energy and focus.`
       : '';
 
+    // Include emotional context if available
+    const emotionalBeat = state.emotionalBeat;
+    const emotionalSection = emotionalBeat
+      ? `\nEMOTIONAL DYNAMICS:
+- Temperature: ${emotionalBeat.currentTemperature}
+- Energy: ${emotionalBeat.energyLevel}
+- Recent agreements: ${emotionalBeat.recentAgreements}
+- Recent disagreements: ${emotionalBeat.recentDisagreements}
+${emotionalBeat.currentTemperature === 'rising_tension'
+    ? '- Consider: bringing in a different voice to shift dynamics, or finding common ground'
+    : emotionalBeat.currentTemperature === 'agreement_forming'
+    ? '- Consider: introducing a challenging perspective or moving to a new angle'
+    : emotionalBeat.currentTemperature === 'declining_energy'
+    ? '- Consider: injecting energy with a provocative question or new topic angle'
+    : ''}`
+      : '';
+
     const prompt = `Decide who should speak next in this podcast conversation.
 
 RECENT TRANSCRIPT:
@@ -372,7 +390,7 @@ CONTEXT BOARD STATE:
 ${signalInfo}
 
 TURN BALANCE:
-${turnCounts.map(t => `- ${t.name}: ${t.turns} turns`).join('\n')}${hostInterjectionGuidance}
+${turnCounts.map(t => `- ${t.name}: ${t.turns} turns`).join('\n')}${emotionalSection}${hostInterjectionGuidance}
 
 Consider:
 1. Does anyone have a high-urgency signal?
@@ -526,6 +544,65 @@ Create a natural transition that:
       sessionId: this.sessionId,
       length: content.length,
     }, 'Redirect generated');
+
+    return content;
+  }
+
+  /**
+   * Generate a topic transition that synthesizes the previous topic before moving on
+   */
+  async generateTopicTransition(
+    previousTopic: string,
+    newTopic: string,
+    contextSummary: string,
+    emotionalBeat?: EmotionalBeatState
+  ): Promise<string> {
+    logger.info({
+      sessionId: this.sessionId,
+      previousTopic,
+      newTopic,
+      rapidFire: this.rapidFire,
+    }, 'Generating topic transition');
+
+    const emotionalContext = emotionalBeat
+      ? `\nCONVERSATION DYNAMICS:
+- Temperature: ${emotionalBeat.currentTemperature}
+- Energy level: ${emotionalBeat.energyLevel}
+- Recent agreements: ${emotionalBeat.recentAgreements}
+- Recent disagreements: ${emotionalBeat.recentDisagreements}`
+      : '';
+
+    const prompt = `Generate a natural transition from one topic to another in this podcast conversation.
+
+PREVIOUS TOPIC: ${previousTopic}
+NEW TOPIC: ${newTopic}
+
+RECENT CONTEXT:
+${contextSummary}
+${emotionalContext}
+
+Create a ${this.rapidFire ? 'quick (1-2 sentences)' : 'smooth (2-3 sentences)'} transition that:
+1. Briefly synthesizes what was discussed - key insights or tensions
+2. ${emotionalBeat?.currentTemperature === 'agreement_forming'
+    ? 'Acknowledges the emerging consensus before pivoting'
+    : emotionalBeat?.currentTemperature === 'rising_tension'
+    ? 'Acknowledges the productive tension before moving on'
+    : 'Captures the essence of the discussion'}
+3. Naturally bridges to the new topic
+4. Feels organic, not like a jarring subject change
+
+${this.rapidFire ? 'Keep it fast - this is rapid fire mode!' : 'Be conversational and warm.'}`;
+
+    const maxTokens = this.rapidFire ? 80 : 150;
+    const content = await this.generate(prompt, 'topic_transition', 0.8, maxTokens);
+    this.addToHistory('assistant', content);
+
+    logger.info({
+      sessionId: this.sessionId,
+      length: content.length,
+      previousTopic,
+      newTopic,
+    }, 'Topic transition generated');
 
     return content;
   }

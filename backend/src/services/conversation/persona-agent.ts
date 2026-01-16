@@ -15,6 +15,7 @@ import type {
   ConversationParticipant,
   SpeakerSignal,
   SignalReason,
+  EmotionalBeatState,
 } from '../../types/conversation.js';
 import type {
   ConversationTruncationDetectedEventData,
@@ -159,6 +160,9 @@ export class PersonaAgent {
   private currentTurnCount: number = 0;
   private currentUtteranceId?: number;
 
+  // Emotional context for conversation dynamics
+  private emotionalContext?: EmotionalBeatState;
+
   constructor(options: PersonaAgentOptions) {
     this.llmClient = options.llmClient || createOpenRouterClient(options.participant.modelId);
     this.sseManager = options.sseManager;
@@ -295,6 +299,31 @@ export class PersonaAgent {
   }
 
   // =========================================================================
+  // EMOTIONAL CONTEXT
+  // =========================================================================
+
+  /**
+   * Set emotional context for the next response
+   * This affects how the persona responds based on conversation dynamics
+   */
+  setEmotionalContext(beat: EmotionalBeatState): void {
+    this.emotionalContext = beat;
+    logger.debug({
+      sessionId: this.sessionId,
+      persona: this.persona.slug,
+      temperature: beat.currentTemperature,
+      energyLevel: beat.energyLevel,
+    }, 'Emotional context set for persona');
+  }
+
+  /**
+   * Clear emotional context
+   */
+  clearEmotionalContext(): void {
+    this.emotionalContext = undefined;
+  }
+
+  // =========================================================================
   // GENERATION METHODS
   // =========================================================================
 
@@ -312,6 +341,7 @@ export class PersonaAgent {
       addressedTo,
       previousSpeaker,
       rapidFire: this.rapidFire,
+      emotionalContext: this.emotionalContext?.currentTemperature,
     }, 'Generating persona response');
 
     const prompt = buildResponsePrompt(
@@ -320,7 +350,8 @@ export class PersonaAgent {
       addressedTo,
       previousSpeaker,
       this.otherParticipants.map(p => p.name),
-      this.rapidFire
+      this.rapidFire,
+      this.emotionalContext
     );
 
     try {

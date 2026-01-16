@@ -313,6 +313,55 @@ export interface ContextBoardState {
   currentThread?: string;
   speakerQueue: SpeakerSignal[];
   updatedAt: Date;
+
+  // Emotional tracking for conversation dynamics
+  emotionalBeat?: EmotionalBeatState;
+  momentum?: MomentumMetrics;
+
+  // Flow control tracking
+  recentSpeakerHistory: string[];   // Last 5 speaker IDs for pattern detection
+  consecutiveHostTurns: number;     // Counter for host-host prevention
+}
+
+// ============================================================================
+// Emotional & Flow Tracking
+// ============================================================================
+
+/** Emotional temperature of the conversation */
+export type EmotionalTemperature =
+  | 'rising_tension'
+  | 'agreement_forming'
+  | 'declining_energy'
+  | 'neutral'
+  | 'breakthrough';
+
+/** Emotional beat tracking for conversation dynamics */
+export interface EmotionalBeatState {
+  currentTemperature: EmotionalTemperature;
+  recentAgreements: number;         // Count in last N turns
+  recentDisagreements: number;      // Count in last N turns
+  energyLevel: 'high' | 'medium' | 'low';
+  lastPositionChange?: {            // Track concessions/position shifts
+    participantId: string;
+    turnNumber: number;
+  };
+}
+
+/** Momentum metrics for flow tracking */
+export interface MomentumMetrics {
+  signalFrequency: number;          // 0-1 normalized (signals per turn)
+  hostGuestRatio: number;           // Host turns / guest turns (ideal ~0.3)
+  topicDepth: number;               // Turns spent on current topic
+  engagementScore: number;          // Composite 0-100
+  balanceHealth: 'good' | 'host_heavy' | 'guest_heavy';
+}
+
+/** Emotional indicators extracted from utterances */
+export interface EmotionalIndicators {
+  showsAgreement: boolean;
+  showsConcession: boolean;
+  showsExcitement: boolean;
+  showsFrustration: boolean;
 }
 
 /**
@@ -329,6 +378,12 @@ export interface ContextBoardRow {
   current_thread?: string;
   speaker_queue: SpeakerSignal[];
   updated_at: Date;
+
+  // Emotional tracking (computed in-memory, optionally persisted)
+  emotional_beat?: EmotionalBeatState;
+  momentum?: MomentumMetrics;
+  recent_speaker_history?: string[];
+  consecutive_host_turns?: number;
 }
 
 // ============================================================================
@@ -624,5 +679,11 @@ export function mapContextBoardRow(row: ContextBoardRow): ContextBoardState {
     currentThread: row.current_thread,
     speakerQueue: row.speaker_queue,
     updatedAt: row.updated_at,
+    // Flow control tracking (with defaults for backwards compatibility)
+    recentSpeakerHistory: row.recent_speaker_history || [],
+    consecutiveHostTurns: row.consecutive_host_turns || 0,
+    // Emotional tracking (optional fields)
+    emotionalBeat: row.emotional_beat,
+    momentum: row.momentum,
   };
 }
