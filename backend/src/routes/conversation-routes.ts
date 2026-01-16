@@ -19,6 +19,7 @@ import {
   ConversationalOrchestrator,
 } from '../services/conversation/conversational-orchestrator.js';
 import { createConversationScriptRefiner, TTSProvider } from '../services/podcast/conversation-script-refiner.js';
+import { createOpenRouterClient } from '../services/llm/openrouter-adapter.js';
 import type { SSEManager } from '../services/sse/sse-manager.js';
 import type { FlowMode, SessionStatus } from '../types/conversation.js';
 import type { RefinedPodcastScript, TTSProviderType, VoiceAssignment } from '../types/podcast-export.js';
@@ -1510,13 +1511,21 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
       let script;
       let usedSavedEdits = false;
 
+      // Create LLM client for Gemini emotional tag enhancement
+      // Uses a fast model (Haiku) for efficient tag injection
+      const llmClient = provider === 'gemini'
+        ? createOpenRouterClient('anthropic/claude-3-haiku')
+        : undefined;
+
       if (savedScript && savedScript.segments.length > 0) {
         // Use saved edits
         usedSavedEdits = true;
 
         // Refine to get voice assignments and metadata, but use saved segments
-        const refiner = createConversationScriptRefiner(pool);
-        const freshScript = await refiner.refine(id, provider as TTSProvider);
+        const refiner = createConversationScriptRefiner(pool, llmClient);
+        const freshScript = provider === 'gemini'
+          ? await refiner.refineWithLLMEnhancement(id, provider as TTSProvider)
+          : await refiner.refine(id, provider as TTSProvider);
 
         script = {
           ...freshScript,
@@ -1535,17 +1544,21 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
           provider,
           totalSegments: script.totalSegments,
           usedSavedEdits: true,
+          llmEnhanced: provider === 'gemini',
         }, 'Using saved script edits for podcast export');
       } else {
-        // Refine from original utterances
-        const refiner = createConversationScriptRefiner(pool);
-        script = await refiner.refine(id, provider as TTSProvider);
+        // Refine from original utterances with LLM enhancement for Gemini
+        const refiner = createConversationScriptRefiner(pool, llmClient);
+        script = provider === 'gemini'
+          ? await refiner.refineWithLLMEnhancement(id, provider as TTSProvider)
+          : await refiner.refine(id, provider as TTSProvider);
 
         logger.info({
           sessionId: id,
           provider,
           totalSegments: script.totalSegments,
           estimatedDuration: script.estimatedDurationMinutes,
+          llmEnhanced: provider === 'gemini',
         }, 'Conversation exported for podcast');
       }
 
@@ -1609,8 +1622,16 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
 
       // Check for saved edits first, otherwise refine from original
       const savedScript = await sessionRepo.getRefinedScript(id);
-      const refiner = createConversationScriptRefiner(pool);
-      const freshScript = await refiner.refine(id, provider as TTSProvider);
+
+      // Create LLM client for Gemini emotional tag enhancement
+      const llmClient = provider === 'gemini'
+        ? createOpenRouterClient('anthropic/claude-3-haiku')
+        : undefined;
+
+      const refiner = createConversationScriptRefiner(pool, llmClient);
+      const freshScript = provider === 'gemini'
+        ? await refiner.refineWithLLMEnhancement(id, provider as TTSProvider)
+        : await refiner.refine(id, provider as TTSProvider);
 
       let conversationScript;
       if (savedScript && savedScript.segments.length > 0) {
@@ -1623,7 +1644,7 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
             (sum, s) => sum + s.content.split(/\s+/).length, 0
           ),
         };
-        logger.info({ sessionId: id, usedSavedEdits: true }, 'Using saved script edits for audio generation');
+        logger.info({ sessionId: id, usedSavedEdits: true, llmEnhanced: provider === 'gemini' }, 'Using saved script edits for audio generation');
       } else {
         conversationScript = freshScript;
       }
@@ -1779,9 +1800,10 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         return;
       }
 
-      // Refine the script to get director's notes
-      const refiner = createConversationScriptRefiner(pool);
-      const script = await refiner.refine(id, provider as TTSProvider);
+      // Refine the script to get director's notes with LLM emotional enhancement
+      const llmClient = createOpenRouterClient('anthropic/claude-3-haiku');
+      const refiner = createConversationScriptRefiner(pool, llmClient);
+      const script = await refiner.refineWithLLMEnhancement(id, provider as TTSProvider);
 
       if (!script.geminiDirectorNotes) {
         res.status(400).json({ error: 'Director notes only available for Gemini provider' });
@@ -1901,9 +1923,14 @@ export function createConversationRoutes(pool: Pool, sseManager?: SSEManager): R
         return;
       }
 
-      // Refine the script
-      const refiner = createConversationScriptRefiner(pool);
-      const script = await refiner.refine(id, provider as TTSProvider);
+      // Refine the script with LLM emotional enhancement for Gemini
+      const llmClient = provider === 'gemini'
+        ? createOpenRouterClient('anthropic/claude-3-haiku')
+        : undefined;
+      const refiner = createConversationScriptRefiner(pool, llmClient);
+      const script = provider === 'gemini'
+        ? await refiner.refineWithLLMEnhancement(id, provider as TTSProvider)
+        : await refiner.refine(id, provider as TTSProvider);
 
       if (segmentIndex >= script.segments.length) {
         res.status(404).json({ error: `Segment ${segmentIndex} not found. Script has ${script.segments.length} segments.` });
