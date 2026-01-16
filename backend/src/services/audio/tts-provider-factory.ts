@@ -11,6 +11,7 @@ import pino from 'pino';
 import type { TTSProvider, ITTSService, TTSProviderInfo } from './types.js';
 import { ElevenLabsService, createElevenLabsService } from './elevenlabs-service.js';
 import { GeminiTTSService, createGeminiTTSService } from './gemini-tts-service.js';
+import { VertexTTSService, createVertexTTSService } from './vertex-tts-service.js';
 import { GoogleCloudTTSService, createGoogleCloudTTSService } from './google-cloud-tts-service.js';
 import { GoogleCloudLongAudioService, createGoogleCloudLongAudioService } from './google-cloud-long-audio-service.js';
 import { AzureTTSService, createAzureTTSService } from './azure-tts-service.js';
@@ -35,6 +36,11 @@ export function getAvailableProviders(): TTSProvider[] {
   // Gemini (Google AI Studio)
   if (process.env.GOOGLE_AI_API_KEY) {
     available.push('gemini');
+  }
+
+  // Vertex AI (Gemini via service account)
+  if (process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON) {
+    available.push('vertex');
   }
 
   // Google Cloud TTS
@@ -63,15 +69,20 @@ export function getAvailableProviders(): TTSProvider[] {
  * Get the default TTS provider based on available configuration
  *
  * Priority order:
- * 1. Google Cloud Long Audio (async, no chunking needed, high quality)
- * 2. ElevenLabs (premium quality)
- * 3. Gemini (premium quality, but requires chunking)
- * 4. Azure (high quality, good free tier)
- * 5. Google Cloud (high quality, good free tier)
- * 6. Edge (free, no API key needed)
+ * 1. Vertex AI (Gemini 2.5 Flash Lite Preview - premium quality, fast)
+ * 2. Google Cloud Long Audio (async, no chunking needed, high quality)
+ * 3. ElevenLabs (premium quality)
+ * 4. Gemini (premium quality via AI Studio, but requires chunking)
+ * 5. Azure (high quality, good free tier)
+ * 6. Google Cloud (high quality, good free tier)
+ * 7. Edge (free, no API key needed)
  */
 export function getDefaultProvider(): TTSProvider {
-  // Prefer Google Cloud Long Audio - async synthesis, no chunking needed
+  // Prefer Vertex AI - Gemini 2.5 Flash Lite Preview TTS
+  if (process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON) {
+    return 'vertex';
+  }
+  // Fallback to Google Cloud Long Audio - async synthesis, no chunking needed
   if (process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_CLOUD_TTS_BUCKET) {
     return 'google-cloud-long';
   }
@@ -111,6 +122,16 @@ export function createTTSService(provider: TTSProvider): ITTSService {
         );
       }
       return createGeminiTTSService();
+    }
+
+    case 'vertex': {
+      if (!process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON) {
+        throw new Error(
+          'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON is required for Vertex AI TTS. ' +
+            'Set the environment variable with your service account JSON.'
+        );
+      }
+      return createVertexTTSService();
     }
 
     case 'google-cloud': {
@@ -217,6 +238,15 @@ export function getProvidersWithStatus(): Array<
       requiresApiKey: true,
       envVar: 'GOOGLE_AI_API_KEY',
     },
+    vertex: {
+      id: 'vertex',
+      name: 'Vertex AI TTS',
+      description: 'Gemini 2.5 Flash Lite Preview TTS via Vertex AI',
+      freeTier: 'Pay-as-you-go (service account required)',
+      quality: 'premium',
+      requiresApiKey: true,
+      envVar: 'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON',
+    },
     'google-cloud': {
       id: 'google-cloud',
       name: 'Google Cloud TTS',
@@ -267,6 +297,7 @@ export type { TTSProvider, ITTSService, TTSProviderInfo };
 export {
   ElevenLabsService,
   GeminiTTSService,
+  VertexTTSService,
   GoogleCloudTTSService,
   GoogleCloudLongAudioService,
   AzureTTSService,

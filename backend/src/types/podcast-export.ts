@@ -2,7 +2,7 @@ import type { DebateTone } from './duelogic.js';
 
 export type PodcastJobStatus = 'pending' | 'refining' | 'generating' | 'complete' | 'error';
 
-export type GenerationPhase = 'pending' | 'tts' | 'concat' | 'normalize' | 'tag' | 'complete' | 'error';
+export type GenerationPhase = 'pending' | 'tts' | 'concat' | 'reactions' | 'normalize' | 'tag' | 'complete' | 'error';
 
 export type TTSProviderType = 'elevenlabs' | 'gemini' | 'google-cloud-long';
 

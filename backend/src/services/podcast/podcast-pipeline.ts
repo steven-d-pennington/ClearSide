@@ -19,6 +19,10 @@ import pino from 'pino';
 import { PodcastTTSClient } from './podcast-tts-client.js';
 import { PodcastTTSAdapter, getAvailablePodcastProviders } from './podcast-tts-adapter.js';
 import { AudioProcessor } from '../audio/audio-processor.js';
+import { getReactionLibrary, ReactionLibrary } from '../audio/reaction-library.js';
+import { createReactionInserter, ReactionInserter } from '../audio/reaction-inserter.js';
+import type { ReactionInsertionConfig } from '../../types/reactions.js';
+import { DEFAULT_REACTION_CONFIG } from '../../types/reactions.js';
 import * as podcastRepo from '../../db/repositories/podcast-export-repository.js';
 import {
   PodcastExportJob,
@@ -47,7 +51,7 @@ const logger = pino({
  * Pipeline progress event data
  */
 export interface PipelineProgress {
-  phase: 'initializing' | 'generating' | 'concatenating' | 'normalizing' | 'tagging' | 'complete' | 'error';
+  phase: 'initializing' | 'generating' | 'concatenating' | 'reactions' | 'normalizing' | 'tagging' | 'complete' | 'error';
   currentSegment?: number;
   totalSegments?: number;
   percentComplete: number;
@@ -76,6 +80,8 @@ export interface PipelineConfig {
   ttsProvider?: TTSProviderType;
   /** ElevenLabs API key (required if using ElevenLabs provider) */
   elevenLabsApiKey?: string;
+  /** Configuration for cross-talk reactions (optional) */
+  reactions?: Partial<ReactionInsertionConfig>;
 }
 
 /**
@@ -101,6 +107,9 @@ export class PodcastGenerationPipeline extends EventEmitter {
   private audioProcessor: AudioProcessor;
   private exportsDir: string;
   private tempDir: string;
+  private reactionConfig: ReactionInsertionConfig;
+  private reactionLibrary: ReactionLibrary | null = null;
+  private reactionInserter: ReactionInserter | null = null;
 
   constructor(config: PipelineConfig) {
     super();
@@ -108,6 +117,17 @@ export class PodcastGenerationPipeline extends EventEmitter {
     this.audioProcessor = new AudioProcessor({ tempDir: config.tempDir });
     this.exportsDir = config.exportsDir || DEFAULT_EXPORTS_DIR;
     this.tempDir = config.tempDir || DEFAULT_TEMP_DIR;
+
+    // Initialize reaction configuration
+    this.reactionConfig = { ...DEFAULT_REACTION_CONFIG, ...config.reactions };
+    if (this.reactionConfig.enabled) {
+      this.reactionLibrary = getReactionLibrary();
+      this.reactionInserter = createReactionInserter(this.reactionConfig);
+      logger.info({
+        reactionsPerMinute: this.reactionConfig.reactionsPerMinute,
+        minimumGapMs: this.reactionConfig.minimumGapMs,
+      }, 'Reactions enabled');
+    }
 
     // Initialize the appropriate TTS client/adapter
     if (this.ttsProvider === 'elevenlabs' && config.elevenLabsApiKey) {
@@ -118,7 +138,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
       this.ttsAdapter = new PodcastTTSAdapter(this.ttsProvider);
     }
 
-    logger.info({ ttsProvider: this.ttsProvider }, 'Pipeline initialized');
+    logger.info({ ttsProvider: this.ttsProvider, reactionsEnabled: this.reactionConfig.enabled }, 'Pipeline initialized');
   }
 
   /**
@@ -187,6 +207,28 @@ export class PodcastGenerationPipeline extends EventEmitter {
       const concatenatedFile = path.join(workDir, 'concatenated.mp3');
       await this.audioProcessor.concatenateSegments(audioFiles, concatenatedFile, 'mp3');
 
+      // Phase 2.5: Add cross-talk reactions (if enabled)
+      let audioForNormalization = concatenatedFile;
+      if (this.reactionConfig.enabled && this.reactionInserter && this.reactionLibrary) {
+        await podcastRepo.updateGenerationPhase(jobId, 'reactions');
+        this.emitProgress({
+          phase: 'reactions',
+          percentComplete: 78,
+          message: 'Adding cross-talk reactions...',
+        });
+
+        const reactedFile = await this.processReactionsPhase(
+          jobId,
+          allSegments,
+          audioFiles,
+          concatenatedFile,
+          workDir
+        );
+        if (reactedFile) {
+          audioForNormalization = reactedFile;
+        }
+      }
+
       // Phase 3: Normalize volume levels
       await podcastRepo.updateGenerationPhase(jobId, 'normalize');
       this.emitProgress({
@@ -196,7 +238,7 @@ export class PodcastGenerationPipeline extends EventEmitter {
       });
 
       const normalizedFile = path.join(workDir, 'normalized.mp3');
-      const processingResult = await this.audioProcessor.normalizeAudio(concatenatedFile, normalizedFile);
+      const processingResult = await this.audioProcessor.normalizeAudio(audioForNormalization, normalizedFile);
 
       // Phase 4: Add ID3 metadata and move to exports
       await podcastRepo.updateGenerationPhase(jobId, 'tag');
@@ -548,6 +590,142 @@ export class PodcastGenerationPipeline extends EventEmitter {
     } catch (error) {
       logger.warn({ workDir, error }, 'Cleanup error (non-fatal)');
     }
+  }
+
+  /**
+   * Process reactions phase: identify insertion points and mix reactions into audio
+   *
+   * @param jobId - Job ID for logging
+   * @param segments - Podcast segments with speaker/text info
+   * @param audioFiles - Paths to generated audio files for each segment
+   * @param concatenatedFile - Path to the concatenated audio file
+   * @param workDir - Working directory for temp files
+   * @returns Path to the audio file with reactions mixed in, or null if no reactions added
+   */
+  private async processReactionsPhase(
+    jobId: string,
+    segments: PodcastSegment[],
+    audioFiles: string[],
+    concatenatedFile: string,
+    workDir: string
+  ): Promise<string | null> {
+    if (!this.reactionInserter || !this.reactionLibrary) {
+      return null;
+    }
+
+    try {
+      // Get durations of each segment by probing the audio files
+      const segmentDurationsMs = await this.getSegmentDurations(audioFiles);
+
+      if (segmentDurationsMs.length === 0) {
+        logger.warn({ jobId }, 'Could not get segment durations, skipping reactions');
+        return null;
+      }
+
+      // Collect unique voice IDs from segments
+      const voiceIds = [...new Set(segments.map(s => s.voiceId).filter(Boolean))];
+
+      // Check which voices have reaction clips available
+      const availableVoiceIds: string[] = [];
+      for (const voiceId of voiceIds) {
+        if (voiceId && await this.reactionLibrary.hasReactionsForVoice(voiceId)) {
+          availableVoiceIds.push(voiceId);
+        }
+      }
+
+      if (availableVoiceIds.length < 2) {
+        // Need at least 2 voices to have cross-talk (reactions from other speakers)
+        logger.info({ jobId, availableVoiceIds }, 'Not enough voices with reactions, skipping');
+        return null;
+      }
+
+      // Identify insertion points based on segment content
+      const insertionPoints = this.reactionInserter.identifyInsertionPoints(
+        segments,
+        segmentDurationsMs
+      );
+
+      if (insertionPoints.length === 0) {
+        logger.info({ jobId }, 'No suitable insertion points found, skipping reactions');
+        return null;
+      }
+
+      // Create mix instructions with actual reaction clips
+      const mixInstructions = await this.reactionInserter.createMixInstructions(
+        insertionPoints,
+        this.reactionLibrary,
+        availableVoiceIds
+      );
+
+      if (mixInstructions.length === 0) {
+        logger.info({ jobId }, 'No mix instructions created, skipping reactions');
+        return null;
+      }
+
+      logger.info({
+        jobId,
+        insertionPoints: insertionPoints.length,
+        mixInstructions: mixInstructions.length,
+        availableVoices: availableVoiceIds.length,
+      }, 'Processing reactions');
+
+      // Mix reactions into the concatenated audio
+      const reactedFile = path.join(workDir, 'reacted.mp3');
+      await this.audioProcessor.mixWithReactions(
+        concatenatedFile,
+        mixInstructions,
+        reactedFile
+      );
+
+      logger.info({
+        jobId,
+        reactionsAdded: mixInstructions.length,
+        outputFile: reactedFile,
+      }, 'Reactions mixed successfully');
+
+      return reactedFile;
+
+    } catch (error) {
+      logger.error({
+        jobId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Error in reactions phase (continuing without reactions)');
+      return null;
+    }
+  }
+
+  /**
+   * Get durations of audio files by probing with FFmpeg
+   *
+   * @param audioFiles - Paths to audio files
+   * @returns Array of durations in milliseconds
+   */
+  private async getSegmentDurations(audioFiles: string[]): Promise<number[]> {
+    const durations: number[] = [];
+
+    for (const file of audioFiles) {
+      try {
+        const result = await this.audioProcessor.probeAudio(file);
+        if (result && result.durationSeconds) {
+          durations.push(Math.round(result.durationSeconds * 1000));
+        } else {
+          // Fallback: estimate from file size (rough approximation for MP3)
+          const stats = await fs.stat(file);
+          // Assuming ~128kbps MP3: size_bytes / (128000/8) = duration_seconds
+          const estimatedSeconds = stats.size / 16000;
+          durations.push(Math.round(estimatedSeconds * 1000));
+          logger.debug({ file, estimatedSeconds }, 'Used file size estimate for duration');
+        }
+      } catch (error) {
+        logger.warn({
+          file,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }, 'Could not get duration for file');
+        durations.push(0);
+      }
+    }
+
+    return durations;
   }
 
   /**

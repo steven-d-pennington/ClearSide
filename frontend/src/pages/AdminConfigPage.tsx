@@ -78,6 +78,30 @@ interface ModelInfo {
 
 type TabType = 'presets' | 'personas' | 'podcastPersonas' | 'providers' | 'modelDefaults';
 
+// Reaction status for a voice
+interface ReactionStatus {
+  hasReactions: boolean;
+  totalClips: number;
+  clipsByCategory?: {
+    agreement: number;
+    disagreement: number;
+    interest: number;
+    acknowledgment: number;
+    challenge: number;
+    amusement: number;
+    surprise: number;
+    skepticism: number;
+  };
+  isGenerating?: boolean;
+}
+
+// Reaction clip for preview
+interface ReactionClip {
+  category: string;
+  text: string;
+  audioUrl: string;
+}
+
 export function AdminConfigPage() {
   const [activeTab, setActiveTab] = useState<TabType>('presets');
   const [presets, setPresets] = useState<DebatePreset[]>([]);
@@ -98,6 +122,12 @@ export function AdminConfigPage() {
   const [editingPreset, setEditingPreset] = useState<DebatePreset | null>(null);
   const [editingPersona, setEditingPersona] = useState<Persona | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Reaction state
+  const [reactionStatus, setReactionStatus] = useState<Record<string, ReactionStatus>>({});
+  const [previewingVoice, setPreviewingVoice] = useState<{ voiceId: string; personaName: string } | null>(null);
+  const [previewClips, setPreviewClips] = useState<ReactionClip[]>([]);
+  const [playingClip, setPlayingClip] = useState<string | null>(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -167,6 +197,115 @@ export function AdminConfigPage() {
     }
   }, [API_BASE_URL]);
 
+  // Fetch reaction status for a single voice
+  const fetchReactionStatusForVoice = useCallback(async (voiceId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reactions/${voiceId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setReactionStatus(prev => ({
+          ...prev,
+          [voiceId]: {
+            hasReactions: data.clips.length > 0,
+            totalClips: data.clips.length,
+            clipsByCategory: data.clipsByCategory,
+          }
+        }));
+      } else {
+        setReactionStatus(prev => ({
+          ...prev,
+          [voiceId]: { hasReactions: false, totalClips: 0 }
+        }));
+      }
+    } catch (err) {
+      console.error('Error fetching reaction status for voice:', voiceId, err);
+      setReactionStatus(prev => ({
+        ...prev,
+        [voiceId]: { hasReactions: false, totalClips: 0 }
+      }));
+    }
+  }, [API_BASE_URL]);
+
+  // Generate reactions for a voice with character context
+  const handleGenerateReactions = useCallback(async (persona: PodcastPersona) => {
+    const voiceId = persona.defaultVoiceId!;
+    setReactionStatus(prev => ({
+      ...prev,
+      [voiceId]: { ...prev[voiceId], hasReactions: prev[voiceId]?.hasReactions ?? false, totalClips: prev[voiceId]?.totalClips ?? 0, isGenerating: true }
+    }));
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reactions/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voiceId,
+          voiceName: persona.name,
+          speakingStyle: persona.speakingStyle,
+          backstory: persona.backstory,
+          accent: persona.voiceCharacteristics?.accent,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate reactions');
+      }
+
+      const data = await response.json();
+      setActionMessage({ type: 'success', text: `Generated ${data.generatedCount} reaction clips for ${persona.name}` });
+
+      // Refresh status
+      await fetchReactionStatusForVoice(voiceId);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to generate reactions' });
+      setReactionStatus(prev => ({
+        ...prev,
+        [voiceId]: { ...prev[voiceId], hasReactions: prev[voiceId]?.hasReactions ?? false, totalClips: prev[voiceId]?.totalClips ?? 0, isGenerating: false }
+      }));
+    }
+  }, [API_BASE_URL, fetchReactionStatusForVoice]);
+
+  // Preview reactions for a voice
+  const handlePreviewReactions = useCallback(async (voiceId: string, personaName: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reactions/${voiceId}`);
+      if (!response.ok) throw new Error('Failed to fetch reaction clips');
+
+      const data = await response.json();
+      setPreviewClips(data.clips || []);
+      setPreviewingVoice({ voiceId, personaName });
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to load reaction clips' });
+    }
+  }, [API_BASE_URL]);
+
+  // Close preview modal
+  const handleClosePreview = useCallback(() => {
+    setPreviewingVoice(null);
+    setPreviewClips([]);
+    setPlayingClip(null);
+  }, []);
+
+  // Play a reaction clip
+  const handlePlayClip = useCallback((audioUrl: string) => {
+    // Stop any currently playing clip
+    if (playingClip) {
+      const currentAudio = document.getElementById('reactionAudio') as HTMLAudioElement;
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+    }
+
+    if (playingClip === audioUrl) {
+      setPlayingClip(null);
+      return;
+    }
+
+    setPlayingClip(audioUrl);
+  }, [playingClip]);
+
   useEffect(() => {
     const fetchAll = async () => {
       setIsLoading(true);
@@ -188,6 +327,21 @@ export function AdminConfigPage() {
     };
     fetchAll();
   }, [fetchPresets, fetchPersonas, fetchPodcastPersonas, fetchProviders, fetchModelDefaults, fetchAvailableModels]);
+
+  // Fetch reaction status for all podcast personas with voices
+  useEffect(() => {
+    const voicesWithIds = podcastPersonas
+      .filter(p => p.defaultVoiceId)
+      .map(p => p.defaultVoiceId as string);
+
+    const uniqueVoices = [...new Set(voicesWithIds)];
+
+    uniqueVoices.forEach(voiceId => {
+      if (!reactionStatus[voiceId]) {
+        fetchReactionStatusForVoice(voiceId);
+      }
+    });
+  }, [podcastPersonas, reactionStatus, fetchReactionStatusForVoice]);
 
   const handleSavePreset = async () => {
     if (!editingPreset) return;
@@ -782,6 +936,51 @@ export function AdminConfigPage() {
                       <span className={styles.noVoiceBadge}>🔇 No voice assigned</span>
                     )}
                   </div>
+                  {/* Reaction Clips Section */}
+                  {persona.defaultVoiceId && (
+                    <div className={styles.reactionSection}>
+                      <div className={styles.reactionStatus}>
+                        {reactionStatus[persona.defaultVoiceId]?.isGenerating ? (
+                          <span className={styles.generatingBadge}>
+                            ⏳ Generating...
+                          </span>
+                        ) : reactionStatus[persona.defaultVoiceId]?.hasReactions ? (
+                          <span className={styles.hasReactionsBadge}>
+                            🎵 {reactionStatus[persona.defaultVoiceId]?.totalClips || 0} clips
+                          </span>
+                        ) : (
+                          <span className={styles.noReactionsBadge}>
+                            No reaction clips
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.reactionActions}>
+                        <button
+                          className={styles.reactionButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateReactions(persona);
+                          }}
+                          disabled={reactionStatus[persona.defaultVoiceId]?.isGenerating}
+                          title="Generate reaction clips for cross-talk"
+                        >
+                          {reactionStatus[persona.defaultVoiceId]?.hasReactions ? '🔄 Regenerate' : '✨ Generate'}
+                        </button>
+                        {reactionStatus[persona.defaultVoiceId]?.hasReactions && (
+                          <button
+                            className={styles.previewButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePreviewReactions(persona.defaultVoiceId!, persona.name);
+                            }}
+                            title="Preview reaction clips"
+                          >
+                            🔊 Preview
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -892,6 +1091,72 @@ export function AdminConfigPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Reaction Preview Modal */}
+      {previewingVoice && (
+        <div className={styles.modalOverlay} onClick={handleClosePreview}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2>Reaction Clips: {previewingVoice.personaName}</h2>
+            <p className={styles.modalSubtitle}>
+              Click on a clip to preview. These are used for cross-talk during podcasts.
+            </p>
+
+            {previewClips.length === 0 ? (
+              <div className={styles.noData}>No reaction clips found</div>
+            ) : (
+              <div className={styles.clipGrid}>
+                {['agreement', 'disagreement', 'interest', 'acknowledgment', 'challenge', 'amusement', 'surprise', 'skepticism'].map(category => {
+                  const categoryClips = previewClips.filter(c => c.category === category);
+                  if (categoryClips.length === 0) return null;
+
+                  return (
+                    <div key={category} className={styles.clipCategory}>
+                      <h3 className={styles.categoryTitle}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                        <span className={styles.clipCount}>{categoryClips.length}</span>
+                      </h3>
+                      <div className={styles.clipList}>
+                        {categoryClips.map((clip, index) => (
+                          <button
+                            key={index}
+                            className={`${styles.clipButton} ${playingClip === `${API_BASE_URL}${clip.audioUrl}` ? styles.playing : ''}`}
+                            onClick={() => handlePlayClip(`${API_BASE_URL}${clip.audioUrl}`)}
+                          >
+                            <span className={styles.clipIcon}>
+                              {playingClip === `${API_BASE_URL}${clip.audioUrl}` ? '⏸️' : '▶️'}
+                            </span>
+                            <span className={styles.clipText}>{clip.text}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Hidden audio element for playback */}
+            {playingClip && (
+              <audio
+                id="reactionAudio"
+                src={playingClip}
+                autoPlay
+                onEnded={() => setPlayingClip(null)}
+                onError={() => {
+                  setPlayingClip(null);
+                  setActionMessage({ type: 'error', text: 'Failed to play audio clip' });
+                }}
+              />
+            )}
+
+            <div className={styles.modalActions}>
+              <Button variant="ghost" onClick={handleClosePreview}>
+                Close
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

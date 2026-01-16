@@ -826,6 +826,198 @@
   max-width: 500px;
 }
 
+/* Reaction Section - Podcast Persona cards */
+.reactionSection {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.reactionStatus {
+  display: flex;
+  align-items: center;
+}
+
+.generatingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent-dark);
+  background: rgba(201, 162, 39, 0.15);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.hasReactionsBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-pro);
+  background: rgba(45, 106, 79, 0.15);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+.noReactionsBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  background: var(--color-bg-secondary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-style: italic;
+}
+
+.reactionActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.reactionButton,
+.previewButton {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.reactionButton:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent-dark);
+  background: rgba(201, 162, 39, 0.1);
+}
+
+.reactionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.previewButton:hover {
+  border-color: var(--color-pro);
+  color: var(--color-pro);
+  background: rgba(45, 106, 79, 0.1);
+}
+
+/* Modal Subtitle */
+.modalSubtitle {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  margin: calc(-1 * var(--spacing-md)) 0 var(--spacing-xl) 0;
+  line-height: var(--line-height-relaxed);
+}
+
+/* Clip Grid - Reaction Preview Modal */
+.clipGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.clipCategory {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+.categoryTitle {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md) 0;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.clipCount {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-muted);
+  background: var(--color-bg-secondary);
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}
+
+.clipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.clipButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.clipButton:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+}
+
+.clipButton.playing {
+  border-color: var(--color-pro);
+  color: var(--color-pro);
+  background: rgba(45, 106, 79, 0.1);
+}
+
+.clipIcon {
+  font-size: var(--font-size-xs);
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.clipText {
+  font-style: italic;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .container {

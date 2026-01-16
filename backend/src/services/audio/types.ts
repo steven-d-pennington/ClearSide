@@ -17,12 +17,13 @@ export type VoiceType = 'pro' | 'con' | 'moderator' | 'narrator';
  *
  * - elevenlabs: Premium quality, paid API ($5+ per month)
  * - gemini: Google Gemini 2.5 TTS via AI Studio API
+ * - vertex: Gemini 2.5 Flash Lite Preview TTS via Vertex AI (service account auth)
  * - google-cloud: Google Cloud Text-to-Speech (1M chars/month free)
  * - google-cloud-long: Google Cloud Long Audio Synthesis (async, up to 1MB input)
  * - azure: Microsoft Azure Cognitive Services TTS (500K chars/month free)
  * - edge: Microsoft Edge TTS (completely free, no API key needed)
  */
-export type TTSProvider = 'elevenlabs' | 'gemini' | 'google-cloud' | 'google-cloud-long' | 'azure' | 'edge';
+export type TTSProvider = 'elevenlabs' | 'gemini' | 'vertex' | 'google-cloud' | 'google-cloud-long' | 'azure' | 'edge';
 
 /**
  * TTS Provider metadata for UI display
@@ -345,6 +346,15 @@ export const TTS_PROVIDERS: Record<TTSProvider, TTSProviderInfo> = {
     quality: 'premium',
     requiresApiKey: true,
     envVar: 'GOOGLE_AI_API_KEY',
+  },
+  vertex: {
+    id: 'vertex',
+    name: 'Vertex AI TTS',
+    description: 'Gemini 2.5 Flash Lite Preview TTS via Vertex AI',
+    freeTier: 'Pay-as-you-go (service account required)',
+    quality: 'premium',
+    requiresApiKey: true,
+    envVar: 'GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON',
   },
   'google-cloud': {
     id: 'google-cloud',

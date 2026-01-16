@@ -12,6 +12,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import pino from 'pino';
 import type { AudioFormat, AudioProcessingResult } from './types.js';
+import type { ReactionMixInstruction } from '../../types/reactions.js';
 
 /**
  * Logger instance
@@ -261,6 +262,149 @@ export class AudioProcessor {
   }
 
   /**
+   * Mix reaction audio clips over the main audio at specified timestamps
+   *
+   * This creates the "cross-talk" effect where brief reactions (e.g., "Mm-hmm",
+   * "That's right") are overlaid on top of the main speaker's audio to make
+   * the podcast sound like participants are in a shared room.
+   *
+   * @param mainAudioPath - Path to the main audio file
+   * @param reactions - Array of reaction mix instructions with timing
+   * @param outputPath - Path for the output file
+   * @returns Processing result
+   */
+  async mixWithReactions(
+    mainAudioPath: string,
+    reactions: ReactionMixInstruction[],
+    outputPath: string
+  ): Promise<AudioProcessingResult> {
+    if (reactions.length === 0) {
+      // No reactions to mix, just copy the file
+      await fs.copyFile(mainAudioPath, outputPath);
+      const stats = await fs.stat(outputPath);
+      const info = await this.getAudioInfo(outputPath);
+
+      return {
+        outputPath,
+        fileSizeBytes: stats.size,
+        durationSeconds: info.duration,
+        metadata: {
+          format: this.getFormatFromPath(outputPath),
+          bitrate: '192k',
+          sampleRate: 44100,
+          channels: info.channels,
+        },
+      };
+    }
+
+    logger.info({
+      mainAudioPath,
+      reactionCount: reactions.length,
+      outputPath,
+    }, 'Mixing reactions into audio');
+
+    // Ensure output directory exists
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+
+    return new Promise((resolve, reject) => {
+      // Build FFmpeg command with multiple inputs
+      const command = ffmpeg();
+
+      // Add main audio as first input
+      command.input(mainAudioPath);
+
+      // Add each reaction audio as an input
+      for (const reaction of reactions) {
+        command.input(reaction.audioPath);
+      }
+
+      // Build the complex filter chain
+      // [0:a] is the main audio
+      // [1:a], [2:a], etc. are the reaction clips
+      const filterParts: string[] = [];
+
+      // Main audio stays at full volume
+      filterParts.push('[0:a]volume=1.0[main]');
+
+      // Each reaction gets delayed to its insertion point and volume adjusted
+      const reactionLabels: string[] = ['[main]'];
+
+      for (let i = 0; i < reactions.length; i++) {
+        const reaction = reactions[i];
+        if (!reaction) continue;
+
+        const inputIndex = i + 1; // reactions start at input 1
+        const label = `r${i}`;
+        const delayMs = Math.max(0, Math.round(reaction.insertAtMs));
+        const volume = reaction.volume || 0.7;
+
+        // Apply delay and volume to each reaction
+        // adelay format: delay_left|delay_right (in milliseconds)
+        filterParts.push(
+          `[${inputIndex}:a]adelay=${delayMs}|${delayMs},volume=${volume}[${label}]`
+        );
+        reactionLabels.push(`[${label}]`);
+      }
+
+      // Mix all audio streams together
+      // duration=first: output duration matches the main audio
+      // dropout_transition=0: no fade when streams end
+      const mixInputs = reactionLabels.join('');
+      filterParts.push(
+        `${mixInputs}amix=inputs=${reactionLabels.length}:duration=first:dropout_transition=0[out]`
+      );
+
+      const filterComplex = filterParts.join(';');
+
+      logger.debug({ filterComplex }, 'FFmpeg reaction mix filter');
+
+      command
+        .complexFilter(filterComplex)
+        .outputOptions(['-map', '[out]'])
+        .audioCodec('libmp3lame')
+        .outputOptions(['-b:a', '192k', '-ar', '44100'])
+        .output(outputPath)
+        .on('start', (cmd) => {
+          logger.debug({ cmd }, 'FFmpeg reaction mix started');
+        })
+        .on('progress', (progress) => {
+          logger.debug({ percent: progress.percent }, 'Reaction mix progress');
+        })
+        .on('end', async () => {
+          const stats = await fs.stat(outputPath);
+          const info = await this.getAudioInfo(outputPath);
+
+          logger.info({
+            outputPath,
+            reactionCount: reactions.length,
+            sizeBytes: stats.size,
+            duration: info.duration,
+          }, 'Reaction mixing complete');
+
+          resolve({
+            outputPath,
+            fileSizeBytes: stats.size,
+            durationSeconds: info.duration,
+            metadata: {
+              format: this.getFormatFromPath(outputPath),
+              bitrate: '192k',
+              sampleRate: 44100,
+              channels: info.channels,
+            },
+          });
+        })
+        .on('error', (err) => {
+          logger.error({
+            error: err.message,
+            reactionCount: reactions.length,
+          }, 'FFmpeg reaction mix failed');
+          reject(new Error(`Reaction audio mixing failed: ${err.message}`));
+        })
+        .run();
+    });
+  }
+
+  /**
    * Add silence/padding between audio files
    *
    * @param inputPath - Path to input audio
@@ -479,6 +623,27 @@ export class AudioProcessor {
         });
       });
     });
+  }
+
+  /**
+   * Probe an audio file to get its duration and metadata
+   *
+   * @param filePath - Path to audio file
+   * @returns Audio probe result with duration in seconds
+   */
+  async probeAudio(filePath: string): Promise<{
+    durationSeconds: number;
+    channels: number;
+    sampleRate: number;
+    bitrate: number;
+  }> {
+    const info = await this.getAudioInfo(filePath);
+    return {
+      durationSeconds: info.duration,
+      channels: info.channels,
+      sampleRate: info.sampleRate,
+      bitrate: info.bitrate,
+    };
   }
 
   /**

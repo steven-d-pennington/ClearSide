@@ -24,6 +24,7 @@ import { createRSSFeedService } from '../services/podcast/rss-feed-service.js';
 import { publishQueue } from '../services/queue/queue-manager.js';
 import { createLogger } from '../utils/logger.js';
 import { getRateLimiter } from '../services/llm/rate-limiter.js';
+import { getReactionLibrary } from '../services/audio/reaction-library.js';
 import type { DebateStatus, SystemEventType, EventSeverity } from '../types/database.js';
 
 const router = express.Router();
@@ -1484,6 +1485,326 @@ router.get('/admin/queue/failed', async (_req: Request, res: Response) => {
     logger.error({ errorMessage }, 'Failed to list failed jobs');
     res.status(500).json({
       error: 'Failed to list failed jobs',
+      message: errorMessage,
+    });
+  }
+});
+
+// =============================================================================
+// Reaction Library Management
+// =============================================================================
+
+/**
+ * GET /admin/reactions
+ * Get reaction library status and list of voices with reactions
+ */
+router.get('/admin/reactions', async (_req: Request, res: Response) => {
+  try {
+    const reactionLibrary = getReactionLibrary();
+    const availableVoices = await reactionLibrary.getAvailableVoices();
+
+    // Get clip counts for each voice
+    const voiceDetails = await Promise.all(
+      availableVoices.map(async (voiceId) => {
+        const counts = await reactionLibrary.getClipCounts(voiceId);
+        const totalClips = Object.values(counts).reduce((sum, n) => sum + n, 0);
+        return {
+          voiceId,
+          totalClips,
+          clipsByCategory: counts,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      voiceCount: availableVoices.length,
+      voices: voiceDetails,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to get reaction library status');
+    res.status(500).json({
+      error: 'Failed to get reaction library status',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /admin/reactions/generate
+ * Generate reaction clips for a voice
+ * Body: { voiceId: string, voiceName?: string, speakingStyle?: string, backstory?: string, accent?: string }
+ */
+router.post('/admin/reactions/generate', async (req: Request, res: Response) => {
+  try {
+    const { voiceId, voiceName, speakingStyle, backstory, accent } = req.body;
+
+    if (!voiceId || typeof voiceId !== 'string') {
+      res.status(400).json({
+        error: 'Missing required field: voiceId',
+      });
+      return;
+    }
+
+    logger.info({ voiceId, voiceName, hasCharacterContext: !!(speakingStyle || backstory || accent) }, 'Starting reaction clip generation');
+
+    const reactionLibrary = getReactionLibrary();
+
+    // Check if already has reactions
+    const hasReactions = await reactionLibrary.hasReactionsForVoice(voiceId);
+    if (hasReactions) {
+      const counts = await reactionLibrary.getClipCounts(voiceId);
+      res.json({
+        success: true,
+        message: 'Reactions already exist for this voice',
+        voiceId,
+        alreadyExists: true,
+        clipsByCategory: counts,
+      });
+      return;
+    }
+
+    // Build character context if provided
+    const characterContext = (speakingStyle || backstory || accent) ? {
+      speakingStyle,
+      backstory,
+      accent,
+    } : undefined;
+
+    // Generate reactions (this may take a while)
+    const generatedCount = await reactionLibrary.generateForVoice(voiceId, voiceName, characterContext);
+    const counts = await reactionLibrary.getClipCounts(voiceId);
+
+    logger.info({ voiceId, generatedCount }, 'Reaction clip generation complete');
+
+    res.json({
+      success: true,
+      message: `Generated ${generatedCount} reaction clips`,
+      voiceId,
+      generatedCount,
+      clipsByCategory: counts,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to generate reaction clips');
+    res.status(500).json({
+      error: 'Failed to generate reaction clips',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * DELETE /admin/reactions/:voiceId
+ * Delete all reaction clips for a voice
+ */
+router.delete('/admin/reactions/:voiceId', async (req: Request, res: Response) => {
+  try {
+    const { voiceId } = req.params;
+
+    if (!voiceId) {
+      res.status(400).json({
+        error: 'Missing required parameter: voiceId',
+      });
+      return;
+    }
+
+    logger.info({ voiceId }, 'Deleting reaction clips');
+
+    const reactionLibrary = getReactionLibrary();
+    await reactionLibrary.deleteForVoice(voiceId);
+
+    res.json({
+      success: true,
+      message: `Deleted reaction clips for voice ${voiceId}`,
+      voiceId,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to delete reaction clips');
+    res.status(500).json({
+      error: 'Failed to delete reaction clips',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/reactions/:voiceId
+ * Get reaction clips for a specific voice with audio URLs for preview
+ */
+router.get('/admin/reactions/:voiceId', async (req: Request, res: Response) => {
+  try {
+    const { voiceId } = req.params;
+
+    if (!voiceId) {
+      res.status(400).json({
+        error: 'Missing required parameter: voiceId',
+      });
+      return;
+    }
+
+    const reactionLibrary = getReactionLibrary();
+    const hasReactions = await reactionLibrary.hasReactionsForVoice(voiceId);
+
+    if (!hasReactions) {
+      res.json({
+        success: true,
+        voiceId,
+        hasReactions: false,
+        clips: [],
+      });
+      return;
+    }
+
+    const counts = await reactionLibrary.getClipCounts(voiceId);
+
+    // Get all clips for this voice from manifest
+    const allClips = await reactionLibrary.getAllClipsForVoice(voiceId);
+    const clips = allClips.map(clip => ({
+      category: clip.category,
+      text: clip.text,
+      audioUrl: `/api/admin/reactions/${voiceId}/audio/${encodeURIComponent(clip.text)}`,
+    }));
+
+    res.json({
+      success: true,
+      voiceId,
+      hasReactions: true,
+      clipsByCategory: counts,
+      totalClips: Object.values(counts).reduce((sum, n) => sum + n, 0),
+      clips,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to get reaction clips');
+    res.status(500).json({
+      error: 'Failed to get reaction clips',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * GET /admin/reactions/:voiceId/audio/:phrase
+ * Stream a specific reaction audio clip for preview
+ */
+router.get('/admin/reactions/:voiceId/audio/:phrase', async (req: Request, res: Response) => {
+  try {
+    const { voiceId, phrase } = req.params;
+
+    if (!voiceId || !phrase) {
+      res.status(400).json({
+        error: 'Missing required parameters',
+      });
+      return;
+    }
+
+    const decodedPhrase = decodeURIComponent(phrase);
+    const fs = await import('fs');
+    const path = await import('path');
+
+    // Sanitize phrase for filename
+    const sanitized = decodedPhrase
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // Try each category (all 8 categories)
+    const allCategories = ['agreement', 'disagreement', 'interest', 'acknowledgment', 'challenge', 'amusement', 'surprise', 'skepticism'] as const;
+    for (const category of allCategories) {
+      const filename = `${category}_${sanitized}.mp3`;
+      const audioPath = path.join('./assets/reactions', voiceId, filename);
+
+      if (fs.existsSync(audioPath)) {
+        const stat = fs.statSync(audioPath);
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Length', stat.size);
+        res.setHeader('Accept-Ranges', 'bytes');
+
+        const stream = fs.createReadStream(audioPath);
+        stream.pipe(res);
+        return;
+      }
+    }
+
+    res.status(404).json({ error: 'Reaction clip not found' });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to stream reaction audio');
+    res.status(500).json({
+      error: 'Failed to stream reaction audio',
+      message: errorMessage,
+    });
+  }
+});
+
+/**
+ * POST /admin/reactions/generate-all
+ * Generate reaction clips for all voices used in recent conversations
+ * This finds unique voice IDs from conversation personas and generates clips for each
+ */
+router.post('/admin/reactions/generate-all', async (req: Request, res: Response) => {
+  try {
+    // Get voice IDs from request body, or we could query from personas
+    const { voiceIds } = req.body as { voiceIds?: string[] };
+
+    if (!voiceIds || !Array.isArray(voiceIds) || voiceIds.length === 0) {
+      res.status(400).json({
+        error: 'Missing required field: voiceIds (array of voice IDs)',
+        hint: 'Provide an array of ElevenLabs/Gemini voice IDs to generate reactions for',
+      });
+      return;
+    }
+
+    logger.info({ voiceCount: voiceIds.length }, 'Starting bulk reaction generation');
+
+    const reactionLibrary = getReactionLibrary();
+    const results: Array<{
+      voiceId: string;
+      status: 'generated' | 'skipped' | 'error';
+      generatedCount?: number;
+      error?: string;
+    }> = [];
+
+    for (const voiceId of voiceIds) {
+      try {
+        const hasReactions = await reactionLibrary.hasReactionsForVoice(voiceId);
+        if (hasReactions) {
+          results.push({ voiceId, status: 'skipped' });
+          continue;
+        }
+
+        const generatedCount = await reactionLibrary.generateForVoice(voiceId);
+        results.push({ voiceId, status: 'generated', generatedCount });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        results.push({ voiceId, status: 'error', error: errorMessage });
+      }
+    }
+
+    const generated = results.filter(r => r.status === 'generated').length;
+    const skipped = results.filter(r => r.status === 'skipped').length;
+    const errors = results.filter(r => r.status === 'error').length;
+
+    logger.info({ generated, skipped, errors }, 'Bulk reaction generation complete');
+
+    res.json({
+      success: true,
+      summary: {
+        total: voiceIds.length,
+        generated,
+        skipped,
+        errors,
+      },
+      results,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error({ errorMessage }, 'Failed to generate bulk reaction clips');
+    res.status(500).json({
+      error: 'Failed to generate bulk reaction clips',
       message: errorMessage,
     });
   }

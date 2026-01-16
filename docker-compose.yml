@@ -72,6 +72,9 @@ services:
       GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON: ${GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON:-}
       GOOGLE_CLOUD_TTS_BUCKET: ${GOOGLE_CLOUD_TTS_BUCKET:-}
       GOOGLE_CLOUD_PROJECT_ID: ${GOOGLE_CLOUD_PROJECT_ID:-}
+      # Vertex AI TTS (Gemini 2.5 Flash Lite Preview)
+      VERTEX_AI_REGION: ${VERTEX_AI_REGION:-us-central1}
+      VERTEX_TTS_MODEL: ${VERTEX_TTS_MODEL:-gemini-2.5-flash-lite-preview-tts}
       LLM_DEFAULT_MODEL: ${LLM_DEFAULT_MODEL:-gpt-4}
       # Vector Database (Pinecone) for RAG
       PINECONE_API_KEY: ${PINECONE_API_KEY:-}
