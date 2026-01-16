@@ -2264,6 +2264,65 @@ ${segment.content}`;
           .replace(/\.\s+(But|However|Yet|Now|Well)\b/g, '.<break time="500ms"/> $1');
       }
 
+      // For Gemini, prepend director's notes for proper voice direction
+      if (ttsProvider === 'gemini') {
+        // Get the refined script to access director's notes
+        const llmClient = createOpenRouterClient('anthropic/claude-haiku-4.5');
+        const refiner = createConversationScriptRefiner(pool, llmClient);
+        const script = await refiner.refineWithLLMEnhancement(id, 'gemini');
+
+        if (script.geminiDirectorNotes) {
+          // Find the speaker name for this segment from saved script or use generic
+          const savedScript = await sessionRepo.getRefinedScript(id);
+          const segment = savedScript?.segments?.[segmentIndex];
+          const speakerName = segment?.speakerName || 'Speaker';
+
+          const { showContext, speakerDirections, sceneContext, pacingNotes } = script.geminiDirectorNotes;
+          const speakerDirection = speakerDirections[speakerName];
+
+          // Build the full prompt with director's notes
+          const promptParts: string[] = [];
+
+          if (speakerDirection) {
+            promptParts.push(
+              `# AUDIO PROFILE: ${speakerDirection.characterProfile}`,
+              '',
+              speakerDirection.vocalStyle,
+              ''
+            );
+          }
+
+          promptParts.push(
+            '## THE SCENE',
+            '',
+            sceneContext,
+            '',
+            showContext,
+            ''
+          );
+
+          promptParts.push('### DIRECTOR\'S NOTES', '');
+
+          if (speakerDirection) {
+            promptParts.push(speakerDirection.performanceNotes, '');
+          }
+
+          promptParts.push(pacingNotes, '');
+
+          promptParts.push('#### TRANSCRIPT', '', processedContent);
+
+          processedContent = promptParts.join('\n');
+
+          logger.debug({
+            sessionId: id,
+            segmentIndex,
+            speakerName,
+            hasDirectorNotes: true,
+            promptLength: processedContent.length,
+          }, 'Prepended Gemini director notes to segment preview');
+        }
+      }
+
       const ttsService = getTTSService(serviceProvider);
 
       logger.info({
@@ -2271,7 +2330,7 @@ ${segment.content}`;
         segmentIndex,
         voiceId,
         provider: ttsProvider,
-        contentLength: content.length,
+        contentLength: processedContent.length,
       }, 'Generating segment preview');
 
       // Generate audio with custom voice ID
