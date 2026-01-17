@@ -19,12 +19,13 @@ type ExternalServiceId =
   | 'openrouter'
   | 'openai'
   | 'pinecone'
-  | 'listen-notes';
+  | 'listen-notes'
+  | 'ffmpeg-stitch';
 
 interface ExternalServiceInfo {
   id: ExternalServiceId;
   name: string;
-  category: 'tts' | 'llm' | 'research' | 'vector';
+  category: 'tts' | 'llm' | 'research' | 'vector' | 'audio';
   description: string;
   configured: boolean;
   keyPreview?: string | null;
@@ -89,6 +90,7 @@ const SERVICE_FIELDS: Record<ExternalServiceId, ServiceFieldConfig[]> = {
   'listen-notes': [
     { id: 'apiKey', label: 'API Key', type: 'text', placeholder: 'Paste Listen Notes API key' },
   ],
+  'ffmpeg-stitch': [],
 };
 
 export function AdminTestingPage() {
