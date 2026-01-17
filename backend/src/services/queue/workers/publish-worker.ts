@@ -281,7 +281,7 @@ async function getAudioStats(audioUrl: string): Promise<{ fileSizeBytes: number 
     return { fileSizeBytes: 0 };
   }
 
-  const exportsDir = process.env.EXPORTS_DIR || './exports';
+  const exportsDir = process.env.EXPORTS_DIR || '/storage/exports';
   const relativePath = audioUrl.replace(/^\/exports\//, '');
   const filePath = path.resolve(exportsDir, relativePath);
 

@@ -85,10 +85,10 @@ export interface PipelineConfig {
 }
 
 /**
- * Default directories
+ * Default directories - using /storage mount for persistence
  */
-const DEFAULT_EXPORTS_DIR = './exports/podcasts';
-const DEFAULT_TEMP_DIR = './temp/podcasts';
+const DEFAULT_EXPORTS_DIR = process.env.EXPORTS_DIR || '/storage/exports/podcasts';
+const DEFAULT_TEMP_DIR = process.env.TEMP_DIR || '/storage/temp/podcasts';
 
 /**
  * Podcast Generation Pipeline
