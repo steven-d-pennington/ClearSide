@@ -64,7 +64,8 @@ app.use((req, res, next) => {
 });
 
 // Parse cookies (for JWT authentication)
-app.use(cookieParser());
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use(cookieParser() as any);
 
 // Parse JSON request bodies
 app.use(express.json());
