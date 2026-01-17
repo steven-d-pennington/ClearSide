@@ -84,8 +84,8 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Serve static files from exports directory
-const exportsDir = process.env.EXPORTS_DIR || './exports';
+// Serve static files from exports directory (using /storage mount for persistence)
+const exportsDir = process.env.EXPORTS_DIR || '/storage/exports';
 app.use('/exports', express.static(path.resolve(exportsDir)));
 app.use('/public', express.static(path.resolve('public')));
 

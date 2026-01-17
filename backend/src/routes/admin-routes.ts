@@ -1361,11 +1361,12 @@ router.post('/admin/testing/services/:serviceId/test', async (req: Request, res:
         // Test FFmpeg audio concatenation using generated test tones
         const fs = await import('fs/promises');
         const pathModule = await import('path');
-        const os = await import('os');
 
-        const tempDir = await fs.mkdtemp(pathModule.join(os.tmpdir(), 'ffmpeg-stitch-test-'));
+        const tempBaseDir = process.env.TEMP_DIR || '/storage/temp';
+        await fs.mkdir(tempBaseDir, { recursive: true });
+        const tempDir = await fs.mkdtemp(pathModule.join(tempBaseDir, 'ffmpeg-stitch-test-'));
         const checks: ExternalServiceTestResult[] = [];
-        const REACTIONS_DIR = './assets/reactions';
+        const REACTIONS_DIR = process.env.REACTIONS_DIR || '/storage/assets/reactions';
 
         try {
           // Step 1: Check if reaction files exist, otherwise generate test tones
@@ -1842,10 +1843,11 @@ router.get('/admin/reactions/:voiceId/audio/:phrase', async (req: Request, res: 
       .replace(/^-|-$/g, '');
 
     // Try each category (all 8 categories)
+    const reactionsDir = process.env.REACTIONS_DIR || '/storage/assets/reactions';
     const allCategories = ['agreement', 'disagreement', 'interest', 'acknowledgment', 'challenge', 'amusement', 'surprise', 'skepticism'] as const;
     for (const category of allCategories) {
       const filename = `${category}_${sanitized}.mp3`;
-      const audioPath = path.join('./assets/reactions', voiceId, filename);
+      const audioPath = path.join(reactionsDir, voiceId, filename);
 
       if (fs.existsSync(audioPath)) {
         const stat = fs.statSync(audioPath);

@@ -26,9 +26,9 @@ const logger = pino({
 });
 
 /**
- * Default directory for storing reaction audio clips
+ * Default directory for storing reaction audio clips - using /storage mount for persistence
  */
-const DEFAULT_REACTIONS_DIR = './assets/reactions';
+const DEFAULT_REACTIONS_DIR = process.env.REACTIONS_DIR || '/storage/assets/reactions';
 
 /**
  * Manifest filename

@@ -76,9 +76,9 @@ export class AudioExportOrchestrator {
     this.audioProcessor = createAudioProcessor();
     this.id3Manager = createID3Manager();
 
-    // Use persistent storage (mounted in Docker) instead of /tmp
-    this.workDir = config.workDir || './temp/audio';
-    this.outputDir = config.outputDir || './exports/audio';
+    // Use persistent storage mount for all file operations
+    this.workDir = config.workDir || process.env.AUDIO_TEMP_DIR || '/storage/temp/audio';
+    this.outputDir = config.outputDir || process.env.AUDIO_EXPORTS_DIR || '/storage/exports/audio';
     this.baseUrl = config.baseUrl || '/api/exports/audio';
 
     logger.info(

@@ -2340,7 +2340,8 @@ ${segment.content}`;
       const fs = await import('fs/promises');
       const path = await import('path');
 
-      const previewDir = path.join(process.cwd(), 'exports', 'previews', id);
+      const previewBaseDir = process.env.PREVIEWS_DIR || '/storage/exports/previews';
+      const previewDir = path.join(previewBaseDir, id);
       await fs.mkdir(previewDir, { recursive: true });
 
       const audioFilename = `segment-${segmentIndex}-${Date.now()}.mp3`;
@@ -2561,7 +2562,8 @@ ${segment.content}`;
 
       // Also delete the preview directory
       const path = await import('path');
-      const previewDir = path.join(process.cwd(), 'exports', 'previews', id);
+      const previewBaseDir = process.env.PREVIEWS_DIR || '/storage/exports/previews';
+      const previewDir = path.join(previewBaseDir, id);
       try {
         await fs.rm(previewDir, { recursive: true, force: true });
       } catch {

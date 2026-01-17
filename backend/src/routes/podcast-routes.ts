@@ -970,7 +970,7 @@ router.post('/:jobId/reset-generation', async (req: Request, res: Response): Pro
         }
 
         // Clear temp files
-        const tempDir = process.env.TEMP_DIR || './temp/podcasts';
+        const tempDir = process.env.TEMP_DIR || '/storage/temp/podcasts';
         const workDir = path.join(tempDir, jobId!);
 
         try {
@@ -1031,7 +1031,7 @@ router.get('/:jobId/stream', async (req: Request, res: Response): Promise<void> 
         logger.info({ jobId }, 'Restart requested - clearing existing segments');
 
         // Clear temp files
-        const tempDir = process.env.TEMP_DIR || './temp/podcasts';
+        const tempDir = process.env.TEMP_DIR || '/storage/temp/podcasts';
         const workDir = path.join(tempDir, jobId!);
 
         try {
@@ -1104,7 +1104,7 @@ router.delete('/:jobId/temp', async (req: Request, res: Response): Promise<void>
         }
 
         // Build temp directory path
-        const tempDir = process.env.TEMP_DIR || './temp/podcasts';
+        const tempDir = process.env.TEMP_DIR || '/storage/temp/podcasts';
         const workDir = path.join(tempDir, jobId!);
 
         let filesDeleted = 0;
@@ -1198,7 +1198,7 @@ router.post('/:jobId/recover', async (req: Request, res: Response): Promise<void
             'Fetched ElevenLabs history for recovery');
 
         // Create temp directory
-        const tempDir = process.env.TEMP_DIR || './temp/podcasts';
+        const tempDir = process.env.TEMP_DIR || '/storage/temp/podcasts';
         const workDir = path.join(tempDir, jobId!);
         const fsPromises = await import('fs/promises');
         await fsPromises.mkdir(workDir, { recursive: true });
