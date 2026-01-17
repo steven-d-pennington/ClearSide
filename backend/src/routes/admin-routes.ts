@@ -20,6 +20,7 @@ import { GoogleAuth } from 'google-auth-library';
 import {
   parseServiceAccountJson,
 } from '../services/audio/google-cloud-long-audio-service.js';
+import { createAudioProcessor } from '../services/audio/audio-processor.js';
 import { createRSSFeedService } from '../services/podcast/rss-feed-service.js';
 import { publishQueue } from '../services/queue/queue-manager.js';
 import { createLogger } from '../utils/logger.js';
@@ -1082,6 +1083,14 @@ router.get('/admin/testing/services', (_req: Request, res: Response) => {
       configured: !!process.env.LISTEN_NOTES_API_KEY,
       keyPreview: maskKey(process.env.LISTEN_NOTES_API_KEY),
     },
+    {
+      id: 'ffmpeg-stitch',
+      name: 'FFmpeg Audio Stitch',
+      category: 'audio',
+      description: 'Tests FFmpeg audio concatenation used in podcast export.',
+      configured: true, // FFmpeg is always available if the app runs
+      keyPreview: null,
+    },
   ];
 
   res.json({ services });
@@ -1345,6 +1354,124 @@ router.post('/admin/testing/services/:serviceId/test', async (req: Request, res:
         finish(true, 'Listen Notes API reachable.', {
           termCount: response.data?.terms?.length || 0,
         });
+        return;
+      }
+      case 'ffmpeg-stitch': {
+        // Test FFmpeg audio concatenation using generated test tones
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const os = await import('os');
+
+        const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ffmpeg-stitch-test-'));
+        const checks: ExternalServiceTestResult[] = [];
+
+        try {
+          // Step 1: Check if reaction files exist, otherwise generate test tones
+          const reactionLibrary = getReactionLibrary();
+          const manifest = await reactionLibrary.getManifest();
+          const voiceIds = Object.keys(manifest.voices || {});
+
+          let testFiles: string[] = [];
+          let usingReactions = false;
+
+          if (voiceIds.length > 0) {
+            // Try to use existing reaction files
+            const firstVoice = voiceIds[0];
+            const clips = manifest.voices[firstVoice]?.clips || [];
+            const existingClips = clips.slice(0, 3);
+
+            for (const clip of existingClips) {
+              try {
+                await fs.access(clip.path);
+                testFiles.push(clip.path);
+              } catch {
+                // File doesn't exist, will fall back to generated tones
+              }
+            }
+
+            if (testFiles.length >= 2) {
+              usingReactions = true;
+              checks.push({
+                success: true,
+                message: `Found ${testFiles.length} reaction clips from voice "${firstVoice}"`,
+                durationMs: 0,
+              });
+            }
+          }
+
+          // If no reaction files, generate test tones
+          if (testFiles.length < 2) {
+            checks.push({
+              success: true,
+              message: 'No reaction clips found, generating test tones with FFmpeg',
+              durationMs: 0,
+            });
+
+            // Generate 3 short test tones (0.5s each, different frequencies)
+            const frequencies = [440, 880, 660]; // A4, A5, E5
+            for (let i = 0; i < frequencies.length; i++) {
+              const tonePath = path.join(tempDir, `test-tone-${i}.mp3`);
+              await new Promise<void>((resolve, reject) => {
+                exec(
+                  `ffmpeg -f lavfi -i "sine=frequency=${frequencies[i]}:duration=0.5" -c:a libmp3lame -b:a 128k "${tonePath}" -y`,
+                  { timeout: 10000 }
+                ).then(() => resolve()).catch(reject);
+              });
+              testFiles.push(tonePath);
+            }
+
+            checks.push({
+              success: true,
+              message: `Generated ${testFiles.length} test tones`,
+              durationMs: 0,
+            });
+          }
+
+          // Step 2: Concatenate the files
+          const outputPath = path.join(tempDir, 'stitched-output.mp3');
+          const audioProcessor = createAudioProcessor({ tempDir });
+
+          const concatStart = Date.now();
+          const result = await audioProcessor.concatenateSegments(testFiles, outputPath, 'mp3');
+          const concatDuration = Date.now() - concatStart;
+
+          checks.push({
+            success: true,
+            message: `Concatenation completed in ${concatDuration}ms`,
+            durationMs: concatDuration,
+          });
+
+          // Step 3: Verify the output file
+          const stats = await fs.stat(outputPath);
+          checks.push({
+            success: stats.size > 0,
+            message: `Output file size: ${stats.size} bytes, duration: ${result.durationSeconds?.toFixed(2)}s`,
+            durationMs: 0,
+          });
+
+          finish(true, 'FFmpeg stitch test passed', {
+            usingReactions,
+            inputFiles: testFiles.length,
+            outputSizeBytes: stats.size,
+            outputDurationSeconds: result.durationSeconds,
+          }, checks);
+
+        } catch (ffmpegError) {
+          const errorMessage = ffmpegError instanceof Error ? ffmpegError.message : String(ffmpegError);
+          checks.push({
+            success: false,
+            message: `FFmpeg error: ${errorMessage}`,
+            durationMs: 0,
+          });
+          finish(false, `FFmpeg stitch test failed: ${errorMessage}`, {}, checks);
+        } finally {
+          // Cleanup temp directory
+          try {
+            await fs.rm(tempDir, { recursive: true, force: true });
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
         return;
       }
       default: {
